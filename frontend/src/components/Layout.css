@@ -1,0 +1,315 @@
+/* Reset basics */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    font-family: sans-serif;
+}
+
+
+/* Sidebar */
+.sidebar {
+    width: 60px;
+    background-color: #1f2a37;
+    padding-top: 70px;
+    /* offset for top-nav */
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 900;
+}
+
+/* Sidebar links */
+.sidebar a {
+    display: block;
+    padding: 10px;
+    color: white;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.sidebar a:hover {
+    background-color: #4b5563;
+}
+
+/* Sidebar icon */
+.sidebar .icon {
+    font-size: 24px;
+    color: #9ca3af;
+}
+
+/* Main Wrapper */
+.main-wrapper {
+    display: flex;
+    padding-top: var(--topnav-height);
+}
+
+/* Main Content */
+.content-area {
+    flex: 1;
+    margin-left: 60px;
+    /* Sidebar width */
+    padding: 20px;
+    background-color: #0f172a;
+    /* Matches your dark theme */
+    min-height: calc(100vh - 70px);
+    /* Offset for top-nav */
+    color: white;
+}
+
+/* Light Theme Overrides */
+.bg-light {
+    background-color: #f9fafb;
+}
+
+.text-light {
+    color: white;
+}
+
+.text-dark {
+    color: black;
+}
+
+/* Dark Theme Overrides */
+.bg-dark {
+    background-color: #111827;
+}
+
+.text-dark {
+    color: white;
+}
+
+/* Main Content Light Mode */
+.main-content-light {
+    background-color: #ffffff;
+    color: #333;
+}
+
+/* Top Navigation */
+:root {
+    --topnav-bg: #1f2937;
+    --topnav-text: #ffffff;
+    --topnav-hover: #374151;
+    --topnav-height: 70px;
+    /* Adjusted height for better alignment */
+}
+
+.dark {
+    --topnav-bg: #111827;
+    --topnav-text: #f3f4f6;
+    --topnav-hover: #1f2937;
+}
+
+.top-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    background-color: var(--topnav-bg);
+    color: var(--topnav-text);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.top-nav-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    gap: 1.5rem;
+}
+
+.top-nav-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.top-nav-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+}
+
+.top-nav-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1;
+    gap: 1rem;
+}
+
+.top-nav-logo {
+    width: 7rem;
+    height: auto;
+}
+
+.top-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.top-nav-button {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    background-color: #3b82f6;
+    color: white;
+    transition: all 0.2s;
+}
+
+.top-nav-button:hover {
+    background-color: #2563eb;
+}
+
+.top-nav-icon-button {
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.top-nav-icon-button:hover {
+    background-color: var(--topnav-hover);
+}
+
+/* Buttons */
+button {
+    padding: 10px 20px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+/* Error Boundary */
+.error-boundary {
+    background-color: #f9fafb;
+    color: #333;
+    padding: 20px;
+    border-radius: 5px;
+}
+
+/* Footer */
+footer {
+    background-color: #1f2937;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+/* Links */
+a {
+    text-decoration: none;
+    color: #4b5563;
+}
+
+a:hover {
+    color: #2c3e50;
+}
+
+/* Utility Classes for Layout */
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.gap-4 {
+    gap: 1rem;
+}
+
+.px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+
+.min-h-screen {
+    min-height: 100vh;
+}
+
+.transition-all {
+    transition: all 0.3s ease;
+}
+
+.duration-300 {
+    transition-duration: 300ms;
+}
+
+/* Dark Theme Specific */
+.bg-gray-900 {
+    background-color: #1a202c;
+}
+
+.bg-gray-100 {
+    background-color: #f7fafc;
+}
+
+.bg-gray-800 {
+    background-color: #2d3748;
+}
+
+.text-white {
+    color: white;
+}
+
+.text-black {
+    color: black;
+}
+
+.bg-blue-600 {
+    background-color: #2563eb;
+}
+
+.bg-blue-500 {
+    background-color: #3b82f6;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #2c3e50;
+}

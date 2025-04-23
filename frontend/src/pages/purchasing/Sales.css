@@ -1,0 +1,156 @@
+/* General Styles */
+.sales-invoice-page {
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background-color: transparent;
+    min-height: 100vh;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+/* Dashboard Styles */
+.dashboard {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.dashboard h2 {
+    color: #555;
+    margin-bottom: 15px;
+}
+
+.metrics {
+    display: flex;
+    gap: 20px;
+}
+
+.metrics p {
+    background-color: #e3f2fd;
+    padding: 10px;
+    border-radius: 4px;
+    color: #1976d2;
+    font-weight: bold;
+}
+
+/* Invoice Form Styles */
+.invoice-form {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.invoice-form h2 {
+    color: #555;
+    margin-bottom: 15px;
+}
+
+.invoice-form label {
+    display: block;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.invoice-form input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.invoice-form button {
+    background-color: #1976d2;
+    color: #fff;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.invoice-form button:hover {
+    background-color: #1565c0;
+}
+
+/* Cart Styles */
+.cart {
+    margin-top: 20px;
+}
+
+.cart h3 {
+    color: #555;
+    margin-bottom: 10px;
+}
+
+.cart-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.cart-item button {
+    background-color: #ff4444;
+    color: #fff;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cart-item button:hover {
+    background-color: #cc0000;
+}
+
+/* Invoice History Styles */
+.invoice-history {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.invoice-history h2 {
+    color: #555;
+    margin-bottom: 15px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+th {
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+tr:hover {
+    background-color: #f1f1f1;
+}
+
+@media print {
+    .no-print {
+        display: none;
+    }
+
+    .print-only {
+        display: block;
+    }
+}

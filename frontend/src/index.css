@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Root theme variables */
+:root {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --table-border-color: #e5e7eb;
+  --table-header-bg: #f3f4f6;
+  --table-row-hover-bg: #f9fafb;
+  --chart-line-color: #4f46e5;
+  --chart-fill-color: rgba(79, 70, 229, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #ffffff;
+    --text-color: #f9fafb;
+    --table-border-color: #374151;
+    --table-header-bg: #4b5563;
+    --table-row-hover-bg: #6b7280;
+    --chart-line-color: #93c5fd;
+    --chart-fill-color: rgba(147, 197, 253, 0.2);
+  }
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+@layer utilities {
+
+  /* Slide down animation */
+  .animate-slide-down {
+    animation: slideDown 0.5s ease-out;
+  }
+
+  @keyframes slideDown {
+    0% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* Floating animation */
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Glowing effect */
+  .animate-glow {
+    animation: glowPulse 2.5s ease-in-out infinite;
+  }
+
+  @keyframes glowPulse {
+    0% {
+      box-shadow: 0 0 5px #3b82f6;
+    }
+
+    50% {
+      box-shadow: 0 0 20px #3b82f6, 0 0 30px #06b6d4;
+    }
+
+    100% {
+      box-shadow: 0 0 5px #3b82f6;
+    }
+  }
+
+  /* Blinking effect */
+  .animate-blink {
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /* Gradient border animation */
+  .border-gradient {
+    background: linear-gradient(90deg, #3b82f6, #06b6d4, #3b82f6);
+    background-size: 300% 300%;
+    animation: gradientMove 5s ease infinite;
+  }
+
+  @keyframes gradientMove {
+    0% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
+
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+}
+
+.typing-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid #e0e0e0;
+  /* Cursor effect */
+  animation: typing 3s steps(30) 1s forwards, blink 0.75s step-end infinite;
+}

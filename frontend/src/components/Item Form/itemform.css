@@ -1,0 +1,252 @@
+/* General Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Form Container */
+.fixed {
+  background: transparent;
+  /* Dark overlay */
+  backdrop-filter: blur(6px);
+  /* Blur effect */
+}
+
+form {
+  background-color: #28182f;
+  width: 1000px;
+  max-width: 100%;
+  padding: 20px;
+  color: #545454;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+form.dark {
+  background-color: #1e293b;
+  color: #f0f4f8;
+}
+
+form h2 {
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+form button {
+  transition: all 0.3s ease;
+}
+
+/* Input Fields */
+.item-form-input {
+  border: 1px solid #d1d5db;
+  background-color: #f9fafb;
+  color: #111827;
+  font-size: 14px;
+  border-radius: 6px;
+  width: 100%;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.item-form-input:focus {
+  border-color: #4f46e5;
+  background-color: #ffffff;
+  outline: none;
+}
+
+form.dark .item-form-input {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  border: 1px solid #4a5568;
+}
+
+form.dark .item-form-input:focus {
+  border-color: #63b3ed;
+  background-color: #1a202c;
+}
+
+/* Labels */
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.item-form-required {
+  color: #ef4444;
+}
+
+/* Buttons */
+button {
+  padding: 10px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button[type="submit"] {
+  background-color: #4f46e5;
+  color: #ffffff;
+  border: none;
+}
+
+button[type="submit"]:hover {
+  background-color: #4338ca;
+}
+
+button[type="button"] {
+  background-color: #e5e7eb;
+  color: #333333;
+  border: none;
+}
+
+button[type="button"]:hover {
+  background-color: #d1d5db;
+}
+
+/* Grid Layout */
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.sm\:grid-cols-2 {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.col-span-full {
+  grid-column: span 3 / span 3;
+}
+
+/* Category Dropdown */
+select {
+  border: 1px solid #d1d5db;
+  background-color: #f9fafb;
+  padding: 10px 12px;
+  font-size: 14px;
+  border-radius: 6px;
+  width: 100%;
+}
+
+form.dark select {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  border: 1px solid #4a5568;
+}
+
+select:focus {
+  border-color: #4f46e5;
+}
+
+/* Description */
+.ql-container {
+  min-height: 120px;
+  font-size: 14px;
+  background-color: #f9fafb;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+form.dark .ql-container {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  border: 1px solid #4a5568;
+}
+
+.ql-toolbar {
+  background-color: #f3f4f6;
+  border-radius: 6px 6px 0 0;
+}
+
+form.dark .ql-toolbar {
+  background-color: #2d3748;
+}
+
+/* Spacing */
+.mt-1 {
+  margin-top: 8px;
+}
+
+.mt-6 {
+  margin-top: 24px;
+}
+
+.p-6 {
+  padding: 24px;
+}
+
+.pb-4 {
+  padding-bottom: 16px;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.space-x-4>*:not(:last-child) {
+  margin-right: 16px;
+}
+
+/* Hover Effects */
+.hover\:bg-gray-300:hover {
+  background-color: #e5e7eb;
+}
+
+.hover\:bg-indigo-700:hover {
+  background-color: #4338ca;
+}
+
+.hover\:text-blue-800:hover {
+  color: #1d4ed8;
+}
+
+/* Miscellaneous */
+.shadow-lg {
+  box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.rounded-md {
+  border-radius: 8px;
+}
+
+/* index.css or your global CSS file */
+.grid {
+  display: grid;
+  gap: 1rem;
+  /* Space between grid items */
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  /* Make inputs take full width of their grid cell */
+  padding: 0.5rem;
+  /* Add some padding */
+  border: 1px solid #ccc;
+  /* Add a border */
+  border-radius: 0.25rem;
+  /* Rounded corners */
+}
+
+textarea {
+  resize: vertical;
+  /* Allow vertical resizing */
+}
