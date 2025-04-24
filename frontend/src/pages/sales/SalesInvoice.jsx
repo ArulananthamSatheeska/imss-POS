@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { debounce } from 'lodash';
 
 const SalesInvoice = ({
     selectedCustomer,
@@ -34,16 +35,73 @@ const SalesInvoice = ({
     const [loading, setLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    const [products, setProducts] = useState([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Refs for auto-focus and keyboard navigation
     const firstInputRef = useRef(null);
     const itemRefs = useRef([]);
+
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            setLoadingProducts(true);
+            try {
+                // Use consistent base URL for API
+                let baseUrl = 'http://127.0.0.1:8000/api/products';
+                let url = baseUrl;
+                if (searchTerm) {
+                    url = `${baseUrl}/search?q=${encodeURIComponent(searchTerm)}`;
+                }
+
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    setProducts(data.data);
+                } else {
+                    console.error('Failed to fetch products');
+                }
+            } catch (error) {
+                console.error('Error fetching products:', error);
+            } finally {
+                setLoadingProducts(false);
+            }
+        };
+
+        const debouncedFetch = debounce(fetchProducts, 300);
+        debouncedFetch();
+
+        return () => debouncedFetch.cancel();
+    }, [searchTerm]);
+
 
     useEffect(() => {
         if (firstInputRef.current) {
             firstInputRef.current.focus();
         }
     }, []);
+
+    const handleProductSelect = (index, value) => {
+        const selectedProduct = products.find(p =>
+            p.product_name.toLowerCase() === value.toLowerCase() ||
+            (p.short_name && p.short_name.toLowerCase() === value.toLowerCase()) ||
+            p.item_code.toLowerCase() === value.toLowerCase() ||
+            (p.barcode && p.barcode.toLowerCase() === value.toLowerCase())
+        );
+
+        if (selectedProduct) {
+            const updatedItems = [...items];
+            updatedItems[index] = {
+                ...updatedItems[index],
+                description: selectedProduct.product_name,
+                unitPrice: selectedProduct.sales_price,
+                mrp: selectedProduct.mrp,
+                productId: selectedProduct.product_id,
+            };
+            setItems(updatedItems);
+        }
+    };
 
     // Persist draft to localStorage on changes
     useEffect(() => {
@@ -82,7 +140,13 @@ const SalesInvoice = ({
     const handleItemChange = (index, e) => {
         const { name, value } = e.target;
         const updatedItems = [...items];
-        updatedItems[index][name] = name === 'description' ? value : parseFloat(value) || 0;
+
+        if (name === 'description') {
+            setSearchTerm(value);
+            updatedItems[index][name] = value;
+        } else {
+            updatedItems[index][name] = name === 'description' ? value : parseFloat(value) || 0;
+        }
 
         // Calculate total based on quantity, unit price, and discounts
         const item = updatedItems[index];
@@ -412,23 +476,42 @@ const SalesInvoice = ({
                                     {items.map((item, index) => (
                                         <tr key={item.id} className={`border-t border-gray-700/30 ${index % 2 === 0 ? 'bg-gray-700/30' : 'bg-gray-700/20'} hover:bg-gray-700/40 transition-colors`}>
                                             <td className="p-2">
-                                                <input
-                                                    ref={el => {
-                                                        if (!itemRefs.current[index]) itemRefs.current[index] = {};
-                                                        itemRefs.current[index].description = el;
-                                                    }}
-                                                    type="text"
-                                                    name="description"
-                                                    value={item.description}
-                                                    onChange={(e) => handleItemChange(index, e)}
-                                                    onKeyDown={(e) => handleItemKeyDown(index, 'description', e)}
-                                                    className={`w-full p-2 bg-gray-700/20 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white transition-all ${errors[`itemDescription${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'}`}
-                                                    placeholder="Item description"
-                                                    aria-invalid={!!errors[`itemDescription${index}`]}
-                                                    aria-describedby={`itemDescriptionError${index}`}
-                                                    required
-                                                />
-                                                {errors[`itemDescription${index}`] && <p id={`itemDescriptionError${index}`} className="text-red-400 text-xs mt-1">{errors[`itemDescription${index}`]}</p>}
+                                                <div className="relative">
+                                                    <input
+                                                        ref={el => {
+                                                            if (!itemRefs.current[index]) itemRefs.current[index] = {};
+                                                            itemRefs.current[index].description = el;
+                                                        }}
+                                                        type="text"
+                                                        name="description"
+                                                        value={item.description}
+                                                        onChange={(e) => handleItemChange(index, e)}
+                                                        onBlur={(e) => handleProductSelect(index, e.target.value)}
+                                                        onKeyDown={(e) => handleItemKeyDown(index, 'description', e)}
+                                                        list={`productList${index}`}
+                                                        className={`w-full p-2 bg-gray-700/20 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white transition-all ${errors[`itemDescription${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'}`}
+                                                        placeholder="Search product..."
+                                                        aria-invalid={!!errors[`itemDescription${index}`]}
+                                                        aria-describedby={`itemDescriptionError${index}`}
+                                                        required
+                                                    />
+                                                    {loadingProducts && (
+                                                        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                                            <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                    <datalist id={`productList${index}`}>
+                                                        {products.map((product) => (
+                                                            <option key={product.product_id} value={product.product_name}>
+                                                                {product.item_code} - {product.sales_price} LKR
+                                                            </option>
+                                                        ))}
+                                                    </datalist>
+                                                    {errors[`itemDescription${index}`] && <p id={`itemDescriptionError${index}`} className="text-red-400 text-xs mt-1">{errors[`itemDescription${index}`]}</p>}
+                                                </div>
                                             </td>
                                             <td className="p-2">
                                                 <input

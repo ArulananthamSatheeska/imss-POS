@@ -58,6 +58,7 @@ Route::middleware(['api'])->group(function () {
     // Permission routes
     Route::apiResource('permissions', PermissionController::class)->except(['update']);
     // Other resource routes
+    Route::get('/products/search', [ProductController::class, 'search']);
     Route::apiResource('products', ProductController::class);
     Route::post('/products/import', [ProductController::class, 'import']);
     Route::apiResource('categories', CategoryController::class);

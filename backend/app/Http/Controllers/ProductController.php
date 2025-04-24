@@ -240,4 +240,26 @@ class ProductController extends Controller
                 : null,
         ], $status);
     }
+
+    public function search(Request $request)
+    {
+        $query = $request->input('q', '');
+
+        if (empty($query)) {
+            return response()->json([
+                'message' => 'Query parameter is required',
+                'data' => [],
+            ], 200);
+        }
+
+        $products = Product::where('product_name', 'LIKE', "%{$query}%")
+            // ->orWhere('short_name', 'LIKE', "%{$query}%") // Removed because 'short_name' may not exist in DB
+            ->orWhere('barcode', 'LIKE', "%{$query}%")
+            ->get();
+
+        return response()->json([
+            'message' => 'Products fetched successfully',
+            'data' => $products,
+        ], 200);
+    }
 }
