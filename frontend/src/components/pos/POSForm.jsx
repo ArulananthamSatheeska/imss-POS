@@ -377,7 +377,7 @@ const POSForm = () => {
         }`}
     >
       <div className="p-2 rounded-lg shadow-xl">
-        <div className="flex items-center justify-between w-full bg-slate-500 mt-0 mb-1 p-4 rounded-lg shadow-md">
+        <div className="flex items-center justify-between w-full p-4 mt-0 mb-1 rounded-lg shadow-md bg-slate-500">
           <div className="flex items-center space-x-4">
             <div>
               <label className="block font-bold">Sale Type</label>
@@ -456,7 +456,7 @@ const POSForm = () => {
               <input
                 ref={searchInputRef}
                 type="text"
-                className="w-full text-slate-700 px-4 py-2 border rounded-lg"
+                className="w-full px-4 py-2 border rounded-lg text-slate-700"
                 placeholder="Search by name, code, or barcode"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
@@ -464,7 +464,7 @@ const POSForm = () => {
               />
 
               {searchQuery.trim() !== "" && searchResults.length > 0 && (
-                <ul className="absolute z-50 w-60 border rounded-lg top-full bg-slate-50/5 backdrop-blur-sm shadow-lg max-h-60 overflow-auto">
+                <ul className="absolute z-50 overflow-auto border rounded-lg shadow-lg w-60 top-full bg-slate-50/5 backdrop-blur-sm max-h-60">
                   {searchResults.map((item, index) => (
                     <li
                       key={index}
@@ -482,7 +482,7 @@ const POSForm = () => {
 
               <input
                 type="text"
-                className="w-full bg-transparent text-amber-600 px-4 py-2 border rounded-lg"
+                className="w-full px-4 py-2 bg-transparent border rounded-lg text-amber-600"
                 readOnly
                 value={selectedProduct ? selectedProduct.product_name : ""}
               />
@@ -492,7 +492,7 @@ const POSForm = () => {
                   ref={quantityInputRef}
                   type="number"
                   step="0.01"
-                  className="w-20 bg-transparent px-4 py-2 border rounded-lg"
+                  className="w-20 px-4 py-2 bg-transparent border rounded-lg"
                   placeholder="Qty"
                   value={quantity}
                   onChange={(e) => setQuantity(parseFloat(e.target.value) || 1)}
@@ -513,18 +513,18 @@ const POSForm = () => {
             {/* Products Table */}
             <h2 className="mt-10 mb-2 text-lg font-bold">Selected Products</h2>
             <table className="w-full border border-gray-300">
-              <thead className="bg-gray-700 border text-amber-600 border-gray-300">
+              <thead className="bg-gray-700 border border-gray-300 text-amber-600">
                 <tr className="border border-gray-300">
-                  <th className="border border-gray-500 px-2 py-1">S.No</th>
-                  <th className="border border-gray-500 px-2 py-1">Name</th>
-                  <th className="border border-gray-500 px-2 py-1">MRP</th>
-                  <th className="border border-gray-500 px-2 py-1">Qty</th>
-                  <th className="border border-gray-500 px-2 py-1">U.Price</th>
-                  <th className="border border-gray-500 px-2 py-1">
+                  <th className="px-2 py-1 border border-gray-500">S.No</th>
+                  <th className="px-2 py-1 border border-gray-500">Name</th>
+                  <th className="px-2 py-1 border border-gray-500">MRP</th>
+                  <th className="px-2 py-1 border border-gray-500">Qty</th>
+                  <th className="px-2 py-1 border border-gray-500">U.Price</th>
+                  <th className="px-2 py-1 border border-gray-500">
                     U.Discount
                   </th>
-                  <th className="border border-gray-500 px-2 py-1">Total</th>
-                  <th className="px-2 py-2 flex justify-center items-center">
+                  <th className="px-2 py-1 border border-gray-500">Total</th>
+                  <th className="flex items-center justify-center px-2 py-2">
                     <Trash2 size={20} />
                   </th>
                 </tr>
@@ -532,19 +532,19 @@ const POSForm = () => {
               <tbody className="text-center">
                 {products.map((product, index) => (
                   <tr key={index} className="border border-gray-300">
-                    <td className="border border-gray-500 text-center px-2 py-1">
+                    <td className="px-2 py-1 text-center border border-gray-500">
                       {index + 1}
                     </td>
-                    <td className="border border-gray-500 text-left px-2 py-1">
+                    <td className="px-2 py-1 text-left border border-gray-500">
                       {product.product_name}
                     </td>
-                    <td className="border border-gray-500 text-right px-2 py-1">
+                    <td className="px-2 py-1 text-right border border-gray-500">
                       {formatNumberWithCommas(product.mrp)}
                     </td>
-                    <td className="border border-gray-500 text-center px-2 py-1">
+                    <td className="px-2 py-1 text-center border border-gray-500">
                       <input
                         type="number"
-                        className="w-16 bg-transparent text-center py-1 border rounded-lg"
+                        className="w-16 py-1 text-center bg-transparent border rounded-lg"
                         value={product.qty}
                         onChange={(e) =>
                           updateProductQuantity(
@@ -554,10 +554,10 @@ const POSForm = () => {
                         }
                       />
                     </td>
-                    <td className="border border-gray-500 px-2 py-1">
+                    <td className="px-2 py-1 border border-gray-500">
                       <input
                         type="number"
-                        className="w-28 bg-transparent text-right py-1 border rounded-lg"
+                        className="py-1 text-right bg-transparent border rounded-lg w-28"
                         value={product.price}
                         readOnly
                         onChange={(e) =>
@@ -568,18 +568,18 @@ const POSForm = () => {
                         }
                       />
                     </td>
-                    <td className="border border-gray-500 text-right px-2 py-1">
+                    <td className="px-2 py-1 text-right border border-gray-500">
                       {formatNumberWithCommas(product.discount.toFixed(2))}
                     </td>
-                    <td className="border border-gray-500 text-right px-2 py-1">
+                    <td className="px-2 py-1 text-right border border-gray-500">
                       {formatNumberWithCommas(
                         (product.qty * product.price).toFixed(2)
                       )}
                     </td>
-                    <td className="border text-center border-gray-500 px-2 py-1">
+                    <td className="px-2 py-1 text-center border border-gray-500">
                       <button
                         onClick={() => handleDeleteClick(index)}
-                        className="px-2 py-1 text-red-600 bg-red-200 rounded-lg hover:bg-red-300 flex items-center gap-1"
+                        className="flex items-center gap-1 px-2 py-1 text-red-600 bg-red-200 rounded-lg hover:bg-red-300"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -597,13 +597,13 @@ const POSForm = () => {
               >
                 <button
                   onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                  className="px-4 py-2 text-white bg-red-600 rounded-lg"
                 >
                   Yes, Delete
                 </button>
                 <button
                   onClick={cancelDelete}
-                  className="px-4 py-2 bg-gray-400 text-white rounded-lg"
+                  className="px-4 py-2 text-white bg-gray-400 rounded-lg"
                 >
                   Cancel
                 </button>
@@ -611,8 +611,8 @@ const POSForm = () => {
             )}
           </div>
 
-          <div className="p-4 min-w-80 w-full rounded-lg shadow-lg backdrop-blur-md bg-slate-700 bg-opacity-40">
-            <h2 className="mb- text-lg font-bold">Payment Details</h2>
+          <div className="w-full p-4 rounded-lg shadow-lg min-w-80 backdrop-blur-md bg-slate-700 bg-opacity-40">
+            <h2 className="text-lg font-bold mb-">Payment Details</h2>
             <div className="space-y-3">
               <div>
                 <label>Tax (%)</label>
@@ -681,9 +681,9 @@ const POSForm = () => {
               </h2>
             </div>
 
-            <div className="mt-4 justify-center flex gap-2">
+            <div className="flex justify-center gap-2 mt-4">
               <button
-                className="flex items-center gap-2 px-4 py-2 text-white bg-emerald-500 rounded-lg shadow hover:bg-emerald-300 hover:text-amber-600"
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg shadow bg-emerald-500 hover:bg-emerald-300 hover:text-amber-600"
                 onClick={holdSale}
               >
                 <PauseCircle size={18} /> Hold
@@ -701,7 +701,7 @@ const POSForm = () => {
               </button>
 
               <button
-                className="flex items-center gap-2 px-4 py-2 text-white bg-fuchsia-500 rounded-lg shadow hover:bg-fuchsia-300 hover:text-amber-600"
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg shadow bg-fuchsia-500 hover:bg-fuchsia-300 hover:text-amber-600"
                 onClick={handelOpenBill}
               >
                 <Printer size={18} /> Pay
