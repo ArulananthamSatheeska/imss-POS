@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { FiSearch, FiDownload, FiRefreshCw, FiChevronDown, FiChevronUp, FiPrinter } from "react-icons/fi";
 import { FaFilter, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { getData } from "../../services/api";
+import { getData, postData } from "../../services/api";
 import PrintableInvoice from './PrintableInvoice';
+import SalesInvoice from './SalesInvoice';
+import Quotation from './quatation';  // Import Quotation component
 
 const SalesReport = () => {
   // Date range setup
@@ -20,6 +22,8 @@ const SalesReport = () => {
   const [expandedRow, setExpandedRow] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [invoiceData, setInvoiceData] = useState(null);
+  const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
+  const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);  // State for Quotation form
 
   useEffect(() => {
     fetchReportData();
@@ -82,6 +86,16 @@ const SalesReport = () => {
     setInvoiceData(null);
   };
 
+  const handleEditSale = (row) => {
+    // Placeholder for edit sale functionality
+    console.log("Edit sale", row);
+  };
+
+  const handleDeleteSale = (id) => {
+    // Placeholder for delete sale functionality
+    console.log("Delete sale", id);
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -89,6 +103,49 @@ const SalesReport = () => {
       minimumFractionDigits: 2
     }).format(amount);
   };
+
+  const handleGenerateInvoice = async (newInvoice) => {
+    try {
+      await postData('/sales', newInvoice);
+      setIsInvoiceFormOpen(false);
+      fetchReportData();
+    } catch (error) {
+      console.error("Failed to create invoice:", error);
+      alert("Failed to create invoice. Please try again.");
+    }
+  };
+
+  const handleCancelInvoice = () => {
+    setIsInvoiceFormOpen(false);
+  };
+
+  const handleGenerateQuotation = () => {
+    // Placeholder for handling quotation save
+    setIsQuotationFormOpen(false);
+    fetchReportData();
+  };
+
+  const handleCancelQuotation = () => {
+    setIsQuotationFormOpen(false);
+  };
+
+  if (isInvoiceFormOpen) {
+    return (
+      <SalesInvoice
+        onGenerateInvoice={handleGenerateInvoice}
+        onCancel={handleCancelInvoice}
+      />
+    );
+  }
+
+  if (isQuotationFormOpen) {
+    return (
+      <Quotation
+        onGenerateQuotation={handleGenerateQuotation}
+        onCancel={handleCancelQuotation}
+      />
+    );
+  }
 
   return (
     <div className="p-4 min-h-screen flex flex-col  bg-transparent">
@@ -114,6 +171,18 @@ const SalesReport = () => {
         </div>
 
         <div className="flex gap-2">
+          <button
+            onClick={() => setIsInvoiceFormOpen(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Create Sales Entry
+          </button>
+          <button
+            onClick={() => setIsQuotationFormOpen(true)}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            Create Quotation
+          </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center gap-2 bg-white border dark:bg-slate-800 dark:border-gray-600 dark:text-gray-300  border-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -222,7 +291,7 @@ const SalesReport = () => {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600 text-sm">
               <thead className="bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 uppercase text-xs tracking-wider">
                 <tr>
-                  <th className="px-6 py-3 text-left font-semibold">Invoice #</th>
+                  <th className="px-6 py-3 text-left font-semibold">Invoice # / Bill #</th>
                   <th className="px-6 py-3 text-left font-semibold">Customer</th>
                   <th className="px-6 py-3 text-left font-semibold">Date</th>
                   <th className="px-6 py-3 text-left font-semibold">Amount</th>
@@ -245,14 +314,14 @@ const SalesReport = () => {
                         onClick={() => toggleRow(index)}
                       >
                         <td className="px-6 py-4 font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                          #{row.bill_number}
+                          #{row.bill_number} / {row.sales_invoice_number || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-semibold text-gray-900 dark:text-gray-100">{row.customer_name || 'Walk-in Customer'}</div>
                           <div className="text-gray-500 dark:text-gray-400">{row.customer_phone || ''}</div>
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                          {new Date(row.date || new Date()).toLocaleDateString()}
+                          {new Date(row.created_at || new Date()).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 font-bold text-gray-800 dark:text-white whitespace-nowrap">
                           {formatCurrency(row.total || 0)}
@@ -274,7 +343,25 @@ const SalesReport = () => {
                               }}
                               className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
                             >
-                              <FiPrinter size={16} /> Print
+                              <FiPrinter size={16} /> Reprint
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditSale(row);
+                              }}
+                              className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSale(row.id);
+                              }}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1"
+                            >
+                              Delete
                             </button>
                             <button
                               onClick={(e) => {
@@ -331,11 +418,11 @@ const SalesReport = () => {
                                     <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                                       {row.items?.map((item, i) => (
                                         <tr key={i}>
-                                          <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{item.name}</td>
+                                          <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{item.product_name}</td>
                                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{item.quantity}</td>
-                                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{formatCurrency(item.price || 0)}</td>
+                                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{formatCurrency(item.unit_price || 0)}</td>
                                           <td className="px-3 py-2 font-semibold text-gray-900 dark:text-white">
-                                            {formatCurrency((item.price || 0) * (item.quantity || 0))}
+                                            {formatCurrency((item.unit_price || 0) * (item.quantity || 0))}
                                           </td>
                                         </tr>
                                       ))}
@@ -355,7 +442,6 @@ const SalesReport = () => {
           </div>
         )}
       </div>
-
 
       {/* Invoice Modal */}
       {invoiceData && (
