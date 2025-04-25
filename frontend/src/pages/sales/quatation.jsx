@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import html2pdf from 'html2pdf.js';
 import PrintableQuotation from './PrintableQuotation';
-
 const Quotation = () => {
     const [quotations, setQuotations] = useState([]);
     const [showForm, setShowForm] = useState(false);

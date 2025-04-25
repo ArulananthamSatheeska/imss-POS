@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-const SalesInvoiceForm = ({
+const SalesInvoice = ({
     selectedCustomer,
     cartItems,
     onCustomerSelect,
@@ -9,26 +9,74 @@ const SalesInvoiceForm = ({
     onGenerateInvoice,
     onCancel,
 }) => {
-    const [customer, setCustomer] = useState(selectedCustomer || {
+    // Load draft from localStorage if available
+    const draftKey = 'salesInvoiceDraft';
+    const savedDraft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+
+    const [customer, setCustomer] = useState(savedDraft?.customer || selectedCustomer || {
         name: '',
         address: '',
         phone: '',
         email: '',
     });
 
-    const [items, setItems] = useState(cartItems || [
+    const [items, setItems] = useState(savedDraft?.items || cartItems || [
         { id: 1, description: '', qty: 1, unitPrice: 0, discountAmount: 0, discountPercentage: 0, total: 0 },
     ]);
 
-    const [invoice, setInvoice] = useState({
+    const [invoice, setInvoice] = useState(savedDraft?.invoice || {
         no: '',
         date: new Date().toISOString().split('T')[0],
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
 
+    const [errors, setErrors] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+
+    // Refs for auto-focus and keyboard navigation
+    const firstInputRef = useRef(null);
+    const itemRefs = useRef([]);
+
+    useEffect(() => {
+        if (firstInputRef.current) {
+            firstInputRef.current.focus();
+        }
+    }, []);
+
+    // Persist draft to localStorage on changes
+    useEffect(() => {
+        const draft = { customer, items, invoice };
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+    }, [customer, items, invoice]);
+
+    // Validation function
+    const validateForm = () => {
+        const newErrors = {};
+        if (!invoice.no.trim()) newErrors.invoiceNo = 'Invoice number is required';
+        if (!invoice.date) newErrors.invoiceDate = 'Invoice date is required';
+        if (!invoice.time) newErrors.invoiceTime = 'Invoice time is required';
+
+        if (!customer.name.trim()) newErrors.customerName = 'Customer name is required';
+        if (customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) newErrors.customerEmail = 'Invalid email address';
+
+        items.forEach((item, idx) => {
+            if (!item.description.trim()) newErrors[`itemDescription${idx}`] = 'Description is required';
+            if (item.qty <= 0) newErrors[`itemQty${idx}`] = 'Quantity must be greater than zero';
+            if (item.unitPrice < 0) newErrors[`itemUnitPrice${idx}`] = 'Unit price cannot be negative';
+            if (item.discountAmount < 0) newErrors[`itemDiscountAmount${idx}`] = 'Discount cannot be negative';
+            if (item.discountPercentage < 0 || item.discountPercentage > 100) newErrors[`itemDiscountPercentage${idx}`] = 'Discount % must be between 0 and 100';
+        });
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const handleCustomerChange = (e) => {
         const { name, value } = e.target;
         setCustomer({ ...customer, [name]: value });
+        setErrors((prev) => ({ ...prev, [`customer${name.charAt(0).toUpperCase() + name.slice(1)}`]: undefined }));
     };
 
     const handleItemChange = (index, e) => {
@@ -52,6 +100,9 @@ const SalesInvoiceForm = ({
 
         updatedItems[index].total = totalBeforeDiscount - updatedItems[index].discountAmount;
         setItems(updatedItems);
+
+        // Clear errors for this field
+        setErrors((prev) => ({ ...prev, [`item${name.charAt(0).toUpperCase() + name.slice(1)}${index}`]: undefined }));
     };
 
     const addItem = () => {
@@ -65,6 +116,12 @@ const SalesInvoiceForm = ({
             total: 0,
         };
         setItems([...items, newItem]);
+        setTimeout(() => {
+            const lastIndex = items.length;
+            if (itemRefs.current[lastIndex]) {
+                itemRefs.current[lastIndex].description.focus();
+            }
+        }, 0);
     };
 
     const removeItem = (index) => {
@@ -78,206 +135,392 @@ const SalesInvoiceForm = ({
         return items.reduce((sum, item) => sum + item.total, 0);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const newInvoice = {
-            ...invoice,
-            customer,
-            items,
-            total: calculateTotal(),
-            status: 'pending',
+        if (!validateForm()) {
+            setErrorMessage('Please fix the errors before submitting.');
+            return;
+        }
+        setLoading(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            const newInvoice = {
+                ...invoice,
+                customer,
+                items,
+                total: calculateTotal(),
+                status: 'pending',
+            };
+            await onGenerateInvoice(newInvoice);
+            setSuccessMessage('Invoice saved successfully!');
+            localStorage.removeItem(draftKey);
+        } catch (error) {
+            setErrorMessage('Failed to save invoice. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Keyboard shortcuts: Ctrl+S to save, Esc to cancel
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                document.getElementById('invoiceForm').requestSubmit();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                onCancel();
+            }
         };
-        onGenerateInvoice(newInvoice);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onCancel]);
+
+    // Handle Enter key navigation and adding new item
+    const handleItemKeyDown = (index, fieldName, e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const fieldsOrder = ['description', 'qty', 'unitPrice', 'discountAmount', 'discountPercentage'];
+            const currentFieldIndex = fieldsOrder.indexOf(fieldName);
+            if (currentFieldIndex === -1) return;
+
+            // Move to next field in current item
+            if (currentFieldIndex < fieldsOrder.length - 1) {
+                const nextField = fieldsOrder[currentFieldIndex + 1];
+                if (itemRefs.current[index] && itemRefs.current[index][nextField]) {
+                    itemRefs.current[index][nextField].focus();
+                }
+            } else {
+                // Last field, move to next item description or add new item
+                if (index < items.length - 1) {
+                    if (itemRefs.current[index + 1] && itemRefs.current[index + 1].description) {
+                        itemRefs.current[index + 1].description.focus();
+                    }
+                } else {
+                    addItem();
+                }
+            }
+        }
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-200 dark:bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50">
-            <div className="dark:bg-gray-800 p-8  rounded-lg shadow-xl w-full max-w-screen-xl max-h-[100vh] overflow-y-auto">
-                <h3 className="text-2xl font-bold mb-6 text-blue-400">Fill Invoice Details</h3>
+        <div className="fixed inset-0 bg-slate-200 dark:bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="invoiceTitle">
+            <div className="dark:bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-screen-2xl max-h-[95vh]">
+                <h3 id="invoiceTitle" className="text-3xl font-bold mb-6 text-blue-500">Fill Invoice Details</h3>
 
-                <form onSubmit={handleSubmit} className='dark:bg-gray-800 p-8  rounded-lg shadow-xl w-full max-w-screen-xl max-h-[100vh] overflow-y-auto'>
+                <form
+                    id="invoiceForm"
+                    onSubmit={handleSubmit}
+                    noValidate
+                    className="bg-gray-800/50 rounded-xl p-6 shadow-lg backdrop-blur-sm w-full max-h-[75vh] overflow-y-auto"
+                >   {/* Header */}
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-bold text-blue-400 mb-1">Create Invoice</h2>
+                        <p className="text-gray-400 text-sm">Fill in the details below to create a new invoice</p>
+                    </div>
+
                     {/* Invoice Details */}
-                    <div className="grid grid-cols-1  md:grid-cols-3 gap-4 mb-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">Invoice No:</label>
-                            <input
-                                type="text"
-                                name="no"
-                                value={invoice.no}
-                                onChange={(e) => setInvoice({ ...invoice, no: e.target.value })}
-                                className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                                placeholder="INV-001"
-                                required
-                            />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                        <div className="space-y-1">
+                            <label htmlFor="invoiceNo" className="block text-sm font-medium text-gray-300">Invoice No</label>
+                            <div className="relative">
+                                <input
+                                    id="invoiceNo"
+                                    ref={firstInputRef}
+                                    type="text"
+                                    name="no"
+                                    value={invoice.no}
+                                    onChange={(e) => setInvoice({ ...invoice, no: e.target.value })}
+                                    className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.invoiceNo ? 'border-red-500' : 'border-gray-600/50 hover:border-gray-500'}`}
+                                    placeholder="INV-001"
+                                    aria-invalid={!!errors.invoiceNo}
+                                    aria-describedby="invoiceNoError"
+                                    required
+                                />
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    <span className="text-gray-400 text-xs">#</span>
+                                </div>
+                            </div>
+                            {errors.invoiceNo && <p id="invoiceNoError" className="text-red-400 text-xs mt-1">{errors.invoiceNo}</p>}
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">Invoice Date:</label>
-                            <input
-                                type="date"
-                                name="date"
-                                value={invoice.date}
-                                onChange={(e) => setInvoice({ ...invoice, date: e.target.value })}
-                                className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                                required
-                            />
+
+                        <div className="space-y-1">
+                            <label htmlFor="invoiceDate" className="block text-sm font-medium text-gray-300">Date</label>
+                            <div className="relative">
+                                <input
+                                    id="invoiceDate"
+                                    type="date"
+                                    name="date"
+                                    value={invoice.date}
+                                    onChange={(e) => setInvoice({ ...invoice, date: e.target.value })}
+                                    className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.invoiceDate ? 'border-red-500' : 'border-gray-600/50 hover:border-gray-500'}`}
+                                    aria-invalid={!!errors.invoiceDate}
+                                    aria-describedby="invoiceDateError"
+                                    required
+                                />
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            {errors.invoiceDate && <p id="invoiceDateError" className="text-red-400 text-xs mt-1">{errors.invoiceDate}</p>}
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">Invoice Time:</label>
-                            <input
-                                type="time"
-                                name="time"
-                                value={invoice.time}
-                                onChange={(e) => setInvoice({ ...invoice, time: e.target.value })}
-                                className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                                required
-                            />
+
+                        <div className="space-y-1">
+                            <label htmlFor="invoiceTime" className="block text-sm font-medium text-gray-300">Time</label>
+                            <div className="relative">
+                                <input
+                                    id="invoiceTime"
+                                    type="time"
+                                    name="time"
+                                    value={invoice.time}
+                                    onChange={(e) => setInvoice({ ...invoice, time: e.target.value })}
+                                    className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.invoiceTime ? 'border-red-500' : 'border-gray-600/50 hover:border-gray-500'}`}
+                                    aria-invalid={!!errors.invoiceTime}
+                                    aria-describedby="invoiceTimeError"
+                                    required
+                                />
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            {errors.invoiceTime && <p id="invoiceTimeError" className="text-red-400 text-xs mt-1">{errors.invoiceTime}</p>}
                         </div>
                     </div>
 
                     {/* Customer Details */}
-                    <div className="mb-6">
-                        <h4 className="text-lg font-semibold text-blue-400 mb-4 border-b border-gray-700 pb-2">Customer Details</h4>
+                    <div className="mb-8">
+                        <div className="flex items-center mb-4">
+                            <div className="w-1 h-6 bg-blue-500 rounded-full mr-2"></div>
+                            <h4 className="text-lg font-semibold text-blue-400">Customer Information</h4>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Name:</label>
+                            <div className="space-y-1">
+                                <label htmlFor="customerName" className="block text-sm font-medium text-gray-300">Name</label>
                                 <input
+                                    id="customerName"
                                     type="text"
                                     name="name"
                                     value={customer.name}
                                     onChange={handleCustomerChange}
-                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                                    placeholder="Customer Name"
+                                    className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.customerName ? 'border-red-500' : 'border-gray-600/50 hover:border-gray-500'}`}
+                                    placeholder="John Doe"
+                                    aria-invalid={!!errors.customerName}
+                                    aria-describedby="customerNameError"
                                     required
                                 />
+                                {errors.customerName && <p id="customerNameError" className="text-red-400 text-xs mt-1">{errors.customerName}</p>}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Address:</label>
+
+                            <div className="space-y-1">
+                                <label htmlFor="customerAddress" className="block text-sm font-medium text-gray-300">Address</label>
                                 <input
+                                    id="customerAddress"
                                     type="text"
                                     name="address"
                                     value={customer.address}
                                     onChange={handleCustomerChange}
-                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                                    placeholder="Customer Address"
+                                    className="w-full p-3 bg-gray-700/80 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all hover:border-gray-500"
+                                    placeholder="123 Main St"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Phone:</label>
-                                <input
-                                    type="tel"
-                                    name="phone"
-                                    value={customer.phone}
-                                    onChange={handleCustomerChange}
-                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                                    placeholder="Phone Number"
-                                />
+
+                            <div className="space-y-1">
+                                <label htmlFor="customerPhone" className="block text-sm font-medium text-gray-300">Phone</label>
+                                <div className="relative">
+                                    <input
+                                        id="customerPhone"
+                                        type="tel"
+                                        name="phone"
+                                        value={customer.phone}
+                                        onChange={handleCustomerChange}
+                                        className="w-full p-3 bg-gray-700/80 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all hover:border-gray-500"
+                                        placeholder="+94 123 456 7890"
+                                    />
+                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        </svg>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Email:</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={customer.email}
-                                    onChange={handleCustomerChange}
-                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                                    placeholder="customer@example.com"
-                                />
+
+                            <div className="space-y-1">
+                                <label htmlFor="customerEmail" className="block text-sm font-medium text-gray-300">Email</label>
+                                <div className="relative">
+                                    <input
+                                        id="customerEmail"
+                                        type="email"
+                                        name="email"
+                                        value={customer.email}
+                                        onChange={handleCustomerChange}
+                                        className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.customerEmail ? 'border-red-500' : 'border-gray-600/50 hover:border-gray-500'}`}
+                                        placeholder="customer@example.com"
+                                        aria-invalid={!!errors.customerEmail}
+                                        aria-describedby="customerEmailError"
+                                    />
+                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                {errors.customerEmail && <p id="customerEmailError" className="text-red-400 text-xs mt-1">{errors.customerEmail}</p>}
                             </div>
                         </div>
                     </div>
 
                     {/* Item Table */}
-                    <div className="mb-6">
+                    <div className="mb-8">
                         <div className="flex justify-between items-center mb-4">
-                            <h4 className="text-lg font-semibold text-blue-400 border-b border-gray-700 pb-2">Items</h4>
+                            <div className="flex items-center">
+                                <div className="w-1 h-6 bg-blue-500 rounded-full mr-2"></div>
+                                <h4 className="text-lg font-semibold text-blue-400">Invoice Items</h4>
+                            </div>
                             <button
                                 type="button"
                                 onClick={addItem}
-                                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-all duration-300"
+                                className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-400 transition-all duration-300 shadow-md hover:shadow-blue-500/20"
+                                aria-label="Add item"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                                 </svg>
                                 Add Item
                             </button>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full mb-4">
+                        <div className="overflow-x-auto rounded-lg border border-gray-700/50 shadow-lg">
+                            <table className="w-full mb-4" role="grid" aria-label="Invoice items">
                                 <thead>
-                                    <tr className="bg-gray-700 text-gray-300">
-                                        <th className="p-3 text-left">Description</th>
-                                        <th className="p-3 text-center">Qty</th>
-                                        <th className="p-3 text-right">Price</th>
-                                        <th className="p-3 text-right">Discount (LKR)</th>
-                                        <th className="p-3 text-right">Discount (%)</th>
-                                        <th className="p-3 text-right">Total</th>
-                                        <th className="p-3 text-center">Actions</th>
+                                    <tr className="bg-gray-700/80 text-gray-300">
+                                        <th className="p-3 text-left text-sm font-medium" scope="col">Description</th>
+                                        <th className="p-3 text-left text-sm font-medium" scope="col">Qty</th>
+                                        <th className="p-3 text-left text-sm font-medium" scope="col">Price</th>
+                                        <th className="p-3 text-left text-sm font-medium" scope="col">Discount (LKR)</th>
+                                        <th className="p-3 text-left text-sm font-medium" scope="col">Discount (%)</th>
+                                        <th className="p-3 text-left text-sm font-medium" scope="col">Total</th>
+                                        <th className="p-3 text-left text-sm font-medium" scope="col">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.map((item, index) => (
-                                        <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                                        <tr key={item.id} className={`border-t border-gray-700/30 ${index % 2 === 0 ? 'bg-gray-700/30' : 'bg-gray-700/20'} hover:bg-gray-700/40 transition-colors`}>
                                             <td className="p-2">
                                                 <input
+                                                    ref={el => {
+                                                        if (!itemRefs.current[index]) itemRefs.current[index] = {};
+                                                        itemRefs.current[index].description = el;
+                                                    }}
                                                     type="text"
                                                     name="description"
                                                     value={item.description}
                                                     onChange={(e) => handleItemChange(index, e)}
-                                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-white"
+                                                    onKeyDown={(e) => handleItemKeyDown(index, 'description', e)}
+                                                    className={`w-full p-2 bg-gray-700/20 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white transition-all ${errors[`itemDescription${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'}`}
                                                     placeholder="Item description"
+                                                    aria-invalid={!!errors[`itemDescription${index}`]}
+                                                    aria-describedby={`itemDescriptionError${index}`}
                                                     required
                                                 />
+                                                {errors[`itemDescription${index}`] && <p id={`itemDescriptionError${index}`} className="text-red-400 text-xs mt-1">{errors[`itemDescription${index}`]}</p>}
                                             </td>
                                             <td className="p-2">
                                                 <input
+                                                    ref={el => {
+                                                        if (!itemRefs.current[index]) itemRefs.current[index] = {};
+                                                        itemRefs.current[index].qty = el;
+                                                    }}
                                                     type="number"
                                                     name="qty"
                                                     value={item.qty}
                                                     onChange={(e) => handleItemChange(index, e)}
-                                                    className="w-20 p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-white text-center"
+                                                    onKeyDown={(e) => handleItemKeyDown(index, 'qty', e)}
+                                                    className={`w-20 p-2 bg-gray-700/20 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-center transition-all ${errors[`itemQty${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'}`}
                                                     min="1"
+                                                    aria-invalid={!!errors[`itemQty${index}`]}
+                                                    aria-describedby={`itemQtyError${index}`}
                                                     required
                                                 />
+                                                {errors[`itemQty${index}`] && <p id={`itemQtyError${index}`} className="text-red-400 text-xs mt-1">{errors[`itemQty${index}`]}</p>}
+                                            </td>
+                                            <td className="p-2">
+                                                <div className="relative">
+                                                    <input
+                                                        ref={el => {
+                                                            if (!itemRefs.current[index]) itemRefs.current[index] = {};
+                                                            itemRefs.current[index].unitPrice = el;
+                                                        }}
+                                                        type="number"
+                                                        name="unitPrice"
+                                                        value={item.unitPrice}
+                                                        onChange={(e) => handleItemChange(index, e)}
+                                                        onKeyDown={(e) => handleItemKeyDown(index, 'unitPrice', e)}
+                                                        className={`w-28 p-2 bg-gray-700/20 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${errors[`itemUnitPrice${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'}`}
+                                                        min="0"
+                                                        step="0.01"
+                                                        aria-invalid={!!errors[`itemUnitPrice${index}`]}
+                                                        aria-describedby={`itemUnitPriceError${index}`}
+                                                        required
+                                                    />
+                                                    <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                                                        <span className="text-gray-400 text-xs">LKR</span>
+                                                    </div>
+                                                </div>
+                                                {errors[`itemUnitPrice${index}`] && <p id={`itemUnitPriceError${index}`} className="text-red-400 text-xs mt-1">{errors[`itemUnitPrice${index}`]}</p>}
                                             </td>
                                             <td className="p-2">
                                                 <input
-                                                    type="number"
-                                                    name="unitPrice"
-                                                    value={item.unitPrice}
-                                                    onChange={(e) => handleItemChange(index, e)}
-                                                    className="w-28 p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-white text-right"
-                                                    min="0"
-                                                    step="0.01"
-                                                    required
-                                                />
-                                            </td>
-                                            <td className="p-2">
-                                                <input
+                                                    ref={el => {
+                                                        if (!itemRefs.current[index]) itemRefs.current[index] = {};
+                                                        itemRefs.current[index].discountAmount = el;
+                                                    }}
                                                     type="number"
                                                     name="discountAmount"
                                                     value={item.discountAmount}
                                                     onChange={(e) => handleItemChange(index, e)}
-                                                    className="w-24 p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-white text-right"
+                                                    onKeyDown={(e) => handleItemKeyDown(index, 'discountAmount', e)}
+                                                    className={`w-24 p-2 bg-gray-700/20 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${errors[`itemDiscountAmount${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'}`}
                                                     min="0"
                                                     step="0.01"
+                                                    aria-invalid={!!errors[`itemDiscountAmount${index}`]}
+                                                    aria-describedby={`itemDiscountAmountError${index}`}
                                                 />
+                                                {errors[`itemDiscountAmount${index}`] && <p id={`itemDiscountAmountError${index}`} className="text-red-400 text-xs mt-1">{errors[`itemDiscountAmount${index}`]}</p>}
                                             </td>
                                             <td className="p-2">
-                                                <input
-                                                    type="number"
-                                                    name="discountPercentage"
-                                                    value={item.discountPercentage}
-                                                    onChange={(e) => handleItemChange(index, e)}
-                                                    className="w-20 p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-white text-right"
-                                                    min="0"
-                                                    max="100"
-                                                    step="0.01"
-                                                />
+                                                <div className="relative">
+                                                    <input
+                                                        ref={el => {
+                                                            if (!itemRefs.current[index]) itemRefs.current[index] = {};
+                                                            itemRefs.current[index].discountPercentage = el;
+                                                        }}
+                                                        type="number"
+                                                        name="discountPercentage"
+                                                        value={item.discountPercentage}
+                                                        onChange={(e) => handleItemChange(index, e)}
+                                                        onKeyDown={(e) => handleItemKeyDown(index, 'discountPercentage', e)}
+                                                        className={`w-20 p-2 bg-gray-700/20 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${errors[`itemDiscountPercentage${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'}`}
+                                                        min="0"
+                                                        max="100"
+                                                        step="0.01"
+                                                        aria-invalid={!!errors[`itemDiscountPercentage${index}`]}
+                                                        aria-describedby={`itemDiscountPercentageError${index}`}
+                                                    />
+                                                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                                        <span className="text-gray-400 text-xs">%</span>
+                                                    </div>
+                                                </div>
+                                                {errors[`itemDiscountPercentage${index}`] && <p id={`itemDiscountPercentageError${index}`} className="text-red-400 text-xs mt-1">{errors[`itemDiscountPercentage${index}`]}</p>}
                                             </td>
-                                            <td className="p-2">
-                                                <div className="w-32 p-2 bg-gray-700 rounded-md text-right">
-                                                    {item.total.toFixed(2)}
+                                            <td className="p-2 items-end">
+                                                <div className="w-32 p-2 bg-gray-700/30 rounded text-right text-white font-medium">
+                                                    LKR {item.total.toFixed(2)}
                                                 </div>
                                             </td>
                                             <td className="p-2 text-center">
@@ -285,10 +528,11 @@ const SalesInvoiceForm = ({
                                                     type="button"
                                                     onClick={() => removeItem(index)}
                                                     disabled={items.length <= 1}
-                                                    className={`p-2 rounded-md ${items.length <= 1 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                                                    className={`p-2 rounded-md transition-all ${items.length <= 1 ? 'bg-gray-600/30 text-gray-400 cursor-not-allowed' : 'bg-red-600/80 text-white hover:bg-red-500 shadow-md hover:shadow-red-500/20'}`}
                                                     title={items.length <= 1 ? "Can't remove the only item" : "Remove item"}
+                                                    aria-label={`Remove item ${index + 1}`}
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                                         <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                                                     </svg>
                                                 </button>
@@ -299,241 +543,89 @@ const SalesInvoiceForm = ({
                             </table>
                         </div>
 
-                        <div className="flex justify-end mt-4">
-                            <div className="bg-gray-700 p-4 rounded-lg w-64">
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-gray-300">Subtotal:</span>
-                                    <span className="text-white">{calculateTotal().toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-gray-300">Tax:</span>
-                                    <span className="text-white">0.00</span>
-                                </div>
-                                <div className="flex justify-between text-lg font-semibold border-t border-gray-600 pt-2">
-                                    <span className="text-gray-300">Total:</span>
-                                    <span className="text-blue-400">{calculateTotal().toFixed(2)}</span>
+                        <div className="flex justify-end mt-6">
+                            <div className="bg-gradient-to-br from-gray-700/80 to-gray-700/50 p-6 rounded-xl shadow-lg w-80">
+                                <div className="space-y-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-300">Subtotal:</span>
+                                        <span className="text-white font-medium">LKR {calculateTotal().toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-300">Tax (10%):</span>
+                                        <span className="text-white font-medium">LKR {(calculateTotal() * 0.1).toFixed(2)}</span>
+                                    </div>
+                                    <div className="pt-3 border-t border-gray-600/50">
+                                        <div className="flex justify-between text-right text-lg">
+                                            <span className="text-gray-300 font-semibold">Total:</span>
+                                            <span className="text-blue-400 font-bold">LKR {(calculateTotal() * 1.1).toFixed(2)}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex justify-end space-x-4 mt-6 border-t border-gray-700 pt-4">
+                    <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-700/50">
                         <button
                             type="button"
                             onClick={onCancel}
-                            className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-all duration-300 flex items-center"
+                            className="px-6 py-2.5 bg-gray-600/50 text-white rounded-lg hover:bg-gray-500/60 transition-all duration-300 flex items-center shadow-md hover:shadow-gray-500/10"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center"
+                            disabled={loading}
+                            className={`px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-400 transition-all duration-300 flex items-center shadow-md hover:shadow-blue-500/30 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            Save Invoice
+                            {loading ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                    </svg>
+                                    Processing...
+                                </>
+                            ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Save Invoice
+                                </>
+                            )}
                         </button>
                     </div>
+
+                    {/* Success/Error Notifications */}
+                    {successMessage && (
+                        <div role="alert" className="mt-6 p-4 bg-green-600/90 text-white rounded-lg shadow-lg animate-fade-in">
+                            <div className="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                {successMessage}
+                            </div>
+                        </div>
+                    )}
+                    {errorMessage && (
+                        <div role="alert" className="mt-6 p-4 bg-red-600/90 text-white rounded-lg shadow-lg animate-fade-in">
+                            <div className="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                {errorMessage}
+                            </div>
+                        </div>
+                    )}
                 </form>
             </div>
         </div>
     );
 };
 
-const Dashboard = () => {
-    const [invoices, setInvoices] = useState([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const handleGenerateInvoice = (newInvoice) => {
-        setInvoices([...invoices, { ...newInvoice, id: Date.now() }]);
-        setIsModalOpen(false);
-    };
-
-    const handleCancel = () => {
-        setIsModalOpen(false);
-    };
-
-    const filteredInvoices = invoices.filter(invoice =>
-        invoice.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.no.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    return (
-        <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                    <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-400">
-                        Sales Invoice Dashboard
-                    </h1>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow transition duration-300"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 mr-2"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                        >
-                            <path
-                                fillRule="evenodd"
-                                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                                clipRule="evenodd"
-                            />
-                        </svg>
-                        Create Invoice
-                    </button>
-                </div>
-
-                {/* Search Bar */}
-                <div className="mb-6">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Search invoices..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                        />
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 text-gray-500 dark:text-gray-400 absolute left-3 top-3.5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                        >
-                            <path
-                                fillRule="evenodd"
-                                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                                clipRule="evenodd"
-                            />
-                        </svg>
-                    </div>
-                </div>
-
-                {/* Invoices List */}
-                <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold text-blue-700 dark:text-blue-400">Recent Invoices</h2>
-                        <div className="text-sm text-gray-600 dark:text-gray-300">
-                            {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}
-                        </div>
-                    </div>
-
-                    {filteredInvoices.length === 0 ? (
-                        <div className="text-center py-12">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={1}
-                                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                            </svg>
-                            <p className="mt-4 text-gray-500 dark:text-gray-400">
-                                No invoices found. Create your first invoice!
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm">
-                                <thead>
-                                    <tr className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 uppercase text-xs tracking-wider">
-                                        <th className="p-3 text-left">Invoice No</th>
-                                        <th className="p-3 text-left">Customer</th>
-                                        <th className="p-3 text-left">Date</th>
-                                        <th className="p-3 text-right">Amount</th>
-                                        <th className="p-3 text-center">Status</th>
-                                        <th className="p-3 text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredInvoices.map((invoice) => (
-                                        <tr
-                                            key={invoice.id}
-                                            className="border-b border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-                                        >
-                                            <td className="p-3 text-blue-700 dark:text-blue-300 font-semibold">
-                                                {invoice.no}
-                                            </td>
-                                            <td className="p-3">{invoice.customer.name}</td>
-                                            <td className="p-3 text-gray-600 dark:text-gray-400">{invoice.date}</td>
-                                            <td className="p-3 text-right font-mono">LKR {invoice.total.toFixed(2)}</td>
-                                            <td className="p-3 text-center">
-                                                <span
-                                                    className={`px-3 py-1 rounded-full text-xs font-semibold ${invoice.status === 'paid'
-                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                        : invoice.status === 'pending'
-                                                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-                                                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                                                        }`}
-                                                >
-                                                    {invoice.status}
-                                                </span>
-                                            </td>
-                                            <td className="p-3 text-center flex justify-center space-x-2">
-                                                <button
-                                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                                                    title="Edit"
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className="h-5 w-5"
-                                                        viewBox="0 0 20 20"
-                                                        fill="currentColor"
-                                                    >
-                                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
-                                                    title="Delete"
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className="h-5 w-5"
-                                                        viewBox="0 0 20 20"
-                                                        fill="currentColor"
-                                                    >
-                                                        <path
-                                                            fillRule="evenodd"
-                                                            d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                                                            clipRule="evenodd"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Modal for Creating Invoice */}
-            {isModalOpen && (
-                <SalesInvoiceForm
-                    onGenerateInvoice={handleGenerateInvoice}
-                    onCancel={handleCancel}
-                />
-            )}
-        </div>
-    );
-
-};
-
-export default Dashboard;
+export default SalesInvoice;
