@@ -13,6 +13,7 @@ use App\Http\Controllers\{
     UserController,
     StockReportController,
     AuthController,
+    CompanyController,
     DiscountSchemeController,
     RoleController,
     PermissionController,
@@ -119,12 +120,19 @@ Route::prefix('discount-schemes')->group(function () {
 //     // Route::get('/products', [ProductController::class, 'index']);
 // });
 
-Route::get('/purchases', [PurchaseController::class, 'index']);
+    Route::get('/purchases', [PurchaseController::class, 'index']);
     Route::post('/purchases', [PurchaseController::class, 'store']);
   
     Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
     Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
     Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
+
+    Route::prefix('companies')->group(function () {
+        Route::get('/', [CompanyController::class, 'index']); // Get all companies
+        Route::get('/{company_name}', [CompanyController::class, 'show']); // Get a specific company
+        Route::post('/', [CompanyController::class, 'store']); // Create a new company
+        Route::put('/{company_name}', [CompanyController::class, 'update']); // Update a company
+    });
 
 
 

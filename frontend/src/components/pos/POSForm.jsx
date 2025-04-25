@@ -751,7 +751,7 @@ const POSForm = () => {
                     <h2 className="my-4 text-lg font-bold text-gray-800 dark:text-gray-200"> Current Bill Items ({products.length}) </h2>
                     <div className="overflow-x-auto max-h-[50vh] border border-gray-300 dark:border-gray-600 rounded-lg">
                         <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300">
-                            <thead className="sticky top-0 z-10 text-xs text-white uppercase bg-gray-700 dark:bg-gray-700 dark:text-amber-400">
+                            <thead className="top-0 z-10 text-xs text-white uppercase bg-gray-700 dark:bg-gray-700 dark:text-amber-400">
                                 <tr>
                                     <th scope="col" className="px-3 py-3 border-r dark:border-gray-600">S.No</th>
                                     <th scope="col" className="px-4 py-3 border-r dark:border-gray-600 min-w-[200px]">Name</th>
