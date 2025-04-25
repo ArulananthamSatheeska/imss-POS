@@ -42,6 +42,18 @@ class SaleController extends Controller
             // Generate the next bill number
             $billNumber = BillNumberGenerator::generateNextBillNumber();
 
+            // Fetch active discount schemes
+            $activeSchemes = \App\Models\DiscountScheme::where('active', true)
+                ->where(function ($query) {
+                    $today = date('Y-m-d');
+                    $query->whereNull('start_date')->orWhere('start_date', '<=', $today);
+                })
+                ->where(function ($query) {
+                    $today = date('Y-m-d');
+                    $query->whereNull('end_date')->orWhere('end_date', '>=', $today);
+                })
+                ->get();
+
             // Create the sale
             $sale = Sale::create([
                 'bill_number' => $billNumber,
@@ -56,24 +68,79 @@ class SaleController extends Controller
                 'balance_amount' => $request->balance_amount,
             ]);
 
+            // Helper function to calculate discount for a product
+            $calculateDiscount = function ($product, $schemes) {
+                $basePrice = $product->sales_price ?? 0;
+                $categoryName = $product->category_name ?? null;
+                $maxDiscountValue = 0;
+
+                foreach ($schemes as $scheme) {
+                    if (!$scheme->active) continue;
+
+                    $appliesTo = $scheme->applies_to;
+                    $target = $scheme->target;
+
+                    if ($appliesTo === 'product' && $target === $product->product_name) {
+                        $discountValue = 0;
+                        if ($scheme->type === 'percentage') {
+                            $discountValue = ($basePrice * $scheme->value) / 100;
+                        } elseif ($scheme->type === 'amount') {
+                            $discountValue = $scheme->value;
+                        }
+                        if ($discountValue > $maxDiscountValue) {
+                            $maxDiscountValue = $discountValue;
+                        }
+                    } elseif ($appliesTo === 'category' && $target === $categoryName) {
+                        $discountValue = 0;
+                        if ($scheme->type === 'percentage') {
+                            $discountValue = ($basePrice * $scheme->value) / 100;
+                        } elseif ($scheme->type === 'amount') {
+                            $discountValue = $scheme->value;
+                        }
+                        if ($discountValue > $maxDiscountValue) {
+                            $maxDiscountValue = $discountValue;
+                        }
+                    }
+                }
+                return min($maxDiscountValue, $basePrice);
+            };
+
             // Create the sale items and update product stock
             foreach ($request->items as $item) {
                 $product = Product::where('product_name', $item['product_name'])->first();
                 if ($product) {
+                    // Calculate discount and adjust unit price and total
+                    $discountAmount = $calculateDiscount($product, $activeSchemes);
+                    $unitPrice = $product->sales_price - $discountAmount;
+                    $unitPrice = max(0, $unitPrice);
+                    $totalPrice = $unitPrice * $item['quantity'];
+
                     // Update the stock quantity
                     $product->updateStock($item['quantity'], 'subtract');
-                }
 
-                SaleItem::create([
-                    'sale_id' => $sale->id,
-                    'product_id' => $product ? $product->product_id : null,
-                    'product_name' => $item['product_name'],
-                    'quantity' => $item['quantity'],
-                    'mrp' => $item['mrp'],
-                    'unit_price' => $item['unit_price'],
-                    'discount' => $item['discount'],
-                    'total' => $item['total'],
-                ]);
+                    SaleItem::create([
+                        'sale_id' => $sale->id,
+                        'product_id' => $product->product_id,
+                        'product_name' => $item['product_name'],
+                        'quantity' => $item['quantity'],
+                        'mrp' => $item['mrp'],
+                        'unit_price' => $unitPrice,
+                        'discount' => $discountAmount,
+                        'total' => $totalPrice,
+                    ]);
+                } else {
+                    // If product not found, save as is
+                    SaleItem::create([
+                        'sale_id' => $sale->id,
+                        'product_id' => null,
+                        'product_name' => $item['product_name'],
+                        'quantity' => $item['quantity'],
+                        'mrp' => $item['mrp'],
+                        'unit_price' => $item['unit_price'],
+                        'discount' => $item['discount'],
+                        'total' => $item['total'],
+                    ]);
+                }
             }
 
             DB::commit();
@@ -118,6 +185,18 @@ class SaleController extends Controller
                 }
             }
 
+            // Fetch active discount schemes
+            $activeSchemes = \App\Models\DiscountScheme::where('active', true)
+                ->where(function ($query) {
+                    $today = date('Y-m-d');
+                    $query->whereNull('start_date')->orWhere('start_date', '<=', $today);
+                })
+                ->where(function ($query) {
+                    $today = date('Y-m-d');
+                    $query->whereNull('end_date')->orWhere('end_date', '>=', $today);
+                })
+                ->get();
+
             // Update the sale
             $sale->update([
                 'customer_name' => $request->customer_name,
@@ -133,23 +212,77 @@ class SaleController extends Controller
             // Delete existing sale items
             $sale->items()->delete();
 
+            // Helper function to calculate discount for a product
+            $calculateDiscount = function ($product, $schemes) {
+                $basePrice = $product->sales_price ?? 0;
+                $categoryName = $product->category_name ?? null;
+                $maxDiscountValue = 0;
+
+                foreach ($schemes as $scheme) {
+                    if (!$scheme->active) continue;
+
+                    $appliesTo = $scheme->applies_to;
+                    $target = $scheme->target;
+
+                    if ($appliesTo === 'product' && $target === $product->product_name) {
+                        $discountValue = 0;
+                        if ($scheme->type === 'percentage') {
+                            $discountValue = ($basePrice * $scheme->value) / 100;
+                        } elseif ($scheme->type === 'amount') {
+                            $discountValue = $scheme->value;
+                        }
+                        if ($discountValue > $maxDiscountValue) {
+                            $maxDiscountValue = $discountValue;
+                        }
+                    } elseif ($appliesTo === 'category' && $target === $categoryName) {
+                        $discountValue = 0;
+                        if ($scheme->type === 'percentage') {
+                            $discountValue = ($basePrice * $scheme->value) / 100;
+                        } elseif ($scheme->type === 'amount') {
+                            $discountValue = $scheme->value;
+                        }
+                        if ($discountValue > $maxDiscountValue) {
+                            $maxDiscountValue = $discountValue;
+                        }
+                    }
+                }
+                return min($maxDiscountValue, $basePrice);
+            };
+
             // Create new sale items and update product stock
             foreach ($request->items as $item) {
                 $product = Product::where('product_name', $item['product_name'])->first();
                 if ($product) {
-                    $product->updateStock($item['quantity'], 'subtract');
-                }
+                    // Calculate discount and adjust unit price and total
+                    $discountAmount = $calculateDiscount($product, $activeSchemes);
+                    $unitPrice = $product->sales_price - $discountAmount;
+                    $unitPrice = max(0, $unitPrice);
+                    $totalPrice = $unitPrice * $item['quantity'];
 
-                SaleItem::create([
-                    'sale_id' => $sale->id,
-                    'product_id' => $product ? $product->product_id : null,
-                    'product_name' => $item['product_name'],
-                    'quantity' => $item['quantity'],
-                    'mrp' => $item['mrp'],
-                    'unit_price' => $item['unit_price'],
-                    'discount' => $item['discount'],
-                    'total' => $item['total'],
-                ]);
+                    $product->updateStock($item['quantity'], 'subtract');
+
+                    SaleItem::create([
+                        'sale_id' => $sale->id,
+                        'product_id' => $product->product_id,
+                        'product_name' => $item['product_name'],
+                        'quantity' => $item['quantity'],
+                        'mrp' => $item['mrp'],
+                        'unit_price' => $unitPrice,
+                        'discount' => $discountAmount,
+                        'total' => $totalPrice,
+                    ]);
+                } else {
+                    SaleItem::create([
+                        'sale_id' => $sale->id,
+                        'product_id' => null,
+                        'product_name' => $item['product_name'],
+                        'quantity' => $item['quantity'],
+                        'mrp' => $item['mrp'],
+                        'unit_price' => $item['unit_price'],
+                        'discount' => $item['discount'],
+                        'total' => $item['total'],
+                    ]);
+                }
             }
 
             DB::commit();
