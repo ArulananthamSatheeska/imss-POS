@@ -6,6 +6,7 @@ import { getData, postData } from "../../services/api";
 import PrintableInvoice from './PrintableInvoice';
 import SalesInvoice from './SalesInvoice';
 import Quotation from './quatation';  // Import Quotation component
+import axios from 'axios';
 
 const SalesReport = () => {
   // Date range setup
@@ -24,6 +25,35 @@ const SalesReport = () => {
   const [invoiceData, setInvoiceData] = useState(null);
   const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
   const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);  // State for Quotation form
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+
+  const handleGenerateInvoiceApiCall = async (invoiceData) => {
+    // The endpoint needs to match your Laravel route definition
+    const correctedEndpoint = '/invoices'; // Corrected from '/sales'
+
+    console.log(`Attempting to POST to: ${correctedEndpoint}`); // Debug log
+    console.log("Data for API:", invoiceData); // Debug log
+
+    // --- Choose ONE way to make the call ---
+    // Option 1: Using Axios directly
+    const API_BASE_URL = 'http://localhost:8000/api'; // Use env var ideally
+    const url = `${API_BASE_URL}${correctedEndpoint}`;
+    try {
+         const response = await axios.post(url, invoiceData, {
+             headers: {
+                 'Content-Type': 'application/json',
+                 'Accept': 'application/json',
+                 // Add 'Authorization': `Bearer ${token}` if using auth
+             }
+         });
+         console.log('API Success Response:', response.data);
+         return response.data; // Return data on success
+     } catch (error) {
+         console.error(`API Error during POST ${url}:`, error.response || error);
+         // Re-throw error so SalesInvoice component can catch it and display message
+         throw error;
+     }
+  };
 
   useEffect(() => {
     fetchReportData();
@@ -117,6 +147,7 @@ const SalesReport = () => {
 
   const handleCancelInvoice = () => {
     setIsInvoiceFormOpen(false);
+    setShowInvoiceModal(false);
   };
 
   const handleGenerateQuotation = () => {
@@ -148,17 +179,17 @@ const SalesReport = () => {
   }
 
   return (
-    <div className="p-4 min-h-screen flex flex-col  bg-transparent">
+    <div className="flex flex-col min-h-screen p-4 bg-transparent">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-800 dark:bg-gradient-to-r dark:from-blue-900 dark:to-slate-800 text-white text-center py-3 rounded-lg shadow-md mb-6">
+      <div className="py-3 mb-6 text-center text-white rounded-lg shadow-md bg-gradient-to-r from-blue-500 to-blue-800 dark:bg-gradient-to-r dark:from-blue-900 dark:to-slate-800">
         <h1 className="text-2xl font-bold">SALES REPORT</h1>
         <p className="text-sm opacity-90">Track and analyze your sales performance</p>
       </div>
 
       {/* Action Bar */}
-      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="relative flex-grow max-w-md">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <FiSearch className="text-gray-400" />
           </div>
           <input
@@ -166,55 +197,63 @@ const SalesReport = () => {
             placeholder="Search invoices, customers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full py-2 pl-10 pr-3 bg-white border border-gray-300 rounded-lg shadow-sm dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
         <div className="flex gap-2">
           <button
-            onClick={() => setIsInvoiceFormOpen(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => setShowInvoiceModal(true)}
+            className="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             Create Sales Entry
           </button>
           <button
             onClick={() => setIsQuotationFormOpen(true)}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="flex items-center gap-2 px-4 py-2 text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             Create New Quotation
           </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 bg-white border dark:bg-slate-800 dark:border-gray-600 dark:text-gray-300  border-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm dark:bg-slate-800 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <FaFilter /> {showFilters ? 'Hide Filters' : 'Show Filters'}
           </button>
 
           <button
             onClick={fetchReportData}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <FiRefreshCw className={`${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
 
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="flex items-center gap-2 px-4 py-2 text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             <FaFileExcel /> Export
           </button>
         </div>
       </div>
 
+      {showInvoiceModal && (
+            <SalesInvoice
+                // Pass other props like selectedCustomer, cartItems if needed
+                onGenerateInvoice={handleGenerateInvoiceApiCall} // Pass the corrected API call function
+                onCancel={handleCancelInvoice}
+            />
+        )}
+
       {/* Filters Section */}
       {showFilters && (
-        <div className="bg-white  dark:bg-slate-800 dark:border-gray-600 dark:text-gray-300 p-4 rounded-lg shadow-md mb-6 border border-gray-200">
-          <h3 className="font-medium mb-3 flex items-center gap-2">
+        <div className="p-4 mb-6 bg-white border border-gray-200 rounded-lg shadow-md dark:bg-slate-800 dark:border-gray-600 dark:text-gray-300">
+          <h3 className="flex items-center gap-2 mb-3 font-medium">
             <FaFilter /> Report Filters
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium  mb-1">From Date</label>
+              <label className="block mb-1 text-sm font-medium">From Date</label>
               <input
                 type="date"
                 value={fromDate}
@@ -223,7 +262,7 @@ const SalesReport = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">To Date</label>
+              <label className="block mb-1 text-sm font-medium">To Date</label>
               <input
                 type="date"
                 value={toDate}
@@ -234,7 +273,7 @@ const SalesReport = () => {
             <div className="flex items-end">
               <button
                 onClick={fetchReportData}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Apply Filters
               </button>
@@ -244,24 +283,24 @@ const SalesReport = () => {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 md:grid-cols-4">
         {/* Total Invoices */}
-        <div className="p-4 rounded-2xl shadow-md border-l-4 border-red-600 bg-white dark:bg-gradient-to-br dark:from-slate-700 dark:to-slate-900">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Total Invoices</h3>
+        <div className="p-4 bg-white border-l-4 border-red-600 shadow-md rounded-2xl dark:bg-gradient-to-br dark:from-slate-700 dark:to-slate-900">
+          <h3 className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">Total Invoices</h3>
           <p className="text-3xl font-extrabold text-gray-900 dark:text-red-400">{filteredData.length}</p>
         </div>
 
         {/* Total Sales */}
-        <div className="p-4 rounded-2xl shadow-md border-l-4 border-green-500 bg-white dark:bg-slate-800">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Total Sales</h3>
+        <div className="p-4 bg-white border-l-4 border-green-500 shadow-md rounded-2xl dark:bg-slate-800">
+          <h3 className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">Total Sales</h3>
           <p className="text-3xl font-extrabold text-gray-900 dark:text-green-400">
             {formatCurrency(filteredData.reduce((sum, row) => sum + (parseFloat(row.total) || 0), 0))}
           </p>
         </div>
 
         {/* Average Sale */}
-        <div className="p-4 rounded-2xl shadow-md border-l-4 border-yellow-500 bg-white dark:bg-slate-800">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Average Sale</h3>
+        <div className="p-4 bg-white border-l-4 border-yellow-500 shadow-md rounded-2xl dark:bg-slate-800">
+          <h3 className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">Average Sale</h3>
           <p className="text-3xl font-extrabold text-gray-900 dark:text-yellow-400">
             {filteredData.length > 0
               ? formatCurrency(
@@ -272,8 +311,8 @@ const SalesReport = () => {
         </div>
 
         {/* Date Range */}
-        <div className="p-4 rounded-2xl shadow-md border-l-4 border-purple-500 bg-white dark:bg-slate-800">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Date Range</h3>
+        <div className="p-4 bg-white border-l-4 border-purple-500 shadow-md rounded-2xl dark:bg-slate-800">
+          <h3 className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">Date Range</h3>
           <p className="text-lg font-semibold text-gray-800 dark:text-purple-300">
             {new Date(fromDate).toLocaleDateString()} - {new Date(toDate).toLocaleDateString()}
           </p>
@@ -281,25 +320,25 @@ const SalesReport = () => {
       </div>
 
       {/* Report Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md overflow-hidden border border-gray-200 dark:border-slate-700">
+      <div className="overflow-hidden bg-white border border-gray-200 shadow-md dark:bg-slate-800 rounded-2xl dark:border-slate-700">
         {loading ? (
-          <div className="flex justify-center items-center p-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="flex items-center justify-center p-8">
+            <div className="w-12 h-12 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin"></div>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600 text-sm">
-              <thead className="bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 uppercase text-xs tracking-wider">
+            <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-slate-600">
+              <thead className="text-xs tracking-wider text-gray-700 uppercase bg-gray-100 dark:bg-slate-700 dark:text-gray-300">
                 <tr>
-                  <th className="px-6 py-3 text-left font-semibold">Invoice # / Bill #</th>
-                  <th className="px-6 py-3 text-left font-semibold">Customer</th>
-                  <th className="px-6 py-3 text-left font-semibold">Date</th>
-                  <th className="px-6 py-3 text-left font-semibold">Amount</th>
-                  <th className="px-6 py-3 text-left font-semibold">Payment</th>
-                  <th className="px-6 py-3 text-right font-semibold">Actions</th>
+                  <th className="px-6 py-3 font-semibold text-left">Invoice # / Bill #</th>
+                  <th className="px-6 py-3 font-semibold text-left">Customer</th>
+                  <th className="px-6 py-3 font-semibold text-left">Date</th>
+                  <th className="px-6 py-3 font-semibold text-left">Amount</th>
+                  <th className="px-6 py-3 font-semibold text-left">Payment</th>
+                  <th className="px-6 py-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
+              <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-800 dark:divide-slate-600">
                 {filteredData.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
@@ -335,13 +374,13 @@ const SalesReport = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end items-center gap-3">
+                          <div className="flex items-center justify-end gap-3">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleViewInvoice(row);
                               }}
-                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                             >
                               <FiPrinter size={16} /> Reprint
                             </button>
@@ -350,7 +389,7 @@ const SalesReport = () => {
                                 e.stopPropagation();
                                 handleEditSale(row);
                               }}
-                              className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1"
+                              className="flex items-center gap-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
                             >
                               Edit
                             </button>
@@ -359,7 +398,7 @@ const SalesReport = () => {
                                 e.stopPropagation();
                                 handleDeleteSale(row.id);
                               }}
-                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1"
+                              className="flex items-center gap-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                             >
                               Delete
                             </button>
@@ -380,42 +419,42 @@ const SalesReport = () => {
                       {expandedRow === index && (
                         <tr className="bg-gray-50 dark:bg-slate-700">
                           <td colSpan={6} className="px-6 py-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                               {/* Transaction Details */}
                               <div>
-                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Transaction Details</h4>
-                                <div className="grid grid-cols-2 gap-y-1 text-sm">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Transaction Details</h4>
+                                <div className="grid grid-cols-2 text-sm gap-y-1">
                                   <div className="text-gray-500 dark:text-gray-400">Subtotal:</div>
-                                  <div className="text-gray-900 dark:text-white font-medium">{formatCurrency(row.subtotal || 0)}</div>
+                                  <div className="font-medium text-gray-900 dark:text-white">{formatCurrency(row.subtotal || 0)}</div>
 
                                   <div className="text-gray-500 dark:text-gray-400">Discount:</div>
-                                  <div className="text-red-600 font-medium">-{formatCurrency(row.discount || 0)}</div>
+                                  <div className="font-medium text-red-600">-{formatCurrency(row.discount || 0)}</div>
 
                                   <div className="text-gray-500 dark:text-gray-400">Tax:</div>
-                                  <div className="text-gray-900 dark:text-white font-medium">+{formatCurrency(row.tax || 0)}</div>
+                                  <div className="font-medium text-gray-900 dark:text-white">+{formatCurrency(row.tax || 0)}</div>
 
                                   <div className="text-gray-500 dark:text-gray-400">Received:</div>
-                                  <div className="text-green-600 font-medium">{formatCurrency(row.received_amount || 0)}</div>
+                                  <div className="font-medium text-green-600">{formatCurrency(row.received_amount || 0)}</div>
 
                                   <div className="text-gray-500 dark:text-gray-400">Balance:</div>
-                                  <div className="text-blue-600 font-medium">{formatCurrency(row.balance_amount || 0)}</div>
+                                  <div className="font-medium text-blue-600">{formatCurrency(row.balance_amount || 0)}</div>
                                 </div>
                               </div>
 
                               {/* Items Purchased */}
                               <div>
-                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Items Purchased</h4>
-                                <div className="border border-gray-200 dark:border-slate-600 rounded-md overflow-hidden">
-                                  <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600 text-sm">
-                                    <thead className="bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-300">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Items Purchased</h4>
+                                <div className="overflow-hidden border border-gray-200 rounded-md dark:border-slate-600">
+                                  <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-slate-600">
+                                    <thead className="text-gray-700 bg-gray-100 dark:bg-slate-600 dark:text-gray-300">
                                       <tr>
-                                        <th className="px-3 py-2 text-left font-semibold">Item</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Qty</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Price</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Total</th>
+                                        <th className="px-3 py-2 font-semibold text-left">Item</th>
+                                        <th className="px-3 py-2 font-semibold text-left">Qty</th>
+                                        <th className="px-3 py-2 font-semibold text-left">Price</th>
+                                        <th className="px-3 py-2 font-semibold text-left">Total</th>
                                       </tr>
                                     </thead>
-                                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                                    <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-800 dark:divide-slate-700">
                                       {row.items?.map((item, i) => (
                                         <tr key={i}>
                                           <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{item.product_name}</td>
@@ -445,9 +484,9 @@ const SalesReport = () => {
 
       {/* Invoice Modal */}
       {invoiceData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
-            <div className="flex justify-between items-center border-b p-4">
+            <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold">Invoice Preview</h3>
               <button
                 onClick={closeInvoiceModal}
@@ -460,7 +499,7 @@ const SalesReport = () => {
             <div className="flex justify-end p-4 border-t">
               <button
                 onClick={() => window.print()}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
               >
                 Print Invoice
               </button>
