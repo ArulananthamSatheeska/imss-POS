@@ -276,21 +276,21 @@ function CreateCompany() {
 
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 py-8 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-6xl mx-auto bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
-                <h1 className="text-3xl font-bold text-center text-gray-800 dark:text-white mb-8 flex items-center justify-center">
-                    <BuildingOfficeIcon className="h-8 w-8 text-indigo-500 mr-3" />
+        <div className="min-h-screen px-4 py-8 bg-gray-100 dark:bg-gray-900 sm:px-6 lg:px-8">
+            <div className="max-w-6xl p-6 mx-auto bg-white rounded-lg shadow-lg dark:bg-gray-800">
+                <h1 className="flex items-center justify-center mb-8 text-3xl font-bold text-center text-gray-800 dark:text-white">
+                    <BuildingOfficeIcon className="w-8 h-8 mr-3 text-indigo-500" />
                     {isEditing ? 'Update Company' : 'Create Company'}
                 </h1>
 
                 {/* Company Selection Dropdown */}
-                <div className="mb-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm">
+                <div className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                     <div className="flex flex-col">
-                        <label className="text-gray-700 dark:text-gray-300 font-medium">Select Company</label>
+                        <label className="font-medium text-gray-700 dark:text-gray-300">Select Company</label>
                         <select
                             value={selectedCompany}
                             onChange={handleCompanySelect}
-                            className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                            className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                         >
                             <option value="">Select a company</option>
                             {companies.map((company) => (
@@ -303,27 +303,27 @@ function CreateCompany() {
                 </div>
 
                 {/* Form Fields (Same as before) */}
-                <form className="bg-transparent max-w-full mx-auto" onSubmit={handleSubmit}>
+                <form className="max-w-full mx-auto bg-transparent" onSubmit={handleSubmit}>
                     {/* Company Information */}
-                    <fieldset className="mb-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm">
-                        <legend className="text-2xl font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
-                            <InformationCircleIcon className="h-6 w-6 text-indigo-500 mr-2" />
+                    <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                            <InformationCircleIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             Company Information
                         </legend>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Company Name <span className="text-red-500">*</span></label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Company Name <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
                                     name="company_name"
                                     value={companyInfo.company_name}
                                     onChange={handleChange}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                     required
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Business Category</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Business Category</label>
                                 <input
                                     type="text"
                                     name="businessCategory"
@@ -331,18 +331,18 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'companyLogo')}
                                     ref={refs.businessCategory}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Company Type</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Company Type</label>
                                 <select
                                     name="companyType"
                                     value={companyInfo.companyType}
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'businessCategory')}
                                     ref={refs.companyType}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 >
                                     <option value="Retail">Retail</option>
                                     <option value="Wholesale">Wholesale</option>
@@ -350,30 +350,30 @@ function CreateCompany() {
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Company Logo</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Company Logo</label>
                                 <input
                                     type="file"
                                     name="companyLogo"
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'businessAddress')}
                                     ref={refs.companyLogo}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
                                 />
                                 {companyInfo.companyLogo && (
-                                    <img src={URL.createObjectURL(companyInfo.companyLogo)} alt="Company Logo" className="mt-4 w-20 h-20 rounded-lg shadow-md object-cover" />
+                                    <img src={URL.createObjectURL(companyInfo.companyLogo)} alt="Company Logo" className="object-cover w-20 h-20 mt-4 rounded-lg shadow-md" />
                                 )}
                             </div>                        </div>
                     </fieldset>
 
                     {/* Address & Contact Details */}
-                    <fieldset className="mb-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm">
-                        <legend className="text-2xl font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
-                            <MapPinIcon className="h-6 w-6 text-indigo-500 mr-2" />
+                    <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                            <MapPinIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             Address & Contact Details
                         </legend>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Business Address</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Business Address</label>
                                 <input
                                     type="text"
                                     name="businessAddress"
@@ -381,11 +381,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'city')}
                                     ref={refs.businessAddress}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">City</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">City</label>
                                 <input
                                     type="text"
                                     name="city"
@@ -393,11 +393,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'country')}
                                     ref={refs.city}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Country</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Country</label>
                                 <input
                                     type="text"
                                     name="country"
@@ -405,11 +405,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'contactNumber')}
                                     ref={refs.country}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Contact Number</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Contact Number</label>
                                 <input
                                     type="text"
                                     name="contactNumber"
@@ -417,11 +417,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'email')}
                                     ref={refs.contactNumber}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Email Address</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Email Address</label>
                                 <input
                                     type="email"
                                     name="email"
@@ -429,11 +429,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'website')}
                                     ref={refs.email}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Website (Optional)</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Website (Optional)</label>
                                 <input
                                     type="url"
                                     name="website"
@@ -441,21 +441,21 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'vatGstNumber')}
                                     ref={refs.website}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                         </div>
                     </fieldset>
 
                     {/* Tax & Financial Details */}
-                    <fieldset className="mb-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm">
-                        <legend className="text-2xl font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
-                            <CreditCardIcon className="h-6 w-6 text-indigo-500 mr-2" />
+                    <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                            <CreditCardIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             Tax & Financial Details
                         </legend>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">VAT / GST Number</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">VAT / GST Number</label>
                                 <input
                                     type="text"
                                     name="vatGstNumber"
@@ -463,11 +463,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'taxId')}
                                     ref={refs.vatGstNumber}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Tax ID</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Tax ID</label>
                                 <input
                                     type="text"
                                     name="taxId"
@@ -475,18 +475,18 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'defaultCurrency')}
                                     ref={refs.taxId}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Default Currency</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Currency</label>
                                 <select
                                     name="defaultCurrency"
                                     value={companyInfo.defaultCurrency}
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'fiscalYearStart')}
                                     ref={refs.defaultCurrency}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 >
                                     <option value="LKR">LKR</option>
                                     <option value="USD">USD</option>
@@ -494,7 +494,7 @@ function CreateCompany() {
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Fiscal Year Start</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Fiscal Year Start</label>
                                 <input
                                     type="date"
                                     name="fiscalYearStart"
@@ -505,23 +505,23 @@ function CreateCompany() {
                                     }}
                                     onKeyDown={(e) => handleKeyDown(e, 'fiscalYearEnd')}
                                     ref={refs.fiscalYearStart}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
 
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Fiscal Year End</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Fiscal Year End</label>
                                 <input
                                     type="date"
                                     name="fiscalYearEnd"
                                     value={companyInfo.fiscalYearEnd}
                                     readOnly // Prevent manual editing
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
 
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Chart of Accounts</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Chart of Accounts</label>
                                 <input
                                     type="text"
                                     name="chartOfAccounts"
@@ -529,21 +529,21 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'ownerName')}
                                     ref={refs.chartOfAccounts}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                         </div>
                     </fieldset>
 
                     {/* Owner & User Setup */}
-                    <fieldset className="mb-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm">
-                        <legend className="text-2xl font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
-                            <UserCircleIcon className="h-6 w-6 text-indigo-500 mr-2" />
+                    <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                            <UserCircleIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             Owner & User Setup
                         </legend>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Owner Name</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Owner Name</label>
                                 <input
                                     type="text"
                                     name="ownerName"
@@ -551,11 +551,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'ownerContact')}
                                     ref={refs.ownerName}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Owner Contact</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Owner Contact</label>
                                 <input
                                     type="text"
                                     name="ownerContact"
@@ -563,11 +563,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'adminUsername')}
                                     ref={refs.ownerContact}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Admin Username</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Admin Username</label>
                                 <input
                                     type="text"
                                     name="adminUsername"
@@ -575,11 +575,11 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'adminPassword')}
                                     ref={refs.adminUsername}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Admin Password</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Admin Password</label>
                                 <input
                                     type="password"
                                     name="adminPassword"
@@ -587,18 +587,18 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'userRole')}
                                     ref={refs.adminPassword}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">User Role</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">User Role</label>
                                 <select
                                     name="userRole"
                                     value={companyInfo.userRole}
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'invoicePrefix')}
                                     ref={refs.userRole}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                 >
                                     <option value="Admin">Admin</option>
                                     <option value="Manager">Manager</option>
@@ -609,15 +609,15 @@ function CreateCompany() {
                     </fieldset>
 
                     {/* POS Settings */}
-                    <fieldset className="mb-8  bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300  p-6 rounded-lg">
-                        <legend className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center">
-                            <CogIcon className="h-6 w-6 text-indigo-500 mr-2" />
+                    <fieldset className="p-6 mb-8 text-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700 dark:text-gray-300">
+                        <legend className="flex items-center mb-4 text-xl font-semibold text-gray-700 dark:text-gray-300">
+                            <CogIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             POS Settings
                         </legend>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             {/* Default Invoice Prefix */}
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Default Invoice Prefix:</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Invoice Prefix:</label>
                                 <input
                                     type="text"
                                     name="invoicePrefix"
@@ -625,13 +625,13 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'defaultPaymentMethods')}
                                     ref={refs.invoicePrefix}
-                                    className="mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-amber-600 dark:text-white"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-amber-600 dark:text-white"
                                 />
                             </div>
 
                             {/* Default Payment Methods */}
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Default Payment Methods:</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Payment Methods:</label>
                                 <select
                                     multiple
                                     name="defaultPaymentMethods"
@@ -639,7 +639,7 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'multiStoreSupport')}
                                     ref={refs.defaultPaymentMethods}
-                                    className="mt-2 p-3 rounded-lg border border-gray-600  bg-slate-100  dark:bg-gray-400 text-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg-slate-100 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 >
                                     <option value="Cash">Cash</option>
                                     <option value="Card">Card</option>
@@ -649,7 +649,7 @@ function CreateCompany() {
 
                             {/* Multi-store Support */}
                             <div className="flex flex-col">
-                                <label className="text-gray-700 dark:text-gray-300 font-medium">Multi-store Support:</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Multi-store Support:</label>
                                 <div className="flex items-center">
                                     <input
                                         type="checkbox"
@@ -658,7 +658,7 @@ function CreateCompany() {
                                         onChange={handleChange}
                                         onKeyDown={(e) => handleKeyDown(e, 'defaultLanguage')}
                                         ref={refs.multiStoreSupport}
-                                        className="mt-2 p-3 rounded-lg border border-gray-600 bg:gray-200  dark:bg-gray-400 text-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg:gray-200 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                     />
                                     <span className="ml-2 text-black dark:text-white">Multi-Store functionality</span>
                                 </div>
@@ -667,13 +667,13 @@ function CreateCompany() {
                     </fieldset>
 
                     {/* Multi-Language & Localization */}
-                    <fieldset className="mb-8  bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
-                        <legend className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center">
-                            <GlobeAltIcon className="h-6 w-6 text-indigo-500 mr-2" />
+                    <fieldset className="p-6 mb-8 rounded-lg bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-xl font-semibold text-gray-700 dark:text-gray-300">
+                            <GlobeAltIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             Multi-Language & Localization
                         </legend>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <label className="text-gray-700 dark:text-gray-300 block">
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                            <label className="block text-gray-700 dark:text-gray-300">
                                 <span className="text-gray-700 dark:text-gray-300">Default Language:</span>
                                 <select
                                     name="defaultLanguage"
@@ -681,14 +681,14 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'timeZone')}
                                     ref={refs.defaultLanguage}
-                                    className="mt-2 p-3 rounded-lg border border-gray-600 bg:gray-200  dark:bg-gray-400 text-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg:gray-200 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 >
                                     <option value="English">English</option>
                                     <option value="Sinhala">Sinhala</option>
                                     <option value="Tamil">Tamil</option>
                                 </select>
                             </label>
-                            <label className="text-gray-700 dark:text-gray-300 block">
+                            <label className="block text-gray-700 dark:text-gray-300">
                                 <span className="text-gray-700 dark:text-gray-300">Time Zone:</span>
                                 <input
                                     type="text"
@@ -697,20 +697,20 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'enable2FA')}
                                     ref={refs.timeZone}
-                                    className="mt-2 p-3 rounded-lg border border-gray-600 bg:gray-200  dark:bg-gray-400 text-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg:gray-200 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
                             </label>
                         </div>
                     </fieldset>
 
                     {/* Security & Permissions */}
-                    <fieldset className="mb-8  bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
-                        <legend className="text-xl text-gray-700 dark:text-gray-300 font-semibold mb-4 flex items-center">
-                            <LockClosedIcon className="h-6 w-6 text-indigo-500 mr-2" />
+                    <fieldset className="p-6 mb-8 rounded-lg bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-xl font-semibold text-gray-700 dark:text-gray-300">
+                            <LockClosedIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             Security & Permissions
                         </legend>
                         <div className="space-y-4">
-                            <label className="text-gray-700 dark:text-gray-300 block">
+                            <label className="block text-gray-700 dark:text-gray-300">
                                 <span className="text-gray-700 dark:text-gray-300">Enable Two-Factor Authentication (2FA):</span>
                                 <input
                                     type="checkbox"
@@ -719,7 +719,7 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     onKeyDown={(e) => handleKeyDown(e, 'autoGenerateQR')}
                                     ref={refs.enable2FA}
-                                    className="mt-1 block"
+                                    className="block mt-1"
                                 />
                             </label>
                         </div>
@@ -728,7 +728,7 @@ function CreateCompany() {
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        className="w-full px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                     >
                         {isEditing ? 'Update Company' : 'Create Company'}
                     </button>

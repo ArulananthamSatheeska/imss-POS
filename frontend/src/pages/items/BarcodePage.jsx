@@ -33,22 +33,35 @@ export const BarcodePage = () => {
     };
   }, [user?.token]);
 
-  // Render barcodes when barcodesToPrint updates
   useEffect(() => {
     if (barcodesToPrint.length > 0) {
       barcodesToPrint.forEach((product, index) => {
         const canvas = document.getElementById(`barcode-${index}`);
         if (canvas) {
-          const barcodeWidth = templateSize === "50mmx25mm" ? 1.2 : 1.0;
-          const barcodeHeight = templateSize === "50mmx25mm" ? 15 : 15;
+          const barcodeWidth =
+            parseInt(templateSize.split("x")[0].replace("mm", "")) <= 38
+              ? 0.8
+              : 1.2;
+          const barcodeHeight =
+            parseInt(templateSize.split("x")[1].replace("mm", "")) <= 20
+              ? 10
+              : 15;
 
-          JsBarcode(canvas, product.barcode, {
-            format: "CODE128",
-            width: barcodeWidth,
-            height: barcodeHeight,
-            displayValue: false,
-            margin: 0,
-          });
+          try {
+            JsBarcode(canvas, product.barcode, {
+              format: "CODE128",
+              width: barcodeWidth,
+              height: barcodeHeight,
+              displayValue: false,
+              margin: 0,
+            });
+          } catch (error) {
+            console.error(
+              `Error generating barcode for index ${index}:`,
+              error
+            );
+            toast.error("Failed to generate barcode.");
+          }
         } else {
           console.warn(`Canvas barcode-${index} not found`);
         }
@@ -57,6 +70,7 @@ export const BarcodePage = () => {
   }, [barcodesToPrint, templateSize]);
 
   const fetchProducts = async () => {
+    if (loading) return;
     setLoading(true);
     try {
       const timestamp = new Date().getTime();
@@ -124,6 +138,7 @@ export const BarcodePage = () => {
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
     setBarcodesToPrint([]);
+    setSearchQuery("");
   };
 
   const filteredProducts = products.filter(
@@ -133,127 +148,145 @@ export const BarcodePage = () => {
   );
 
   const handleGenerateBarcodes = () => {
-    if (!selectedProduct || quantity < 1) {
-      toast.error("Please select a product and set a valid quantity.");
+    if (!selectedProduct) {
+      toast.error("Please select a product.");
       return;
     }
     if (selectedProduct.barcode === "N/A") {
       toast.error("Selected product does not have a valid barcode.");
       return;
     }
+    if (quantity < 1 || isNaN(quantity)) {
+      toast.error("Please enter a valid quantity (minimum 1).");
+      return;
+    }
 
-    const barcodes = Array.from({ length: quantity }, () => selectedProduct);
-    console.log("Generated barcodes:", barcodes.length);
-    setBarcodesToPrint(barcodes);
+    // Generate one barcode for preview, but store quantity for printing
+    setBarcodesToPrint([selectedProduct]);
+    console.log(
+      `Prepared to generate ${quantity} barcodes for:`,
+      selectedProduct.product_name
+    );
   };
 
   const handlePrint = () => {
     if (barcodesToPrint.length === 0) {
-      toast.error("Please generate barcodes before printing.");
+      toast.error("Please generate a barcode before printing.");
       return;
     }
 
-    const canvases = printRef.current.querySelectorAll("canvas");
-    console.log("Canvases found for printing:", canvases.length);
+    // Generate the specified quantity of barcodes for printing
+    const printBarcodes = Array.from(
+      { length: quantity },
+      () => selectedProduct
+    );
+
+    // Create canvas elements for each barcode
     const barcodeImages = [];
-    canvases.forEach((canvas, index) => {
+    printBarcodes.forEach((product, index) => {
+      const canvas = document.createElement("canvas");
+      const barcodeWidth =
+        parseInt(templateSize.split("x")[0].replace("mm", "")) <= 38
+          ? 0.8
+          : 1.2;
+      const barcodeHeight =
+        parseInt(templateSize.split("x")[1].replace("mm", "")) <= 20 ? 10 : 15;
+
       try {
-        const dataUrl = canvas.toDataURL("image/png");
-        barcodeImages[index] = dataUrl;
+        JsBarcode(canvas, product.barcode, {
+          format: "CODE128",
+          width: barcodeWidth,
+          height: barcodeHeight,
+          displayValue: false,
+          margin: 0,
+        });
+        barcodeImages[index] = canvas.toDataURL("image/png");
       } catch (error) {
-        console.error("Error converting canvas to image:", error);
+        console.error(`Error generating barcode for index ${index}:`, error);
         toast.error("Failed to prepare barcode for printing.");
       }
     });
 
-    let printContent = printRef.current.innerHTML;
-    barcodeImages.forEach((dataUrl, index) => {
-      if (dataUrl) {
-        const canvasRegex = new RegExp(
-          `<canvas[^>]*id="barcode-${index}"[^>]*></canvas>`
-        );
-        printContent = printContent.replace(
-          canvasRegex,
-          `<img src="${dataUrl}" style="margin: 0 auto; display: block; width: 80%; height: auto;" />`
-        );
-      }
-    });
+    // Generate print content with all barcodes
+    const [labelWidth, labelHeight] = templateSize.split("x").map((dim) => dim);
+    const printContent = printBarcodes
+      .map(
+        (product, index) => `
+        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: left; font-size: 8px; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm;">
+          <h3 style="margin: 0 0 1px 0; font-weight: bold; font-size: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.product_name.toUpperCase()}
+          </h3>
+          <div style="margin: 1px 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            කල්. දිනය/ EXP Date: ${product.expiry_date}
+          </div>
+          <div style="margin: 1px 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            කු. අං/ Batch No: ${product.batch_number}
+          </div>
+          <img src="${
+            barcodeImages[index]
+          }" style="margin: 0 auto; display: block; width: 80%; height: auto;" />
+          <div class="mrp" style="text-align: center; font-size: 8px; position: absolute; bottom: 10px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            MRP: ${product.mrp}
+          </div>
+          <div class="seller" style="text-align: center; font-size: 8px; position: absolute; bottom: 1px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            Import&Distributed by: ${product.supplier}
+          </div>
+        </div>
+      `
+      )
+      .join("");
 
-    const printWindow = window.open("", "_blank");
-    const paperWidth = paperSize; // Use selected paper size (50mm, 100mm, 38mm, or 76mm)
-    const columns = paperSize === "50mm" || paperSize === "38mm" ? 1 : 2;
+    const paperWidth = paperSize;
+    const columns = parseInt(paperWidth) <= 50 ? 1 : 2;
 
     const styles = `
       <style>
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
         body { 
-          font-family: 'Roboto', sans-serif; 
+          font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif; 
           margin: 0; 
           padding: 0; 
         }
-        .barcode-label {
-          border: 1px solid #000;
-          padding: 2px;
-          text-align: left;
-          font-size: 8px;
-          width: ${templateSize === "50mmx25mm" ? "50mm" : "38mm"};
-          height: 25mm;
-          background-color: #fff;
-          position: relative;
-          box-sizing: border-box;
-          margin: 2mm;
-          page-break-inside: avoid;
-        }
-        .barcode-label h3 {
-          margin: 0 0 1px 0;
-          font-weight: bold;
-          font-size: 10px;
-          text-align: center;
-        }
-        .barcode-label div { 
-          margin: 1px 0; 
-          line-height: 1.1; 
-        }
-        .barcode-label img { 
-          margin: 0 auto; 
-          display: block; 
-          width: 80%; 
-          height: auto; 
-        }
-        .barcode-label .mrp {
-          text-align: center;
-          font-size: 8px;
-          position: absolute;
-          bottom: 10px;
-          width: 100%;
-        }
-        .barcode-label .seller {
-          text-align: center;
-          font-size: 8px;
-          position: absolute;
-          bottom: 1px;
-          width: 100%;
-        }
         @media print {
-          .barcode-label { margin: 2mm; }
+          .barcode-label { 
+            margin: 2mm 0 2mm 2mm; /* Keep margins for spacing */
+            page-break-inside: avoid; /* Prevent sticker from splitting */
+            break-inside: avoid; /* Additional support for continuous printing */
+            width: 100%; /* Fill the grid cell */
+            max-width: calc(${labelWidth} - 2mm); /* Ensure label doesn't exceed adjusted width */
+          }
           @page { 
-            size: ${paperWidth} auto; 
-            margin: 0; 
+            size: ${paperWidth} auto; /* Match roll width, auto height for continuous printing */
+            margin: 0; /* Remove page margins */
+          }
+          .barcode-container {
+            width: ${paperWidth};
+            display: grid; /* Use CSS Grid for column layout */
+            grid-template-columns: repeat(${columns}, 1fr); /* 1 or 2 columns based on paperWidth */
+            gap: 0; /* No gap between grid cells */
+            break-after: auto; /* Allow continuous flow */
+            page-break-before: auto;
+            page-break-after: auto;
+            page-break-inside: auto;
           }
         }
       </style>
     `;
 
+    const printWindow = window.open("", "_blank");
     printWindow.document.write(`
       <html>
         <head>
           <title>Print Barcodes</title>
           <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;700&display=swap" rel="stylesheet">
           ${styles}
         </head>
         <body>
-          <div style="display: grid; grid-template-columns: repeat(${columns}, minmax(${
-      templateSize === "50mmx25mm" ? "50mm" : "38mm"
-    }, 1fr)); gap: 4mm; justify-items: center;">
+          <div class="barcode-container" style="width: ${paperWidth};">
             ${printContent}
           </div>
         </body>
@@ -261,16 +294,29 @@ export const BarcodePage = () => {
     `);
     printWindow.document.close();
 
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
-    }, 500);
+    const waitForRender = () => {
+      if (printWindow.document.readyState === "complete") {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      } else {
+        setTimeout(waitForRender, 100);
+      }
+    };
+    setTimeout(waitForRender, 500);
   };
 
   const paperSizeOptions = {
-    "50mmx25mm": ["50mm", "100mm"],
+    "30mmx20mm": ["30mm", "60mm"],
     "38mmx25mm": ["38mm", "76mm"],
+    "30mmx16mm": ["30mm", "60mm"],
+    "40mmx20mm": ["40mm", "80mm"],
+    "50mmx25mm": ["50mm", "100mm"],
+    "60mmx15mm": ["60mm", "120mm"],
+    "75mmx25mm": ["75mm", "150mm"],
+    "70mmx30mm": ["70mm", "140mm"],
+    "100mmx50mm": ["100mm", "200mm"],
+    "100mmx150mm": ["100mm", "200mm"],
   };
 
   return (
@@ -488,46 +534,6 @@ export const BarcodePage = () => {
                 >
                   <div>
                     <label
-                      htmlFor="quantity"
-                      style={{
-                        display: "block",
-                        fontSize: "14px",
-                        color: "#1f2937",
-                        marginBottom: "8px",
-                        fontWeight: "500",
-                      }}
-                    >
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      id="quantity"
-                      placeholder="Enter quantity"
-                      value={quantity}
-                      onChange={(e) =>
-                        setQuantity(Math.max(1, parseInt(e.target.value) || 1))
-                      }
-                      min="1"
-                      disabled={loading}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        border: "1px solid #d1d5db",
-                        borderRadius: "8px",
-                        fontSize: "16px",
-                        color: "#1f2937",
-                        backgroundColor: "#fff",
-                        boxShadow: "inset 0 1px 3px rgba(0, 0, 0, 0.1)",
-                        outline: "none",
-                        transition: "border-color 0.3s ease",
-                      }}
-                      onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
-                      onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
-                    />
-                  </div>
-
-                  <div>
-                    <label
                       htmlFor="templateSize"
                       style={{
                         display: "block",
@@ -562,8 +568,11 @@ export const BarcodePage = () => {
                       onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
                       onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
                     >
-                      <option value="50mmx25mm">50mm x 25mm</option>
-                      <option value="38mmx25mm">38mm x 25mm</option>
+                      {Object.keys(paperSizeOptions).map((size) => (
+                        <option key={size} value={size}>
+                          {size.replace("mmx", "mm x ")}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -607,6 +616,45 @@ export const BarcodePage = () => {
                       ))}
                     </select>
                   </div>
+
+                  <div>
+                    <label
+                      htmlFor="quantity"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        color: "#1f2937",
+                        marginBottom: "8px",
+                        fontWeight: "500",
+                      }}
+                    >
+                      Quantity
+                    </label>
+                    <input
+                      type="number"
+                      id="quantity"
+                      value={quantity}
+                      onChange={(e) =>
+                        setQuantity(parseInt(e.target.value) || 1)
+                      }
+                      min="1"
+                      disabled={loading}
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "8px",
+                        fontSize: "16px",
+                        color: "#1f2937",
+                        backgroundColor: "#fff",
+                        boxShadow: "inset 0 1px 3px rgba(0, 0, 0, 0.1)",
+                        outline: "none",
+                        transition: "border-color 0.3s ease",
+                      }}
+                      onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
+                      onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
+                    />
+                  </div>
                 </div>
               </>
             )}
@@ -622,7 +670,7 @@ export const BarcodePage = () => {
                     fontWeight: "600",
                   }}
                 >
-                  Generated Barcodes
+                  Generated Barcode (Preview)
                 </h3>
                 <div
                   ref={printRef}
@@ -633,53 +681,77 @@ export const BarcodePage = () => {
                     justifyItems: "center",
                   }}
                 >
-                  {barcodesToPrint.map((product, index) => (
-                    <div
-                      key={`${product.barcode}-${index}`}
-                      className="barcode-label"
-                      style={{
-                        border: "1px solid #000",
-                        padding: "2px",
-                        textAlign: "left",
-                        fontSize: "8px",
-                        width: templateSize === "50mmx25mm" ? "50mm" : "38mm",
-                        height: "25mm",
-                        backgroundColor: "#fff",
-                        boxSizing: "border-box",
-                        position: "relative",
-                      }}
-                    >
-                      <h3
+                  {barcodesToPrint.slice(0, 1).map((product, index) => {
+                    const [labelWidth, labelHeight] = templateSize
+                      .split("x")
+                      .map((dim) => dim);
+                    return (
+                      <div
+                        key={`${product.barcode}-${index}`}
+                        className="barcode-label"
                         style={{
-                          margin: "0 0 1px 0",
-                          fontWeight: "bold",
-                          fontSize: "10px",
-                          textAlign: "center",
+                          border: "1px solid #000",
+                          padding: "2px",
+                          textAlign: "left",
+                          fontSize: "8px",
+                          width: labelWidth,
+                          height: labelHeight,
+                          backgroundColor: "#fff",
+                          boxSizing: "border-box",
+                          position: "relative",
                         }}
                       >
-                        {product.product_name.toUpperCase()}
-                      </h3>
-                      <div style={{ margin: "1px 0", lineHeight: "1.1" }}>
-                        කල්. දිනය/ EXP Date: {product.expiry_date}
+                        <h3
+                          style={{
+                            margin: "0 0 1px 0",
+                            fontWeight: "bold",
+                            fontSize: "10px",
+                            textAlign: "center",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {product.product_name.toUpperCase()}
+                        </h3>
+                        <div
+                          style={{
+                            margin: "1px 0",
+                            lineHeight: "1.1",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          කල්. දිනය/ EXP Date: {product.expiry_date}
+                        </div>
+                        <div
+                          style={{
+                            margin: "1px 0",
+                            lineHeight: "1.1",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          කු. අං/ Batch No: ${product.batch_number}
+                        </div>
+                        <canvas
+                          id={`barcode-${index}`}
+                          style={{
+                            margin: "0 auto",
+                            display: "block",
+                            width: "80%",
+                            height: "auto",
+                          }}
+                        />
+                        <div className="mrp">MRP: ${product.mrp}</div>
+                        <div className="seller">
+                          Import&Distributed by: ${product.supplier}
+                        </div>
                       </div>
-                      <div style={{ margin: "1px 0", lineHeight: "1.1" }}>
-                        කු. අං/ Batch No: {product.batch_number}
-                      </div>
-                      <canvas
-                        id={`barcode-${index}`}
-                        style={{
-                          margin: "0 auto",
-                          display: "block",
-                          width: "80%",
-                          height: "auto",
-                        }}
-                      />
-                      <div className="mrp">MRP: {product.mrp}</div>
-                      <div className="seller">
-                        Import&Distributed by: {product.supplier}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -723,7 +795,7 @@ export const BarcodePage = () => {
                     !loading && (e.target.style.transform = "scale(1)")
                   }
                 >
-                  Generate Barcodes
+                  Generate Barcode
                 </button>
                 {barcodesToPrint.length > 0 && (
                   <button
