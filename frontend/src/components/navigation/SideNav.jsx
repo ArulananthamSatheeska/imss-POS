@@ -445,8 +445,8 @@ const SideNav = ({ isPosOpen }) => {
                       to={item.subItems ? "#" : item.path}
                       onClick={() => item.subItems && toggleMenu(item.path)}
                       className={`hover:bg-amber-600 dark:hover:bg-slate-600 flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-100 ${isActive
-                          ? " hover:text-slate-900 text-blue-700  dark:text-amber-600"
-                          : "text-gray-700 hover:text-slate-900 dark:text-gray-400 dark:hover:text-cyan-500"
+                        ? " hover:text-slate-900 text-blue-700  dark:text-amber-600"
+                        : "text-gray-700 hover:text-slate-900 dark:text-gray-400 dark:hover:text-cyan-500"
                         }`}
                     >
                       <Icon size={20} />
@@ -475,8 +475,8 @@ const SideNav = ({ isPosOpen }) => {
                             key={subItem.path}
                             to={subItem.path}
                             className={`flex items-center ml-8 p-2 rounded-lg transition-colors duration-200 ${location.pathname === subItem.path
-                                ? "bg-amber-500 text-blue-700 dark:bg-blue-800 dark:text-blue-300"
-                                : "text-gray-700 hover:bg-amber-500 dark:text-gray-400 dark:hover:bg-gray-700"
+                              ? "bg-amber-500 text-blue-700 dark:bg-blue-800 dark:text-blue-300"
+                              : "text-gray-700 hover:bg-amber-500 dark:text-gray-400 dark:hover:bg-gray-700"
                               }`}
                           >
                             {subItem.icon && <subItem.icon size={16} />}

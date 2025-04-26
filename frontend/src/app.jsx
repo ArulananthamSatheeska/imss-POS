@@ -80,6 +80,12 @@ import ProjectForm from "./components/TaskManager/ProjectForm.jsx";
 import Home from "./components/TaskManager/Home.jsx";
 import { BarcodePage } from "./pages/items/BarcodePage.jsx";
 import Expiry from "./pages/Expiry/Expiry.jsx";
+import PurchaseForm from "./pages/purchasing/PurchaseForm.jsx";
+import PurchaseList from "./pages/purchasing/PurchaseList.jsx";
+import PrintPreviewModal from "./pages/purchasing/PrintPreviewModal.jsx";
+import PrintablePurchase from "./pages/purchasing/PrintablePurchase.jsx";
+import ItemForm from "./components/item Form/ItemForm.jsx";
+
 
 // === App Component ===
 function App() {
@@ -175,6 +181,9 @@ function App() {
                   element={<ItemWiseReport />}
                 />
                 <Route path="DailyProfit" element={<DailyProfitReport />} />
+
+                <Route path="ItemForm" element={<ItemForm />} />
+
                 <Route
                   path="BillWiseProfit"
                   element={<BillWiseProfitReport />}
@@ -214,6 +223,13 @@ function App() {
                 <Route path="SubtaskForm" element={<SubtaskForm />} />
                 <Route path="TaskForm" element={<TaskForm />} />
                 <Route path="Home" element={<Home />} />
+                <Route path="PurchaseForm" element={<PurchaseForm />} />
+                <Route path="PurchaseList" element={<PurchaseList />} />
+                <Route
+                  path="PrintPreviewModal"
+                  element={<PrintPreviewModal />}
+                />
+                <Route path="PrintablePurchase" element={<PrintablePurchase />} />
 
                 <Route
                   path="ProductionCategoryModal"

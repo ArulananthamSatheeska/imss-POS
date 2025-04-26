@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/NewAuthContext";
 import { getApi } from "../../services/api";
+import { useNavigate } from "react-router-dom";
 
 const PurchaseInvoiceForm = ({
   onGenerateInvoice,
@@ -22,6 +23,8 @@ const PurchaseInvoiceForm = ({
     }
   );
 
+  const navigate = useNavigate();
+
   const [items, setItems] = useState(existingInvoice?.items || []);
   const [itemForm, setItemForm] = useState({
     itemId: "",
@@ -31,20 +34,17 @@ const PurchaseInvoiceForm = ({
     discountPercentage: 0,
     discountAmount: 0,
     tax: 0,
+    searchTerm: "",
   });
 
   const [suppliers, setSuppliers] = useState([]);
   const [stores, setStores] = useState([]);
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const api = getApi();
-
-  console.log("PurchaseInvoiceForm rendering", {
-    user,
-    existingInvoice,
-  });
 
   // Fetch data on mount
   useEffect(() => {
@@ -60,62 +60,37 @@ const PurchaseInvoiceForm = ({
     setLoading(true);
     try {
       const timestamp = new Date().getTime();
-      console.log("Fetching data with token:", user.token);
       const [suppliersRes, storesRes, productsRes] = await Promise.all([
-        api.get(`/suppliers?_t=${timestamp}`).catch((err) => {
-          console.error(
-            "Suppliers fetch error:",
-            err.response?.data || err.message
-          );
-          throw err;
-        }),
-        api.get(`/store-locations?_t=${timestamp}`).catch((err) => {
-          console.error(
-            "Stores fetch error:",
-            err.response?.data || err.message
-          );
-          throw err;
-        }),
-        api.get(`/products?_t=${timestamp}`).catch((err) => {
-          console.error(
-            "Products fetch error:",
-            err.response?.data || err.message
-          );
-          throw err;
-        }),
+        api.get(`/suppliers?_t=${timestamp}`),
+        api.get(`/store-locations?_t=${timestamp}`),
+        api.get(`/products?_t=${timestamp}`),
       ]);
-
-      console.log("API responses:", {
-        suppliers: suppliersRes.data,
-        stores: storesRes.data,
-        products: productsRes.data,
-      });
 
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
         : Array.isArray(suppliersRes.data)
-        ? suppliersRes.data
-        : [];
+          ? suppliersRes.data
+          : [];
       const storesData = Array.isArray(storesRes.data.data)
         ? storesRes.data.data
         : Array.isArray(storesRes.data)
-        ? storesRes.data
-        : [];
+          ? storesRes.data
+          : [];
       const productsData = Array.isArray(productsRes.data.data)
         ? productsRes.data.data
         : Array.isArray(productsRes.data)
-        ? productsRes.data
-        : [];
+          ? productsRes.data
+          : [];
 
       setSuppliers(suppliersData);
       setStores(storesData);
       setProducts(productsData);
+      setFilteredProducts(productsData);
 
       if (suppliersData.length === 0) {
         setErrors((prev) => ({
           ...prev,
-          suppliers:
-            "No suppliers available. Please add suppliers in the system.",
+          suppliers: "No suppliers available. Please add suppliers in the system.",
         }));
         toast.warn("No suppliers available");
       }
@@ -137,11 +112,6 @@ const PurchaseInvoiceForm = ({
       const errorMsg = error.response?.data?.message || "Error fetching data";
       setErrors({ fetch: errorMsg });
       toast.error(errorMsg);
-      console.error("Fetch data error:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
       if (error.response?.status === 401) {
         toast.error("Session expired. Please login again.");
       }
@@ -169,7 +139,7 @@ const PurchaseInvoiceForm = ({
     const { name, value } = e.target;
     setItemForm({
       ...itemForm,
-      [name]: name === "itemId" ? value : parseFloat(value) || 0,
+      [name]: name === "itemId" || name === "searchTerm" ? value : parseFloat(value) || 0,
     });
   };
 
@@ -179,6 +149,24 @@ const PurchaseInvoiceForm = ({
       ...invoice,
       [name]: name === "paidAmount" ? parseFloat(value) || 0 : value,
     });
+  };
+
+  const handleItemSearch = (e) => {
+    const search = e.target.value;
+    setItemForm(prev => ({ ...prev, searchTerm: search }));
+
+    if (search === "") {
+      setFilteredProducts(products);
+    } else {
+      setFilteredProducts(
+        products.filter(
+          (p) =>
+            p.product_name?.toLowerCase().includes(search.toLowerCase()) ||
+            p.barcode?.toLowerCase().includes(search.toLowerCase()) ||
+            p.short_name?.toLowerCase().includes(search.toLowerCase())
+        )
+      );
+    }
   };
 
   const addItem = () => {
@@ -224,8 +212,10 @@ const PurchaseInvoiceForm = ({
       discountPercentage: 0,
       discountAmount: 0,
       tax: 0,
+      searchTerm: "",
     });
     setErrors((prev) => ({ ...prev, item: undefined }));
+    setFilteredProducts(products);
   };
 
   const removeItem = (index) => {
@@ -273,7 +263,6 @@ const PurchaseInvoiceForm = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Form submitted:", { invoice, items });
     if (!validateForm()) {
       toast.error("Please fix the errors in the form");
       return;
@@ -293,6 +282,13 @@ const PurchaseInvoiceForm = ({
       total: calculateFinalTotal(),
     };
     onGenerateInvoice(newInvoice);
+  };
+
+  const handleAddNewItem = () => {
+    toast.info("This feature will open a new item form");
+
+    // Navigate to the "Item Add Form" page
+    navigate('/ItemForm'); // Make sure '/item-add' is the correct route for your Item Add Form
   };
 
   return (
@@ -317,181 +313,207 @@ const PurchaseInvoiceForm = ({
         )}
 
         {!loading && (
-          <form onSubmit={handleSubmit}>
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-6 bg-slate-50 dark:bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-screen-xl max-h-[100vh] overflow-y-auto"
+          >
             {/* Purchase Details */}
             <div className="mb-6">
               <h4 className="text-lg font-semibold text-blue-400 mb-4 border-b border-gray-700 pb-2">
                 Purchase Details
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Purchase Date:
-                  </label>
-                  <input
-                    type="date"
-                    name="purchaseDate"
-                    value={invoice.purchaseDate}
-                    onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Bill Number:
-                  </label>
-                  <input
-                    type="text"
-                    name="billNumber"
-                    value={invoice.billNumber}
-                    onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    placeholder="GRN-00001"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Invoice Number:
-                  </label>
-                  <input
-                    type="text"
-                    name="invoiceNumber"
-                    value={invoice.invoiceNumber}
-                    onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    placeholder="PINV-001"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Payment Method:
-                  </label>
-                  <select
-                    name="paymentMethod"
-                    value={invoice.paymentMethod}
-                    onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    disabled={loading}
-                  >
-                    <option value="Cash">Cash</option>
-                    <option value="Credit">Credit</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Supplier:
-                  </label>
-                  <select
-                    name="supplierId"
-                    value={invoice.supplierId}
-                    onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    required
-                    disabled={loading}
-                  >
-                    <option value="">Select Supplier</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.supplier_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Store:
-                  </label>
-                  <select
-                    name="storeId"
-                    value={invoice.storeId}
-                    onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    required
-                    disabled={loading}
-                  >
-                    <option value="">Select Store</option>
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.store_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Paid Amount:
-                  </label>
-                  <input
-                    type="number"
-                    name="paidAmount"
-                    value={invoice.paidAmount}
-                    onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    disabled={loading}
-                  />
-                </div>
-                {existingInvoice && (
+              <div className="mb-8">
+                <h4 className="text-lg font-semibold text-blue-500 mb-4 border-b border-gray-700 pb-2">
+                  Invoice Details
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
-                      Status:
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Purchase Date:
+                    </label>
+                    <input
+                      type="date"
+                      name="purchaseDate"
+                      value={invoice.purchaseDate}
+                      onChange={handleInvoiceChange}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Bill Number:
+                    </label>
+                    <input
+                      type="text"
+                      name="billNumber"
+                      value={invoice.billNumber}
+                      onChange={handleInvoiceChange}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      placeholder="GRN-00001"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Invoice Number:
+                    </label>
+                    <input
+                      type="text"
+                      name="invoiceNumber"
+                      value={invoice.invoiceNumber}
+                      onChange={handleInvoiceChange}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      placeholder="PINV-001"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Payment Method:
                     </label>
                     <select
-                      name="status"
-                      value={invoice.status}
+                      name="paymentMethod"
+                      value={invoice.paymentMethod}
                       onChange={handleInvoiceChange}
-                      className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                       disabled={loading}
                     >
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="cancelled">Cancelled</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Credit">Credit</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
-                )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Supplier:
+                    </label>
+                    <select
+                      name="supplierId"
+                      value={invoice.supplierId}
+                      onChange={handleInvoiceChange}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      required
+                      disabled={loading}
+                    >
+                      <option value="">Select Supplier</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.supplier_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Store:
+                    </label>
+                    <select
+                      name="storeId"
+                      value={invoice.storeId}
+                      onChange={handleInvoiceChange}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      required
+                      disabled={loading}
+                    >
+                      <option value="">Select Store</option>
+                      {stores.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.store_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Paid Amount:
+                    </label>
+                    <input
+                      type="number"
+                      name="paidAmount"
+                      value={invoice.paidAmount}
+                      onChange={handleInvoiceChange}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      disabled={loading}
+                    />
+                  </div>
+                  {existingInvoice && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Status:
+                      </label>
+                      <select
+                        name="status"
+                        value={invoice.status}
+                        onChange={handleInvoiceChange}
+                        className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                        disabled={loading}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Item Selection */}
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold text-blue-400 mb-4 border-b border-gray-700 pb-2">
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-blue-500 mb-4 border-b border-gray-700 pb-2">
                 Item Selection
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Select Item:
                   </label>
-                  <select
-                    name="itemId"
-                    value={itemForm.itemId}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    disabled={loading}
-                  >
-                    <option value="">Select Item</option>
-                    {products.length === 0 ? (
-                      <option disabled>No products available</option>
-                    ) : (
-                      products.map((p) => (
-                        <option key={p.product_id} value={p.product_id}>
-                          {p.product_name}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by name, barcode, or short name"
+                      value={itemForm.searchTerm}
+                      onChange={handleItemSearch}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      disabled={loading}
+                    />
+                    <select
+                      name="itemId"
+                      value={itemForm.itemId}
+                      onChange={handleItemFormChange}
+                      className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white mt-2"
+                      disabled={loading}
+                    >
+                      <option value="">Select Item</option>
+                      {filteredProducts.length === 0 ? (
+                        <option disabled>No products available</option>
+                      ) : (
+                        filteredProducts.map((p) => (
+                          <option key={p.product_id} value={p.product_id}>
+                            {p.product_name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddNewItem}
+                      className="mt-2 p-2 bg-blue-500 text-white rounded-md w-full hover:bg-blue-600 transition-colors"
+                    >
+                      Add New Item
+                    </button>
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Quantity:
                   </label>
                   <input
@@ -499,13 +521,13 @@ const PurchaseInvoiceForm = ({
                     name="quantity"
                     value={itemForm.quantity}
                     onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     min="1"
                     disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Free Items:
                   </label>
                   <input
@@ -513,13 +535,13 @@ const PurchaseInvoiceForm = ({
                     name="freeItems"
                     value={itemForm.freeItems}
                     onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     min="0"
                     disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Buying Cost:
                   </label>
                   <input
@@ -527,14 +549,14 @@ const PurchaseInvoiceForm = ({
                     name="buyingCost"
                     value={itemForm.buyingCost}
                     onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     min="0"
                     step="0.01"
                     disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Discount %:
                   </label>
                   <input
@@ -542,7 +564,7 @@ const PurchaseInvoiceForm = ({
                     name="discountPercentage"
                     value={itemForm.discountPercentage}
                     onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     min="0"
                     max="100"
                     step="0.01"
@@ -550,7 +572,7 @@ const PurchaseInvoiceForm = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Discount Amount:
                   </label>
                   <input
@@ -558,14 +580,14 @@ const PurchaseInvoiceForm = ({
                     name="discountAmount"
                     value={itemForm.discountAmount}
                     onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     min="0"
                     step="0.01"
                     disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Tax:
                   </label>
                   <input
@@ -573,17 +595,17 @@ const PurchaseInvoiceForm = ({
                     name="tax"
                     value={itemForm.tax}
                     onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-3 bg-gray-300 dark:bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                     min="0"
                     step="0.01"
                     disabled={loading}
                   />
                 </div>
-                <div className="flex items-end gap-2">
+                <div className="flex items-end gap-4 md:col-span-2 lg:col-span-3 xl:col-span-2">
                   <button
                     type="button"
                     onClick={addItem}
-                    className="w-full p-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full p-3 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                     disabled={loading}
                   >
                     Add Item
@@ -591,7 +613,7 @@ const PurchaseInvoiceForm = ({
                   <button
                     type="button"
                     onClick={resetItemForm}
-                    className="w-full p-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="w-full p-3 bg-gray-600 text-white rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500"
                     disabled={loading}
                   >
                     Reset
@@ -601,14 +623,14 @@ const PurchaseInvoiceForm = ({
             </div>
 
             {/* Item Table */}
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold text-blue-400 mb-4 border-b border-gray-700 pb-2">
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-blue-500 mb-4 border-b border-gray-700 pb-2">
                 Selected Items
               </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full mb-4">
+              <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+                <table className="w-full table-auto mb-4">
                   <thead>
-                    <tr className="bg-gray-700 text-gray-300">
+                    <tr className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
                       <th className="p-3 text-left">Description</th>
                       <th className="p-3 text-center">Qty</th>
                       <th className="p-3 text-center">Free Items</th>
@@ -625,7 +647,7 @@ const PurchaseInvoiceForm = ({
                       <tr>
                         <td
                           colSpan={9}
-                          className="p-3 text-center text-gray-400"
+                          className="p-3 text-center text-gray-400 dark:text-gray-500"
                         >
                           No items added
                         </td>
@@ -634,7 +656,7 @@ const PurchaseInvoiceForm = ({
                       items.map((item, index) => (
                         <tr
                           key={item.id}
-                          className="border-b border-gray-700 hover:bg-gray-700/50"
+                          className="border-b border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-300"
                         >
                           <td className="p-3">{item.description}</td>
                           <td className="p-3 text-center">{item.quantity}</td>
@@ -658,7 +680,7 @@ const PurchaseInvoiceForm = ({
                             <button
                               type="button"
                               onClick={() => removeItem(index)}
-                              className="p-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                              className="p-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
                               disabled={loading}
                             >
                               <svg
@@ -682,49 +704,61 @@ const PurchaseInvoiceForm = ({
                 </table>
               </div>
 
-              <div className="flex justify-end mt-4">
-                <div className="bg-gray-700 p-4 rounded-lg w-64">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Subtotal:</span>
-                    <span className="text-white">
+              <div className="flex justify-end mt-6">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-72">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Subtotal:
+                    </span>
+                    <span className="text-gray-900 dark:text-white">
                       {calculateSubtotal().toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Total Discount:</span>
-                    <span className="text-white">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Total Discount:
+                    </span>
+                    <span className="text-gray-900 dark:text-white">
                       {items
                         .reduce((sum, item) => sum + item.discountAmount, 0)
                         .toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Total Tax:</span>
-                    <span className="text-white">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Total Tax:
+                    </span>
+                    <span className="text-gray-900 dark:text-white">
                       {items
                         .reduce((sum, item) => sum + item.tax, 0)
                         .toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Total:</span>
-                    <span className="text-blue-400">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Total:
+                    </span>
+                    <span className="text-blue-500 dark:text-blue-400">
                       {calculateFinalTotal().toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Paid Amount:</span>
-                    <span className="text-green-400">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Paid Amount:
+                    </span>
+                    <span className="text-green-500 dark:text-green-400">
                       {invoice.paidAmount.toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-lg font-semibold border-t border-gray-600 pt-2">
-                    <span className="text-gray-300">Balance:</span>
+                  <div className="flex justify-between text-lg font-semibold border-t border-gray-300 dark:border-gray-600 pt-3 mt-3">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Balance:
+                    </span>
                     <span
                       className={
                         calculateBalance() < 0
-                          ? "text-red-400"
-                          : "text-yellow-400"
+                          ? "text-red-500 dark:text-red-400"
+                          : "text-yellow-500 dark:text-yellow-400"
                       }
                     >
                       {calculateBalance().toFixed(2)}
@@ -735,16 +769,16 @@ const PurchaseInvoiceForm = ({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end space-x-4 mt-6 border-t border-gray-700 pt-4">
+            <div className="flex justify-end space-x-4 mt-6 border-t border-gray-700 pt-6">
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-all duration-300 flex items-center"
+                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 transition-all duration-300 flex items-center justify-center gap-2"
                 disabled={loading}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-1"
+                  className="h-5 w-5"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -758,12 +792,12 @@ const PurchaseInvoiceForm = ({
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center"
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all duration-300 flex items-center justify-center gap-2"
                 disabled={loading}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-1"
+                  className="h-5 w-5"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
