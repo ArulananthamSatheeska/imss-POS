@@ -1,6 +1,14 @@
 # Release Notes for 11.x
 
-## [Unreleased](https://github.com/laravel/framework/compare/v11.44.3...11.x)
+## [Unreleased](https://github.com/laravel/framework/compare/v11.44.5...11.x)
+
+## [v11.44.5](https://github.com/laravel/framework/compare/v11.44.4...v11.44.5) - 2025-04-24
+
+* [11.x] Allows to toggle markdown email encoding by [@crynobone](https://github.com/crynobone) in https://github.com/laravel/framework/pull/55539
+
+## [v11.44.4](https://github.com/laravel/framework/compare/v11.44.3...v11.44.4) - 2025-04-23
+
+* [11.x] Remove incorrect syntax from mail's `message` template by [@crynobone](https://github.com/crynobone) in https://github.com/laravel/framework/pull/55530
 
 ## [v11.44.3](https://github.com/laravel/framework/compare/v11.44.2...v11.44.3) - 2025-04-23
 
