@@ -9,6 +9,7 @@ class Company extends Model
 {
     use HasFactory;
 
+    // Ensure all fields submitted by the form are here
     protected $fillable = [
         'company_name',
         'company_type',
@@ -29,7 +30,7 @@ class Company extends Model
         'owner_name',
         'owner_contact',
         'admin_username',
-        'admin_password',
+        'admin_password', // Allow mass assignment for creation/update
         'user_role',
         'invoice_prefix',
         'default_payment_methods',
@@ -42,14 +43,21 @@ class Company extends Model
         'integrate_accounting',
     ];
 
+    // Hidden fields (like password) if you don't want them returned by default
+    protected $hidden = [
+       // 'admin_password', // Uncomment if you want to hide password in API responses
+    ];
+
+
+    // Casts help Eloquent handle data types automatically
     protected $casts = [
-        'default_payment_methods' => 'array',
+        'default_payment_methods' => 'array', // Handles JSON<->array conversion
         'multi_store_support' => 'boolean',
         'enable_2fa' => 'boolean',
         'auto_generate_qr' => 'boolean',
         'enable_notifications' => 'boolean',
         'integrate_accounting' => 'boolean',
-        'fiscal_year_start' => 'date',
-        'fiscal_year_end' => 'date',
+        'fiscal_year_start' => 'date:Y-m-d', // Specify format if needed
+        'fiscal_year_end' => 'date:Y-m-d',   // Specify format if needed
     ];
 }
