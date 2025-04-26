@@ -31,7 +31,7 @@ function CreateCompany() {
     const initialCompanyInfo = {
         company_name: '',
         company_type: 'Retail',
-        custom_company_type: '', // Added for custom type input
+        custom_company_type: '',
         business_category: '',
         company_logo: null,
         business_address: '',
@@ -52,7 +52,7 @@ function CreateCompany() {
         admin_password: '',
         user_role: 'Admin',
         invoice_prefix: 'INV-0001',
-        default_payment_method: 'Cash', // Changed to single selection
+        default_payment_methods: ['Cash'], // Reverted to plural and array
         multi_store_support: false,
         default_language: 'English',
         time_zone: '',
@@ -65,12 +65,12 @@ function CreateCompany() {
     const [companyInfo, setCompanyInfo] = useState(initialCompanyInfo);
     const [existingLogoUrl, setExistingLogoUrl] = useState(null);
     const [logoPreviewUrl, setLogoPreviewUrl] = useState(null);
-    const [showCustomTypeInput, setShowCustomTypeInput] = useState(false); // State for custom type input
+    const [showCustomTypeInput, setShowCustomTypeInput] = useState(false);
 
     const refs = {
         company_name: useRef(null),
         company_type: useRef(null),
-        custom_company_type: useRef(null), // Added ref for custom type
+        custom_company_type: useRef(null),
         business_category: useRef(null),
         company_logo: useRef(null),
         business_address: useRef(null),
@@ -90,7 +90,7 @@ function CreateCompany() {
         admin_password: useRef(null),
         user_role: useRef(null),
         invoice_prefix: useRef(null),
-        default_payment_method: useRef(null), // Updated ref name
+        default_payment_methods: useRef(null), // Reverted to plural
         multi_store_support: useRef(null),
         default_language: useRef(null),
         time_zone: useRef(null),
@@ -126,7 +126,9 @@ function CreateCompany() {
                 ...data,
                 company_logo: null,
                 admin_password: '',
-                default_payment_method: data.default_payment_method || 'Cash', // Updated field
+                default_payment_methods: Array.isArray(data.default_payment_methods)
+                    ? data.default_payment_methods
+                    : (data.default_payment_methods ? JSON.parse(data.default_payment_methods) : ['Cash']),
                 multi_store_support: !!data.multi_store_support,
                 enable_2fa: !!data.enable_2fa,
                 auto_generate_qr: !!data.auto_generate_qr,
@@ -134,10 +136,9 @@ function CreateCompany() {
                 integrate_accounting: !!data.integrate_accounting,
                 fiscal_year_start: formatDateForInput(data.fiscal_year_start),
                 fiscal_year_end: formatDateForInput(data.fiscal_year_end),
-                custom_company_type: data.company_type && !['Retail', 'Wholesale', 'Restaurant', 'Service', 'Manufacturing'].includes(data.company_type) ? data.company_type : '', // Handle custom type
+                custom_company_type: data.company_type && !['Retail', 'Wholesale', 'Restaurant', 'Service', 'Manufacturing'].includes(data.company_type) ? data.company_type : '',
             };
 
-            // Set showCustomTypeInput if company_type is not in predefined list
             setShowCustomTypeInput(!!preparedData.custom_company_type);
             if (preparedData.custom_company_type) {
                 preparedData.company_type = 'Other';
@@ -183,14 +184,16 @@ function CreateCompany() {
         } else if (type === 'checkbox') {
             setCompanyInfo({ ...companyInfo, [name]: checked });
         } else if (name === 'company_type') {
-            // Handle company type change
             const isOther = value === 'Other';
             setShowCustomTypeInput(isOther);
             setCompanyInfo({
                 ...companyInfo,
                 company_type: value,
-                custom_company_type: isOther ? companyInfo.custom_company_type : '', // Reset if not Other
+                custom_company_type: isOther ? companyInfo.custom_company_type : '',
             });
+        } else if (name === 'default_payment_methods') {
+            // Store as an array with a single value
+            setCompanyInfo({ ...companyInfo, [name]: [value] });
         } else {
             setCompanyInfo({ ...companyInfo, [name]: value });
         }
@@ -209,11 +212,13 @@ function CreateCompany() {
                     formData.append(key, companyInfo[key]);
                 }
             } else if (key === 'company_type') {
-                // Send custom_company_type if company_type is Other, otherwise send company_type
                 const value = companyInfo.company_type === 'Other' ? companyInfo.custom_company_type : companyInfo.company_type;
                 if (value) {
                     formData.append(key, value);
                 }
+            } else if (key === 'default_payment_methods') {
+                // Send as JSON string
+                formData.append(key, JSON.stringify(companyInfo[key]));
             } else if (typeof companyInfo[key] === 'boolean') {
                 formData.append(key, companyInfo[key] ? '1' : '0');
             } else if (companyInfo[key] !== null && companyInfo[key] !== undefined && key !== 'custom_company_type') {
@@ -232,7 +237,9 @@ function CreateCompany() {
 
         try {
             console.log("Submitting FormData:");
-            for (let [key, value] of formData.entries()) { console.log(`${key}: ${value}`); }
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
             console.log("URL:", url);
             console.log("Method:", method);
             console.log("Is Editing:", isEditing);
@@ -718,16 +725,16 @@ function CreateCompany() {
                                     onChange={handleChange}
                                     ref={refs.invoice_prefix}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'default_payment_method')}
+                                    onKeyDown={(e) => handleKeyDown(e, 'default_payment_methods')}
                                 />
                             </div>
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Default Payment Method</label>
                                 <select
-                                    name="default_payment_method"
-                                    value={companyInfo.default_payment_method}
+                                    name="default_payment_methods"
+                                    value={companyInfo.default_payment_methods[0] || 'Cash'}
                                     onChange={handleChange}
-                                    ref={refs.default_payment_method}
+                                    ref={refs.default_payment_methods}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                     onKeyDown={(e) => handleKeyDown(e, 'multi_store_support')}
                                 >
