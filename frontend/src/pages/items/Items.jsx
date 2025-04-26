@@ -92,7 +92,8 @@ const Items = () => {
     } catch (error) {
       console.error("Error importing items:", error);
       toast.error(
-        "Error importing items: " + (error.response?.data?.message || error.message)
+        "Error importing items: " +
+          (error.response?.data?.message || error.message)
       );
     }
   };
@@ -133,7 +134,9 @@ const Items = () => {
     } catch (error) {
       console.error("Error saving item:", error);
       console.error("Response data:", error.response?.data);
-      toast.error("Error saving item: " + (error.response?.data?.message || error.message));
+      toast.error(
+        "Error saving item: " + (error.response?.data?.message || error.message)
+      );
     }
   };
 
@@ -153,13 +156,18 @@ const Items = () => {
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const totalItems = filteredItems.length;
-  const totalOpeningQty = filteredItems.reduce((sum, item) => sum + (item.opening_stock_quantity || 0), 0);
+  const totalOpeningQty = filteredItems.reduce(
+    (sum, item) => sum + (item.opening_stock_quantity || 0),
+    0
+  );
   const totalOpeningCost = filteredItems.reduce(
-    (sum, item) => sum + ((item.opening_stock_quantity || 0) * (item.buying_cost || 0)),
+    (sum, item) =>
+      sum + (item.opening_stock_quantity || 0) * (item.buying_cost || 0),
     0
   );
   const totalSellingPrice = filteredItems.reduce(
-    (sum, item) => sum + ((item.opening_stock_quantity || 0) * (item.sales_price || 0)),
+    (sum, item) =>
+      sum + (item.opening_stock_quantity || 0) * (item.sales_price || 0),
     0
   );
   const profitMargin = totalSellingPrice - totalOpeningCost;
@@ -168,7 +176,10 @@ const Items = () => {
     : 0;
 
   const formatNumber = (number) => {
-    return number.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   };
 
   return (
@@ -211,8 +222,13 @@ const Items = () => {
           <button
             onClick={handleImport}
             disabled={!selectedFile}
-            className={`flex items-center gap-2 px-6 py-2 text-white rounded-lg ${selectedFile ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 cursor-not-allowed"
-              }`}
+
+            className={`flex items-center gap-2 px-6 py-2 text-white rounded-lg ${
+              selectedFile
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-gray-400 cursor-not-allowed"
+            }`}
+
           >
             Import Selected File
           </button>
@@ -266,10 +282,16 @@ const Items = () => {
               <th className="p-2 text-xs text-center uppercase">No</th>
               <th className="p-2 text-xs text-center uppercase">Name</th>
               <th className="p-2 text-xs text-center uppercase">Category</th>
-              <th className="p-2 text-xs text-center uppercase">Buying Price</th>
-              <th className="p-2 text-xs text-center uppercase">Selling Price</th>
+              <th className="p-2 text-xs text-center uppercase">
+                Buying Price
+              </th>
+              <th className="p-2 text-xs text-center uppercase">
+                Selling Price
+              </th>
               <th className="p-2 text-xs text-center uppercase">Opening Qty</th>
-              <th className="p-2 text-xs text-center uppercase">Opening Value</th>
+              <th className="p-2 text-xs text-center uppercase">
+                Opening Value
+              </th>
               <th className="p-2 text-xs text-center uppercase">Actions</th>
             </tr>
           </thead>
@@ -282,19 +304,38 @@ const Items = () => {
               </tr>
             ) : filteredItems.length > 0 ? (
               filteredItems
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .slice(
+                  (currentPage - 1) * itemsPerPage,
+                  currentPage * itemsPerPage
+                )
                 .map((item, index) => (
-                  <tr key={item.product_id} className="hover:bg-gray-500 hover:text-emerald-300">
+                  <tr
+                    key={item.product_id}
+                    className="hover:bg-gray-500 hover:text-emerald-300"
+                  >
                     <td className="px-4 py-2 text-xs text-center">
                       {(currentPage - 1) * itemsPerPage + index + 1}
                     </td>
-                    <td className="px-4 py-2 text-xs text-left">{item.product_name}</td>
-                    <td className="px-4 py-2 text-xs text-center">{item.category}</td>
-                    <td className="px-4 py-2 text-xs text-right">LKR {formatNumber(item.buying_cost)}</td>
-                    <td className="px-4 py-2 text-xs text-right">LKR {formatNumber(item.sales_price)}</td>
-                    <td className="px-4 py-2 text-xs text-right">{item.opening_stock_quantity}</td>
+                    <td className="px-4 py-2 text-xs text-left">
+                      {item.product_name}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-center">
+                      {item.category}
+                    </td>
                     <td className="px-4 py-2 text-xs text-right">
-                      LKR {formatNumber(item.opening_stock_quantity * item.buying_cost)}
+                      LKR {formatNumber(item.buying_cost)}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-right">
+                      LKR {formatNumber(item.sales_price)}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-right">
+                      {item.opening_stock_quantity}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-right">
+                      LKR{" "}
+                      {formatNumber(
+                        item.opening_stock_quantity * item.buying_cost
+                      )}
                     </td>
                     <td className="flex justify-center gap-2 p-2">
                       <button
@@ -336,15 +377,20 @@ const Items = () => {
       </div>
 
       <div className="flex justify-center gap-2">
-        {Array.from({ length: Math.ceil(filteredItems.length / itemsPerPage) }, (_, i) => (
-          <button
-            key={i + 1}
-            onClick={() => paginate(i + 1)}
-            className={`px-4 py-2 ${currentPage === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200"} rounded-lg`}
-          >
-            {i + 1}
-          </button>
-        ))}
+        {Array.from(
+          { length: Math.ceil(filteredItems.length / itemsPerPage) },
+          (_, i) => (
+            <button
+              key={i + 1}
+              onClick={() => paginate(i + 1)}
+              className={`px-4 py-2 ${
+                currentPage === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200"
+              } rounded-lg`}
+            >
+              {i + 1}
+            </button>
+          )
+        )}
       </div>
 
       <div className="p-4 mt-4 text-center bg-transparent rounded-lg shadow-lg">
@@ -356,19 +402,27 @@ const Items = () => {
           </div>
           <div className="p-4 rounded-lg bg-rose-800">
             <p className="text-sm text-pink-500">Total Opening Qty</p>
-            <p className="text-2xl font-bold text-pink-300">{totalOpeningQty}</p>
+            <p className="text-2xl font-bold text-pink-300">
+              {totalOpeningQty}
+            </p>
           </div>
           <div className="p-4 rounded-lg bg-lime-800">
             <p className="text-sm text-lime-500">Total Opening Cost</p>
-            <p className="text-2xl font-bold text-lime-300">LKR {formatNumber(totalOpeningCost)}</p>
+            <p className="text-2xl font-bold text-lime-300">
+              LKR {formatNumber(totalOpeningCost)}
+            </p>
           </div>
           <div className="p-4 rounded-lg bg-fuchsia-800">
             <p className="text-sm text-fuchsia-500">Total Selling Price</p>
-            <p className="text-2xl font-bold text-fuchsia-300">LKR {formatNumber(totalSellingPrice)}</p>
+            <p className="text-2xl font-bold text-fuchsia-300">
+              LKR {formatNumber(totalSellingPrice)}
+            </p>
           </div>
           <div className="p-4 bg-purple-800 rounded-lg">
             <p className="text-sm text-purple-500">Profit Margin</p>
-            <p className="text-2xl font-bold text-purple-300">{profitMarginPercentage}%</p>
+            <p className="text-2xl font-bold text-purple-300">
+              {profitMarginPercentage}%
+            </p>
           </div>
         </div>
       </div>
