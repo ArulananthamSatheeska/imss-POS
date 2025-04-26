@@ -40,12 +40,13 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [categoriesRes, unitTypesRes, suppliersRes, storesRes] = await Promise.all([
-          axios.get("http://127.0.0.1:8000/api/categories"),
-          axios.get("http://127.0.0.1:8000/api/units"),
-          axios.get("http://127.0.0.1:8000/api/suppliers"),
-          axios.get("http://127.0.0.1:8000/api/store-locations"),
-        ]);
+        const [categoriesRes, unitTypesRes, suppliersRes, storesRes] =
+          await Promise.all([
+            axios.get("http://127.0.0.1:8000/api/categories"),
+            axios.get("http://127.0.0.1:8000/api/units"),
+            axios.get("http://127.0.0.1:8000/api/suppliers"),
+            axios.get("http://127.0.0.1:8000/api/store-locations"),
+          ]);
 
         setCategories(categoriesRes.data);
         setUnitTypes(unitTypesRes.data);
@@ -90,7 +91,9 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
   };
 
   const removeExtraField = (index) => {
-    const updatedExtraFields = formData.extra_fields.filter((_, i) => i !== index);
+    const updatedExtraFields = formData.extra_fields.filter(
+      (_, i) => i !== index
+    );
     setFormData({ ...formData, extra_fields: updatedExtraFields });
   };
 
@@ -144,13 +147,20 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       onClose();
     } catch (error) {
       console.error("Error saving product:", error);
-      toast.error(error.response?.data?.message || "Failed to save product. Please try again.");
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to save product. Please try again."
+      );
     }
   };
 
   const handleClose = (e) => {
     e.preventDefault();
-    if (window.confirm("Are you sure you want to close? Any unsaved changes will be lost.")) {
+    if (
+      window.confirm(
+        "Are you sure you want to close? Any unsaved changes will be lost."
+      )
+    ) {
       onClose();
     }
   };
@@ -160,14 +170,19 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       const updatedData = { ...prevData };
 
       if (fieldName === "item_code" && !updatedData.item_code) {
-        updatedData.item_code = `ITM ${Math.floor(1000 + Math.random() * 9000)}`;
+        updatedData.item_code = `ITM ${Math.floor(
+          1000 + Math.random() * 9000
+        )}`;
       }
 
       if (fieldName === "barcode" && !updatedData.barcode) {
         updatedData.barcode = `BAR ${Math.floor(1000 + Math.random() * 9000)}`;
       }
 
-      if (fieldName === "opening_stock_quantity" || fieldName === "buying_cost") {
+      if (
+        fieldName === "opening_stock_quantity" ||
+        fieldName === "buying_cost"
+      ) {
         const openingStockValue =
           (parseFloat(updatedData.opening_stock_quantity) || 0) *
           (parseFloat(updatedData.buying_cost) || 0);
