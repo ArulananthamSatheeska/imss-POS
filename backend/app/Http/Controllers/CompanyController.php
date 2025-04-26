@@ -198,6 +198,69 @@ class CompanyController extends Controller
         }
     }
 
-     // Add a destroy method if needed
-    // public function destroy($company_name) { ... }
+    public function destroy($company_name)
+    {
+        // Decode the name just in case of URL encoding issues
+        $decoded_company_name = urldecode($company_name);
+        Log::info('Attempting to delete company:', ['original_name' => $company_name, 'decoded_name' => $decoded_company_name]);
+
+        $company = Company::where('company_name', $decoded_company_name)->first(); // Use decoded name
+
+        if (!$company) {
+            Log::warning('Company not found for deletion:', ['decoded_name' => $decoded_company_name]);
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        Log::info('Found company to delete:', ['id' => $company->id, 'name' => $company->company_name, 'logo_path' => $company->company_logo]); // Log details
+
+        try {
+            // 1. Delete associated logo file from storage if it exists
+            if ($company->company_logo) {
+                $logoPath = $company->company_logo;
+                Log::info('Checking if logo exists:', ['path' => $logoPath, 'disk' => 'public']);
+
+                if (Storage::disk('public')->exists($logoPath)) {
+                    Log::info('Attempting to delete logo file:', ['path' => $logoPath]);
+                    $deleted = Storage::disk('public')->delete($logoPath); // Check return value
+                    if ($deleted) {
+                    Log::info('Successfully deleted company logo file.');
+                    } else {
+                    Log::warning('Storage::delete returned false for logo.', ['path' => $logoPath]);
+                    }
+                } else {
+                    Log::warning('Company logo file not found in storage using Storage::exists.', ['path' => $logoPath]);
+                }
+            } else {
+                Log::info('Company record has no associated logo path.');
+            }
+
+            // 2. Delete the company record from the database
+            Log::info('Attempting to delete company record from DB:', ['id' => $company->id]);
+            $company->delete();
+            Log::info('Successfully deleted company record from DB.');
+
+            // 3. Return success response
+            return response()->json(['message' => 'Company deleted successfully'], 200);
+
+        } catch (\Illuminate\Database\QueryException $qe) { // Catch specific DB errors
+            Log::error('Database error deleting company:', [
+                'company_name' => $decoded_company_name, 'id' => $company->id,
+                'message' => $qe->getMessage(),
+                'sql_error_code' => $qe->getCode(), // Log SQL error code
+                'trace' => $qe->getTraceAsString()
+            ]);
+            // Check for foreign key constraint error (MySQL code 1451)
+            if ($qe->getCode() == '23000' || $qe->errorInfo[1] == 1451) {
+                return response()->json(['message' => 'Cannot delete company. It might be referenced by other records (e.g., users, invoices).'], 409); // 409 Conflict
+            }
+            return response()->json(['message' => 'Database error during deletion. Please check server logs.'], 500);
+
+        } catch (\Exception $e) { // Catch general errors
+            Log::error('General error deleting company:', [
+                'company_name' => $decoded_company_name, 'id' => $company->id,
+                'message' => $e->getMessage(), 'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['message' => 'Error deleting company. Please check server logs.'], 500);
+        }
+    }
 }

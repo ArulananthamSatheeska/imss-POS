@@ -135,6 +135,7 @@ Route::prefix('discount-schemes')->group(function () {
         Route::post('/', [CompanyController::class, 'store']);         // Create a new company (Uses POST)
         Route::get('/{company_name}', [CompanyController::class, 'show']); // Get a specific company by name (Uses GET)
         Route::put('/{company_name}', [CompanyController::class, 'update']); // Update a company (Uses PUT, handled via _method)
+        Route::delete('/{company_name}', [CompanyController::class, 'destroy']); // Correct: DELETE api/companies/{company_name}
     });
     
 
