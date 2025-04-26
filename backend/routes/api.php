@@ -16,7 +16,10 @@ use App\Http\Controllers\{
     DiscountSchemeController,
     RoleController,
     PermissionController,
-    PurchaseController
+    ProductionCategoryController,
+    ProductionItemController,
+    PurchaseController,
+    RawMaterialController
 };
 
 // Authentication routes (no permission middleware)
@@ -133,3 +136,11 @@ Route::get('/purchases', [PurchaseController::class, 'index']);
 //     Route::get('/products', [ProductController::class, 'index']);
 // });
 
+Route::apiResource('production-categories', ProductionCategoryController::class);
+
+Route::apiResource('raw-materials', RawMaterialController::class);
+Route::get('suppliers', [RawMaterialController::class, 'getSuppliers']);
+Route::get('units', [RawMaterialController::class, 'getUnits']);
+
+
+Route::apiResource('production-items', ProductionItemController::class);

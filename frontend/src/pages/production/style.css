@@ -1,56 +1,64 @@
-@keyframes lightMove {
-    0% {
-        transform: translateX(-100%);
-    }
-
-    50% {
-        transform: translateX(100%);
-    }
-
-    100% {
-        transform: translateX(-100%);
-    }
-}
-
-@keyframes outlineMove {
-    0% {
-        transform: scale(1) translateX(0);
-    }
-
-    50% {
-        transform: scale(1.1) translateX(100%);
-    }
-
-    100% {
-        transform: scale(1) translateX(0);
-    }
+body {
+  font-family: "Inter", sans-serif;
 }
 
 .animate-light {
-    animation: lightMove 1.5s ease-in-out infinite;
+  animation: light 2s infinite;
+}
+
+@keyframes light {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 .animate-outline {
-    animation: outlineMove 2s ease-in-out infinite;
-    border-radius: 8px;
-    pointer-events: none;
+  animation: outline 2s infinite;
 }
 
-/* Hover state animation */
-.group:hover {
-    background-color: #6b46c1;
-    /* Darker purple on hover */
+@keyframes outline {
+  0% {
+    transform: scale(1);
+  }
+  50% {
     transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
-.group:hover .animate-outline {
-    opacity: 1;
-    /* Show the outline more brightly on hover */
-    border-color: #ffffff;
-    /* White border color */
+input,
+select {
+  transition: all 0.3s ease;
 }
 
-.group:hover .animate-light {
-    opacity: 0.8;
-    /* Light effect will be more pronounced */
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.dark input,
+.dark select {
+  background-color: #1f2937;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+.dark input:focus,
+.dark select:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+}
+
+button {
+  transition: background-color 0.3s ease;
 }
