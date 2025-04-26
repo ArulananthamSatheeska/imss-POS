@@ -26,9 +26,16 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
     cabinet: initialData?.cabinet || "",
     row: initialData?.row || "",
     extra_fields: initialData?.extra_fields
-      ? typeof initialData.extra_fields === "string"
-        ? JSON.parse(initialData.extra_fields)
-        : initialData.extra_fields
+      ? (() => {
+        try {
+          const parsed = typeof initialData.extra_fields === "string"
+            ? JSON.parse(initialData.extra_fields)
+            : initialData.extra_fields;
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })()
       : [],
   });
 

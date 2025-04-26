@@ -7,88 +7,108 @@ import {
     CogIcon,
     GlobeAltIcon,
     LockClosedIcon,
-    BuildingOfficeIcon
+    BuildingOfficeIcon,
+    EyeIcon,
+    TrashIcon,
+    XMarkIcon
 } from '@heroicons/react/20/solid';
 import axios from 'axios';
 import { useOutletContext } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Helper to format date string (YYYY-MM-DD) or return empty string
+const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    try {
+        return new Date(dateString).toISOString().split('T')[0];
+    } catch (e) {
+        console.error("Error formatting date:", dateString, e);
+        return '';
+    }
+};
 
 function CreateCompany() {
-    const { isNavVisible } = useOutletContext();
-
-    const [companyInfo, setCompanyInfo] = useState({
+    const initialCompanyInfo = {
         company_name: '',
-        companyType: '',
-        businessCategory: '',
-        companyLogo: null,
-        businessAddress: '',
+        company_type: 'Retail',
+        custom_company_type: '',
+        business_category: '',
+        company_logo: null,
+        business_address: '',
         city: '',
         country: '',
-        contactNumber: '',
+        contact_number: '',
         email: '',
         website: '',
-        vatGstNumber: '',
-        taxId: '',
-        defaultCurrency: 'LKR',
-        fiscalYearStart: '',
-        fiscalYearEnd: '',
-        chartOfAccounts: '',
-        ownerName: '',
-        ownerContact: '',
-        adminUsername: '',
-        adminPassword: '',
-        userRole: 'Admin',
-        invoicePrefix: 'INV-0001',
-        defaultPaymentMethods: ['Cash'],
-        multiStoreSupport: false,
-        defaultLanguage: 'English',
-        timeZone: '',
-        enable2FA: false,
-        autoGenerateQR: false,
-        enableNotifications: false,
-        integrateAccounting: false,
-    });
-
-    const refs = {
-        companyType: useRef(null),
-        businessCategory: useRef(null),
-        companyLogo: useRef(null),
-        businessAddress: useRef(null),
-        city: useRef(null),
-        country: useRef(null),
-        contactNumber: useRef(null),
-        email: useRef(null),
-        website: useRef(null),
-        vatGstNumber: useRef(null),
-        taxId: useRef(null),
-        defaultCurrency: useRef(null),
-        fiscalYearStart: useRef(null),
-        chartOfAccounts: useRef(null),
-        ownerName: useRef(null),
-        ownerContact: useRef(null),
-        adminUsername: useRef(null),
-        adminPassword: useRef(null),
-        userRole: useRef(null),
-        invoicePrefix: useRef(null),
-        defaultPaymentMethods: useRef(null),
-        multiStoreSupport: useRef(null),
-        defaultLanguage: useRef(null),
-        timeZone: useRef(null),
-        enable2FA: useRef(null),
+        vat_gst_number: '',
+        tax_id: '',
+        default_currency: 'LKR',
+        fiscal_year_start: '',
+        fiscal_year_end: '',
+        chart_of_accounts: '',
+        owner_name: '',
+        owner_contact: '',
+        admin_username: '',
+        admin_password: '',
+        user_role: 'Admin',
+        invoice_prefix: 'INV-0001',
+        default_payment_methods: ['Cash'], // Reverted to plural and array
+        multi_store_support: false,
+        default_language: 'English',
+        time_zone: '',
+        enable_2fa: false,
+        auto_generate_qr: false,
+        enable_notifications: false,
+        integrate_accounting: false,
     };
 
-    const [companies, setCompanies] = useState([]); // List of companies for dropdown
-    const [selectedCompany, setSelectedCompany] = useState(''); // Selected company for update
-    const [isEditing, setIsEditing] = useState(false); // Flag to check if updating
+    const [companyInfo, setCompanyInfo] = useState(initialCompanyInfo);
+    const [existingLogoUrl, setExistingLogoUrl] = useState(null);
+    const [logoPreviewUrl, setLogoPreviewUrl] = useState(null);
+    const [showCustomTypeInput, setShowCustomTypeInput] = useState(false);
 
-    // Fetch all companies on component mount
+    const refs = {
+        company_name: useRef(null),
+        company_type: useRef(null),
+        custom_company_type: useRef(null),
+        business_category: useRef(null),
+        company_logo: useRef(null),
+        business_address: useRef(null),
+        city: useRef(null),
+        country: useRef(null),
+        contact_number: useRef(null),
+        email: useRef(null),
+        website: useRef(null),
+        vat_gst_number: useRef(null),
+        tax_id: useRef(null),
+        default_currency: useRef(null),
+        fiscal_year_start: useRef(null),
+        chart_of_accounts: useRef(null),
+        owner_name: useRef(null),
+        owner_contact: useRef(null),
+        admin_username: useRef(null),
+        admin_password: useRef(null),
+        user_role: useRef(null),
+        invoice_prefix: useRef(null),
+        default_payment_methods: useRef(null), // Reverted to plural
+        multi_store_support: useRef(null),
+        default_language: useRef(null),
+        time_zone: useRef(null),
+        enable_2fa: useRef(null),
+    };
+
+    const [companies, setCompanies] = useState([]);
+    const [selectedCompany, setSelectedCompany] = useState('');
+    const [isEditing, setIsEditing] = useState(false);
+    const [isCompanyListVisible, setIsCompanyListVisible] = useState(false);
+
     useEffect(() => {
         fetchCompanies();
     }, []);
 
-    // Fetch list of companies
     const fetchCompanies = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/api/companies');
+            const response = await axios.get('http://localhost:8000/api/companies?fields=id,company_name');
             setCompanies(response.data);
         } catch (error) {
             console.error('Error fetching companies:', error);
@@ -96,205 +116,261 @@ function CreateCompany() {
         }
     };
 
-    // Fetch company details when a company is selected
     const fetchCompanyDetails = async (companyName) => {
         try {
             const response = await axios.get(`http://localhost:8000/api/companies/${companyName}`);
             const data = response.data;
-            setCompanyInfo(data); // Populate form with fetched data
-            setIsEditing(true); // Set editing mode to true
+
+            const preparedData = {
+                ...initialCompanyInfo,
+                ...data,
+                company_logo: null,
+                admin_password: '',
+                default_payment_methods: Array.isArray(data.default_payment_methods)
+                    ? data.default_payment_methods
+                    : (data.default_payment_methods ? JSON.parse(data.default_payment_methods) : ['Cash']),
+                multi_store_support: !!data.multi_store_support,
+                enable_2fa: !!data.enable_2fa,
+                auto_generate_qr: !!data.auto_generate_qr,
+                enable_notifications: !!data.enable_notifications,
+                integrate_accounting: !!data.integrate_accounting,
+                fiscal_year_start: formatDateForInput(data.fiscal_year_start),
+                fiscal_year_end: formatDateForInput(data.fiscal_year_end),
+                custom_company_type: data.company_type && !['Retail', 'Wholesale', 'Restaurant', 'Service', 'Manufacturing'].includes(data.company_type) ? data.company_type : '',
+            };
+
+            setShowCustomTypeInput(!!preparedData.custom_company_type);
+            if (preparedData.custom_company_type) {
+                preparedData.company_type = 'Other';
+            }
+
+            setCompanyInfo(preparedData);
+
+            if (data.company_logo) {
+                setExistingLogoUrl(`/storage/${data.company_logo}`);
+            } else {
+                setExistingLogoUrl(null);
+            }
+            setLogoPreviewUrl(null);
+            setIsEditing(true);
         } catch (error) {
             console.error('Error fetching company details:', error);
             alert('Failed to fetch company details.');
+            resetForm();
         }
     };
 
-    // Handle company selection
     const handleCompanySelect = (e) => {
         const companyName = e.target.value;
         setSelectedCompany(companyName);
         if (companyName) {
-            fetchCompanyDetails(companyName); // Fetch details if a company is selected
+            fetchCompanyDetails(companyName);
         } else {
-            // Reset form if no company is selected
-            setCompanyInfo({
-                company_name: '',
-                companyType: '',
-                businessCategory: '',
-                companyLogo: null,
-                businessAddress: '',
-                city: '',
-                country: '',
-                contactNumber: '',
-                email: '',
-                website: '',
-                vatGstNumber: '',
-                taxId: '',
-                defaultCurrency: 'LKR',
-                fiscalYearStart: '',
-                fiscalYearEnd: '',
-                chartOfAccounts: '',
-                ownerName: '',
-                ownerContact: '',
-                adminUsername: '',
-                adminPassword: '',
-                userRole: 'Admin',
-                defaultLanguage: 'English',
-                timeZone: '',
-                enable2FA: false,
-                autoGenerateQR: false,
-                enableNotifications: false,
-                integrateAccounting: false,
-            });
-            setIsEditing(false); // Set editing mode to false
+            resetForm();
         }
     };
 
-    // Handle input changes
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
+
         if (type === 'file') {
-            setCompanyInfo({ ...companyInfo, [name]: files[0] });
+            const file = files[0];
+            setCompanyInfo({ ...companyInfo, [name]: file });
+            if (file) {
+                setLogoPreviewUrl(URL.createObjectURL(file));
+            } else {
+                setLogoPreviewUrl(null);
+            }
         } else if (type === 'checkbox') {
             setCompanyInfo({ ...companyInfo, [name]: checked });
+        } else if (name === 'company_type') {
+            const isOther = value === 'Other';
+            setShowCustomTypeInput(isOther);
+            setCompanyInfo({
+                ...companyInfo,
+                company_type: value,
+                custom_company_type: isOther ? companyInfo.custom_company_type : '',
+            });
+        } else if (name === 'default_payment_methods') {
+            // Store as an array with a single value
+            setCompanyInfo({ ...companyInfo, [name]: [value] });
         } else {
             setCompanyInfo({ ...companyInfo, [name]: value });
         }
     };
 
-    // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        // Prepare form data for submission
         const formData = new FormData();
+
         Object.keys(companyInfo).forEach((key) => {
-            if (key === 'companyLogo' && companyInfo[key]) {
-                formData.append(key, companyInfo[key]); // Append file
-            } else if (Array.isArray(companyInfo[key])) {
-                formData.append(key, JSON.stringify(companyInfo[key])); // Convert arrays to JSON strings
-            } else {
-                formData.append(key, companyInfo[key]); // Append other fields
+            if (isEditing && key === 'admin_password' && !companyInfo[key]) {
+                return;
+            }
+            if (key === 'company_logo') {
+                if (companyInfo[key] instanceof File) {
+                    formData.append(key, companyInfo[key]);
+                }
+            } else if (key === 'company_type') {
+                const value = companyInfo.company_type === 'Other' ? companyInfo.custom_company_type : companyInfo.company_type;
+                if (value) {
+                    formData.append(key, value);
+                }
+            } else if (key === 'default_payment_methods') {
+                // Send as JSON string
+                formData.append(key, JSON.stringify(companyInfo[key]));
+            } else if (typeof companyInfo[key] === 'boolean') {
+                formData.append(key, companyInfo[key] ? '1' : '0');
+            } else if (companyInfo[key] !== null && companyInfo[key] !== undefined && key !== 'custom_company_type') {
+                formData.append(key, companyInfo[key]);
             }
         });
 
-        try {
-            let response;
-            if (isEditing) {
-                // Update existing company
-                response = await axios.put(`http://localhost:8000/api/companies/${selectedCompany}`, formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                });
-                alert('Company updated successfully!');
-            } else {
-                // Create new company
-                response = await axios.post('http://localhost:8000/api/companies', formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                });
-                alert('Company created successfully!');
-            }
+        if (isEditing) {
+            formData.append('_method', 'PUT');
+        }
 
+        const url = isEditing
+            ? `http://localhost:8000/api/companies/${selectedCompany}`
+            : 'http://localhost:8000/api/companies';
+        const method = 'post';
+
+        try {
+            console.log("Submitting FormData:");
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
+            console.log("URL:", url);
+            console.log("Method:", method);
+            console.log("Is Editing:", isEditing);
+
+            const response = await axios({
+                method: method,
+                url: url,
+                data: formData,
+                headers: { 'Content-Type': 'multipart/form-data', 'Accept': 'application/json' },
+            });
+
+            alert(`Company ${isEditing ? 'updated' : 'created'} successfully!`);
             console.log('Company saved successfully:', response.data);
-            resetForm(); // Reset form after submission
-            fetchCompanies(); // Refresh the list of companies
+            resetForm();
+            fetchCompanies();
+            setIsCompanyListVisible(false);
         } catch (error) {
             console.error('Error saving company:', error.response?.data || error.message);
-            alert('Failed to save company. Please try again.');
+            let errorMsg = `Failed to ${isEditing ? 'update' : 'create'} company. `;
+            if (error.response?.data?.errors) {
+                errorMsg += Object.values(error.response.data.errors).flat().join(' ');
+            } else if (error.response?.data?.message) {
+                errorMsg += error.response.data.message;
+            } else {
+                errorMsg += 'Please check the console and try again.';
+            }
+            alert(errorMsg);
         }
     };
 
-    // Reset form to initial state
     const resetForm = () => {
-        setCompanyInfo({
-            company_name: '',
-            companyType: '',
-            businessCategory: '',
-            companyLogo: null,
-            businessAddress: '',
-            city: '',
-            country: '',
-            contactNumber: '',
-            email: '',
-            website: '',
-            vatGstNumber: '',
-            taxId: '',
-            defaultCurrency: 'LKR',
-            fiscalYearStart: '',
-            fiscalYearEnd: '',
-            chartOfAccounts: '',
-            ownerName: '',
-            ownerContact: '',
-            adminUsername: '',
-            adminPassword: '',
-            userRole: 'Admin',
-            invoicePrefix: 'INV-0001',
-            defaultPaymentMethods: ['Cash'],
-            multiStoreSupport: false,
-            defaultLanguage: 'English',
-            timeZone: '',
-            enable2FA: false,
-            autoGenerateQR: false,
-            enableNotifications: false,
-            integrateAccounting: false,
-        });
+        setCompanyInfo(initialCompanyInfo);
         setSelectedCompany('');
         setIsEditing(false);
+        setExistingLogoUrl(null);
+        setLogoPreviewUrl(null);
+        setShowCustomTypeInput(false);
+        if (refs.company_logo.current) {
+            refs.company_logo.current.value = "";
+        }
+    };
+
+    const handleDeleteCompany = async (companyNameToDelete) => {
+        if (!window.confirm(`Are you sure you want to delete ${companyNameToDelete}? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await axios.delete(`http://localhost:8000/api/companies/${companyNameToDelete}`);
+            alert(response.data.message || 'Company deleted successfully!');
+            fetchCompanies();
+            if (selectedCompany === companyNameToDelete) {
+                resetForm();
+            }
+        } catch (error) {
+            console.error('Error deleting company:', error.response?.data || error.message);
+            alert(`Failed to delete company: ${error.response?.data?.message || 'Server error'}`);
+        }
     };
 
     const handleFiscalYearStartChange = (e) => {
-        const startDate = new Date(e.target.value);
-        let endDate = new Date(startDate);
-
-        // Move to the same month in the next year
-        endDate.setFullYear(endDate.getFullYear() + 1);
-
-        // Set to the last day of the same month next year
-        endDate.setDate(0);
-
-        // Format to YYYY-MM-DD for date input
-        const formattedEndDate = endDate.toISOString().split('T')[0];
-
-        setCompanyInfo((prev) => ({
-            ...prev,
-            fiscalYearStart: e.target.value,
-            fiscalYearEnd: formattedEndDate, // Correct format
-        }));
-    };
-    const handleKeyDown = (e, nextField) => {
-        if (e.key === "Enter" || e.key === "ArrowDown") {
-            e.preventDefault(); // Prevent form submission on Enter
-            refs[nextField]?.current?.focus(); // Move focus to the next field
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            refs[e.target.name]?.current?.focus(); // Move focus to previous field
+        const startDateString = e.target.value;
+        if (!startDateString) {
+            setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: '', fiscal_year_end: '' }));
+            return;
+        }
+        try {
+            const startDate = new Date(startDateString);
+            if (isNaN(startDate.getTime())) {
+                setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: startDateString, fiscal_year_end: '' }));
+                return;
+            }
+            let endDate = new Date(startDate);
+            endDate.setFullYear(endDate.getFullYear() + 1);
+            endDate.setDate(endDate.getDate() - 1);
+            const formattedEndDate = endDate.toISOString().split('T')[0];
+            setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: startDateString, fiscal_year_end: formattedEndDate }));
+        } catch (error) {
+            console.error("Error calculating fiscal end date:", error);
+            setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: startDateString, fiscal_year_end: '' }));
         }
     };
 
+    const handleKeyDown = (e, nextField) => {
+        if ((e.key === "Enter" || e.key === "ArrowDown") && refs[nextField]?.current) {
+            e.preventDefault();
+            refs[nextField].current.focus();
+        }
+    };
+
+    // Framer Motion Variants
+    const backdropVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1 },
+    };
+
+    const modalVariants = {
+        hidden: { y: "-100vh", opacity: 0 },
+        visible: { y: "0", opacity: 1, transition: { delay: 0.1, type: 'spring', stiffness: 100 } },
+        exit: { y: "100vh", opacity: 0, transition: { duration: 0.3 } }
+    };
 
     return (
-        <div className="min-h-screen px-4 py-8 bg-gray-100 dark:bg-gray-900 sm:px-6 lg:px-8">
+        <div className="relative min-h-screen px-4 py-8 bg-gray-100 dark:bg-gray-900 sm:px-6 lg:px-8">
             <div className="max-w-6xl p-6 mx-auto bg-white rounded-lg shadow-lg dark:bg-gray-800">
+                <button
+                    onClick={() => setIsCompanyListVisible(true)}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-white transition duration-150 ease-in-out bg-purple-600 rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                    aria-label="View existing companies"
+                >
+                    <EyeIcon className="w-5 h-5 mr-2" />
+                    View Companies
+                </button>
                 <h1 className="flex items-center justify-center mb-8 text-3xl font-bold text-center text-gray-800 dark:text-white">
                     <BuildingOfficeIcon className="w-8 h-8 mr-3 text-indigo-500" />
                     {isEditing ? 'Update Company' : 'Create Company'}
                 </h1>
 
+                <p className="mb-6 text-center text-gray-600 dark:text-gray-400">Fill in the details below to create or update a company.</p>
                 {/* Company Selection Dropdown */}
                 <div className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                     <div className="flex flex-col">
-                        <label className="font-medium text-gray-700 dark:text-gray-300">Select Company</label>
+                        <label className="font-medium text-gray-700 dark:text-gray-300">Select Company to Edit</label>
                         <select
                             value={selectedCompany}
                             onChange={handleCompanySelect}
                             className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                         >
-                            <option value="">Select a company</option>
+                            <option value="">-- Create New Company --</option>
                             {companies.map((company) => (
-                                <option key={company.company_name} value={company.company_name}>
+                                <option key={company.id || company.company_name} value={company.company_name}>
                                     {company.company_name}
                                 </option>
                             ))}
@@ -302,7 +378,7 @@ function CreateCompany() {
                     </div>
                 </div>
 
-                {/* Form Fields (Same as before) */}
+                {/* FORM START */}
                 <form className="max-w-full mx-auto bg-transparent" onSubmit={handleSubmit}>
                     {/* Company Information */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
@@ -311,6 +387,7 @@ function CreateCompany() {
                             Company Information
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            {/* Company Name */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Company Name <span className="text-red-500">*</span></label>
                                 <input
@@ -318,70 +395,98 @@ function CreateCompany() {
                                     name="company_name"
                                     value={companyInfo.company_name}
                                     onChange={handleChange}
+                                    ref={refs.company_name}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                                     required
+                                    onKeyDown={(e) => handleKeyDown(e, 'company_type')}
                                 />
                             </div>
+                            {/* Company Type */}
+                            <div className="flex flex-col">
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Company Type</label>
+                                <select
+                                    name="company_type"
+                                    value={companyInfo.company_type}
+                                    onChange={handleChange}
+                                    ref={refs.company_type}
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, showCustomTypeInput ? 'custom_company_type' : 'business_category')}
+                                >
+                                    <option value="">Select Type</option>
+                                    <option value="Retail">Retail</option>
+                                    <option value="Wholesale">Wholesale</option>
+                                    <option value="Restaurant">Restaurant</option>
+                                    <option value="Service">Service</option>
+                                    <option value="Manufacturing">Manufacturing</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                {showCustomTypeInput && (
+                                    <input
+                                        type="text"
+                                        name="custom_company_type"
+                                        value={companyInfo.custom_company_type}
+                                        onChange={handleChange}
+                                        ref={refs.custom_company_type}
+                                        placeholder="Enter custom company type"
+                                        className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                        onKeyDown={(e) => handleKeyDown(e, 'business_category')}
+                                    />
+                                )}
+                            </div>
+                            {/* Business Category */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Business Category</label>
                                 <input
                                     type="text"
-                                    name="businessCategory"
-                                    value={companyInfo.businessCategory}
+                                    name="business_category"
+                                    value={companyInfo.business_category}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'companyLogo')}
-                                    ref={refs.businessCategory}
+                                    ref={refs.business_category}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'company_logo')}
                                 />
                             </div>
-                            <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">Company Type</label>
-                                <select
-                                    name="companyType"
-                                    value={companyInfo.companyType}
-                                    onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'businessCategory')}
-                                    ref={refs.companyType}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                >
-                                    <option value="Retail">Retail</option>
-                                    <option value="Wholesale">Wholesale</option>
-                                    <option value="Restaurant">Restaurant</option>
-                                </select>
-                            </div>
+                            {/* Company Logo */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Company Logo</label>
                                 <input
                                     type="file"
-                                    name="companyLogo"
+                                    name="company_logo"
+                                    accept="image/*"
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'businessAddress')}
-                                    ref={refs.companyLogo}
+                                    ref={refs.company_logo}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
+                                    onKeyDown={(e) => handleKeyDown(e, 'business_address')}
                                 />
-                                {companyInfo.companyLogo && (
-                                    <img src={URL.createObjectURL(companyInfo.companyLogo)} alt="Company Logo" className="object-cover w-20 h-20 mt-4 rounded-lg shadow-md" />
-                                )}
-                            </div>                        </div>
+                                <div className="mt-4">
+                                    {logoPreviewUrl ? (
+                                        <img src={logoPreviewUrl} alt="New Logo Preview" className="object-cover w-20 h-20 rounded-lg shadow-md" />
+                                    ) : isEditing && existingLogoUrl ? (
+                                        <img src={existingLogoUrl} alt="Current Company Logo" className="object-cover w-20 h-20 rounded-lg shadow-md" />
+                                    ) : (
+                                        <div className="flex items-center justify-center w-20 h-20 text-gray-500 bg-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-400">No Logo</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </fieldset>
 
                     {/* Address & Contact Details */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                            <MapPinIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Address & Contact Details
+                            <MapPinIcon className="w-6 h-6 mr-2 text-indigo-500" /> Address & Contact Details
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Business Address</label>
                                 <input
                                     type="text"
-                                    name="businessAddress"
-                                    value={companyInfo.businessAddress}
+                                    name="business_address"
+                                    value={companyInfo.business_address}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'city')}
-                                    ref={refs.businessAddress}
+                                    ref={refs.business_address}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'city')}
                                 />
                             </div>
                             <div className="flex flex-col">
@@ -391,9 +496,9 @@ function CreateCompany() {
                                     name="city"
                                     value={companyInfo.city}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'country')}
                                     ref={refs.city}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'country')}
                                 />
                             </div>
                             <div className="flex flex-col">
@@ -403,21 +508,21 @@ function CreateCompany() {
                                     name="country"
                                     value={companyInfo.country}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'contactNumber')}
                                     ref={refs.country}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'contact_number')}
                                 />
                             </div>
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Contact Number</label>
                                 <input
-                                    type="text"
-                                    name="contactNumber"
-                                    value={companyInfo.contactNumber}
+                                    type="tel"
+                                    name="contact_number"
+                                    value={companyInfo.contact_number}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'email')}
-                                    ref={refs.contactNumber}
+                                    ref={refs.contact_number}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'email')}
                                 />
                             </div>
                             <div className="flex flex-col">
@@ -427,9 +532,9 @@ function CreateCompany() {
                                     name="email"
                                     value={companyInfo.email}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'website')}
                                     ref={refs.email}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'website')}
                                 />
                             </div>
                             <div className="flex flex-col">
@@ -439,9 +544,10 @@ function CreateCompany() {
                                     name="website"
                                     value={companyInfo.website}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'vatGstNumber')}
                                     ref={refs.website}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    placeholder="https://example.com"
+                                    onKeyDown={(e) => handleKeyDown(e, 'vat_gst_number')}
                                 />
                             </div>
                         </div>
@@ -450,86 +556,83 @@ function CreateCompany() {
                     {/* Tax & Financial Details */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                            <CreditCardIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Tax & Financial Details
+                            <CreditCardIcon className="w-6 h-6 mr-2 text-indigo-500" /> Tax & Financial Details
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">VAT / GST Number</label>
                                 <input
                                     type="text"
-                                    name="vatGstNumber"
-                                    value={companyInfo.vatGstNumber}
+                                    name="vat_gst_number"
+                                    value={companyInfo.vat_gst_number}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'taxId')}
-                                    ref={refs.vatGstNumber}
+                                    ref={refs.vat_gst_number}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'tax_id')}
                                 />
                             </div>
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Tax ID</label>
                                 <input
                                     type="text"
-                                    name="taxId"
-                                    value={companyInfo.taxId}
+                                    name="tax_id"
+                                    value={companyInfo.tax_id}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'defaultCurrency')}
-                                    ref={refs.taxId}
+                                    ref={refs.tax_id}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'default_currency')}
                                 />
                             </div>
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Default Currency</label>
                                 <select
-                                    name="defaultCurrency"
-                                    value={companyInfo.defaultCurrency}
+                                    name="default_currency"
+                                    value={companyInfo.default_currency}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'fiscalYearStart')}
-                                    ref={refs.defaultCurrency}
+                                    ref={refs.default_currency}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'fiscal_year_start')}
                                 >
-                                    <option value="LKR">LKR</option>
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
+                                    <option value="LKR">LKR (Sri Lankan Rupee)</option>
+                                    <option value="USD">USD (US Dollar)</option>
+                                    <option value="EUR">EUR (Euro)</option>
+                                    <option value="GBP">GBP (British Pound)</option>
+                                    <option value="INR">INR (Indian Rupee)</option>
                                 </select>
                             </div>
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Fiscal Year Start</label>
                                 <input
                                     type="date"
-                                    name="fiscalYearStart"
-                                    value={companyInfo.fiscalYearStart}
-                                    onChange={(e) => {
-                                        handleChange(e);
-                                        handleFiscalYearStartChange(e); // Ensure Fiscal Year End updates dynamically
-                                    }}
-                                    onKeyDown={(e) => handleKeyDown(e, 'fiscalYearEnd')}
-                                    ref={refs.fiscalYearStart}
+                                    name="fiscal_year_start"
+                                    value={companyInfo.fiscal_year_start}
+                                    onChange={handleFiscalYearStartChange}
+                                    ref={refs.fiscal_year_start}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'chart_of_accounts')}
                                 />
                             </div>
-
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Fiscal Year End</label>
                                 <input
                                     type="date"
-                                    name="fiscalYearEnd"
-                                    value={companyInfo.fiscalYearEnd}
-                                    readOnly // Prevent manual editing
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    name="fiscal_year_end"
+                                    value={companyInfo.fiscal_year_end}
+                                    readOnly
+                                    className="p-3 mt-2 bg-gray-100 border border-gray-300 rounded-lg shadow-sm cursor-not-allowed dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400"
+                                    tabIndex={-1}
                                 />
                             </div>
-
                             <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">Chart of Accounts</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Chart of Accounts (Optional)</label>
                                 <input
                                     type="text"
-                                    name="chartOfAccounts"
-                                    value={companyInfo.chartOfAccounts}
+                                    name="chart_of_accounts"
+                                    value={companyInfo.chart_of_accounts}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'ownerName')}
-                                    ref={refs.chartOfAccounts}
+                                    ref={refs.chart_of_accounts}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'owner_name')}
                                 />
                             </div>
                         </div>
@@ -538,202 +641,259 @@ function CreateCompany() {
                     {/* Owner & User Setup */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                            <UserCircleIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Owner & User Setup
+                            <UserCircleIcon className="w-6 h-6 mr-2 text-indigo-500" /> Owner & User Setup
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Owner Name</label>
                                 <input
                                     type="text"
-                                    name="ownerName"
-                                    value={companyInfo.ownerName}
+                                    name="owner_name"
+                                    value={companyInfo.owner_name}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'ownerContact')}
-                                    ref={refs.ownerName}
+                                    ref={refs.owner_name}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'owner_contact')}
                                 />
                             </div>
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Owner Contact</label>
                                 <input
                                     type="text"
-                                    name="ownerContact"
-                                    value={companyInfo.ownerContact}
+                                    name="owner_contact"
+                                    value={companyInfo.owner_contact}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'adminUsername')}
-                                    ref={refs.ownerContact}
+                                    ref={refs.owner_contact}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'admin_username')}
                                 />
                             </div>
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Admin Username</label>
                                 <input
                                     type="text"
-                                    name="adminUsername"
-                                    value={companyInfo.adminUsername}
+                                    name="admin_username"
+                                    value={companyInfo.admin_username}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'adminPassword')}
-                                    ref={refs.adminUsername}
+                                    ref={refs.admin_username}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'admin_password')}
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">Admin Password</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Admin Password {isEditing ? '(Leave blank to keep current)' : ''}</label>
                                 <input
                                     type="password"
-                                    name="adminPassword"
-                                    value={companyInfo.adminPassword}
+                                    name="admin_password"
+                                    value={companyInfo.admin_password}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'userRole')}
-                                    ref={refs.adminPassword}
+                                    ref={refs.admin_password}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    placeholder={isEditing ? 'Enter new password to change' : 'Required'}
+                                    onKeyDown={(e) => handleKeyDown(e, 'user_role')}
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">User Role</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Admin User Role</label>
                                 <select
-                                    name="userRole"
-                                    value={companyInfo.userRole}
+                                    name="user_role"
+                                    value={companyInfo.user_role}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'invoicePrefix')}
-                                    ref={refs.userRole}
+                                    ref={refs.user_role}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'invoice_prefix')}
                                 >
                                     <option value="Admin">Admin</option>
                                     <option value="Manager">Manager</option>
-                                    <option value="Cashier">Cashier</option>
                                 </select>
                             </div>
                         </div>
                     </fieldset>
 
                     {/* POS Settings */}
-                    <fieldset className="p-6 mb-8 text-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700 dark:text-gray-300">
-                        <legend className="flex items-center mb-4 text-xl font-semibold text-gray-700 dark:text-gray-300">
-                            <CogIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            POS Settings
+                    <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                            <CogIcon className="w-6 h-6 mr-2 text-indigo-500" /> POS & System Settings
                         </legend>
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                            {/* Default Invoice Prefix */}
                             <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Invoice Prefix:</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Invoice Prefix</label>
                                 <input
                                     type="text"
-                                    name="invoicePrefix"
-                                    value={companyInfo.invoicePrefix}
+                                    name="invoice_prefix"
+                                    value={companyInfo.invoice_prefix}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'defaultPaymentMethods')}
-                                    ref={refs.invoicePrefix}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-amber-600 dark:text-white"
+                                    ref={refs.invoice_prefix}
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'default_payment_methods')}
                                 />
                             </div>
-
-                            {/* Default Payment Methods */}
                             <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Payment Methods:</label>
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Payment Method</label>
                                 <select
-                                    multiple
-                                    name="defaultPaymentMethods"
-                                    value={companyInfo.defaultPaymentMethods}
+                                    name="default_payment_methods"
+                                    value={companyInfo.default_payment_methods[0] || 'Cash'}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'multiStoreSupport')}
-                                    ref={refs.defaultPaymentMethods}
-                                    className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg-slate-100 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    ref={refs.default_payment_methods}
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'multi_store_support')}
                                 >
                                     <option value="Cash">Cash</option>
                                     <option value="Card">Card</option>
                                     <option value="Bank Transfer">Bank Transfer</option>
+                                    <option value="Cheque">Cheque</option>
+                                    <option value="Mobile Payment">Mobile Payment</option>
                                 </select>
                             </div>
-
-                            {/* Multi-store Support */}
-                            <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">Multi-store Support:</label>
-                                <div className="flex items-center">
+                            <div className="flex flex-col justify-center pt-6">
+                                <label className="flex items-center font-medium text-gray-700 cursor-pointer dark:text-gray-300">
                                     <input
                                         type="checkbox"
-                                        name="multiStoreSupport"
-                                        checked={companyInfo.multiStoreSupport}
+                                        name="multi_store_support"
+                                        checked={companyInfo.multi_store_support}
                                         onChange={handleChange}
-                                        onKeyDown={(e) => handleKeyDown(e, 'defaultLanguage')}
-                                        ref={refs.multiStoreSupport}
-                                        className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg:gray-200 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        ref={refs.multi_store_support}
+                                        className="w-5 h-5 mr-3 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:ring-indigo-600 dark:ring-offset-gray-800"
+                                        onKeyDown={(e) => handleKeyDown(e, 'default_language')}
                                     />
-                                    <span className="ml-2 text-black dark:text-white">Multi-Store functionality</span>
-                                </div>
+                                    Enable Multi-store Support
+                                </label>
                             </div>
                         </div>
                     </fieldset>
 
-                    {/* Multi-Language & Localization */}
-                    <fieldset className="p-6 mb-8 rounded-lg bg-gray-50 dark:bg-gray-700">
-                        <legend className="flex items-center mb-4 text-xl font-semibold text-gray-700 dark:text-gray-300">
-                            <GlobeAltIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Multi-Language & Localization
+                    {/* Localization & Security */}
+                    <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
+                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                            <GlobeAltIcon className="w-6 h-6 mr-2 text-indigo-500" /> <span className='mr-6'>Localization & Security</span> <LockClosedIcon className="w-6 h-6 mr-2 text-indigo-500" />
                         </legend>
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                            <label className="block text-gray-700 dark:text-gray-300">
-                                <span className="text-gray-700 dark:text-gray-300">Default Language:</span>
+                            <div className="flex flex-col">
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Default Language</label>
                                 <select
-                                    name="defaultLanguage"
-                                    value={companyInfo.defaultLanguage}
+                                    name="default_language"
+                                    value={companyInfo.default_language}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'timeZone')}
-                                    ref={refs.defaultLanguage}
-                                    className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg:gray-200 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    ref={refs.default_language}
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'time_zone')}
                                 >
                                     <option value="English">English</option>
                                     <option value="Sinhala">Sinhala</option>
                                     <option value="Tamil">Tamil</option>
                                 </select>
-                            </label>
-                            <label className="block text-gray-700 dark:text-gray-300">
-                                <span className="text-gray-700 dark:text-gray-300">Time Zone:</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Time Zone</label>
                                 <input
                                     type="text"
-                                    name="timeZone"
-                                    value={companyInfo.timeZone}
+                                    name="time_zone"
+                                    value={companyInfo.time_zone}
                                     onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'enable2FA')}
-                                    ref={refs.timeZone}
-                                    className="p-3 mt-2 text-black border border-gray-600 rounded-lg bg:gray-200 dark:bg-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    ref={refs.time_zone}
+                                    placeholder="e.g., Asia/Colombo"
+                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                    onKeyDown={(e) => handleKeyDown(e, 'enable_2fa')}
                                 />
-                            </label>
-                        </div>
-                    </fieldset>
-
-                    {/* Security & Permissions */}
-                    <fieldset className="p-6 mb-8 rounded-lg bg-gray-50 dark:bg-gray-700">
-                        <legend className="flex items-center mb-4 text-xl font-semibold text-gray-700 dark:text-gray-300">
-                            <LockClosedIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Security & Permissions
-                        </legend>
-                        <div className="space-y-4">
-                            <label className="block text-gray-700 dark:text-gray-300">
-                                <span className="text-gray-700 dark:text-gray-300">Enable Two-Factor Authentication (2FA):</span>
-                                <input
-                                    type="checkbox"
-                                    name="enable2FA"
-                                    checked={companyInfo.enable2FA}
-                                    onChange={handleChange}
-                                    onKeyDown={(e) => handleKeyDown(e, 'autoGenerateQR')}
-                                    ref={refs.enable2FA}
-                                    className="block mt-1"
-                                />
-                            </label>
+                            </div>
+                            <div className="flex flex-col justify-center pt-6">
+                                <label className="flex items-center font-medium text-gray-700 cursor-pointer dark:text-gray-300">
+                                    <input
+                                        type="checkbox"
+                                        name="enable_2fa"
+                                        checked={companyInfo.enable_2fa}
+                                        onChange={handleChange}
+                                        ref={refs.enable_2fa}
+                                        className="w-5 h-5 mr-3 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:ring-indigo-600 dark:ring-offset-gray-800"
+                                    />
+                                    Enable Two-Factor Auth (2FA)
+                                </label>
+                            </div>
                         </div>
                     </fieldset>
 
                     {/* Submit Button */}
-                    <button
-                        type="submit"
-                        className="w-full px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                    >
-                        {isEditing ? 'Update Company' : 'Create Company'}
-                    </button>
+                    <div className="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            onClick={resetForm}
+                            className="px-6 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+                        >
+                            Cancel / Reset
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-6 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                            disabled={!companyInfo.company_name || (companyInfo.company_type === 'Other' && !companyInfo.custom_company_type)}
+                        >
+                            {isEditing ? 'Update Company' : 'Create Company'}
+                        </button>
+                    </div>
                 </form>
+                {/* FORM END */}
             </div>
+
+            {/* Company List Modal */}
+            <AnimatePresence>
+                {isCompanyListVisible && (
+                    <motion.div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
+                        variants={backdropVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
+                        onClick={() => setIsCompanyListVisible(false)}
+                    >
+                        <motion.div
+                            className="w-full max-w-lg p-6 mx-4 bg-white rounded-xl shadow-2xl dark:bg-gray-800 max-h-[80vh] overflow-y-auto"
+                            variants={modalVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-200 dark:border-gray-600">
+                                <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Manage Companies</h2>
+                                <button
+                                    onClick={() => setIsCompanyListVisible(false)}
+                                    className="text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+                                    aria-label="Close modal"
+                                >
+                                    <XMarkIcon className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            {/* Company List */}
+                            {companies.length > 0 ? (
+                                <ul className="space-y-3">
+                                    {companies.map((company) => (
+                                        <motion.li
+                                            key={company.id || company.company_name}
+                                            className="flex items-center justify-between p-3 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700"
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <span className="font-medium text-gray-800 dark:text-gray-100">{company.company_name}</span>
+                                            <button
+                                                onClick={() => handleDeleteCompany(company.company_name)}
+                                                className="p-1 text-red-500 transition duration-150 ease-in-out rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 dark:focus:ring-offset-gray-700"
+                                                title={`Delete ${company.company_name}`}
+                                                aria-label={`Delete ${company.company_name}`}
+                                            >
+                                                <TrashIcon className="w-5 h-5" />
+                                            </button>
+                                        </motion.li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-center text-gray-500 dark:text-gray-400">No companies found.</p>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            {/* END Company List Modal */}
         </div>
     );
 }
