@@ -135,11 +135,13 @@ Route::prefix('discount-schemes')->group(function () {
     Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
 
     Route::prefix('companies')->group(function () {
-        Route::get('/', [CompanyController::class, 'index']); // Get all companies
-        Route::get('/{company_name}', [CompanyController::class, 'show']); // Get a specific company
-        Route::post('/', [CompanyController::class, 'store']); // Create a new company
-        Route::put('/{company_name}', [CompanyController::class, 'update']); // Update a company
+        Route::get('/', [CompanyController::class, 'index']);          // Get all companies
+        Route::post('/', [CompanyController::class, 'store']);         // Create a new company (Uses POST)
+        Route::get('/{company_name}', [CompanyController::class, 'show']); // Get a specific company by name (Uses GET)
+        Route::put('/{company_name}', [CompanyController::class, 'update']); // Update a company (Uses PUT, handled via _method)
+        Route::delete('/{company_name}', [CompanyController::class, 'destroy']); // Correct: DELETE api/companies/{company_name}
     });
+    
 
 
 
