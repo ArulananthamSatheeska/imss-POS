@@ -7,19 +7,19 @@ import {
     CogIcon,
     GlobeAltIcon,
     LockClosedIcon,
-    BuildingOfficeIcon
+    BuildingOfficeIcon,
+    EyeIcon,      // <-- Added for View Button
+    TrashIcon,    // <-- Added for Delete Button
+    XMarkIcon     // <-- Added for Close Button
 } from '@heroicons/react/20/solid';
 import axios from 'axios';
 import { useOutletContext } from 'react-router-dom';
-
-// Helper to convert camelCase to snake_case (optional, if needed later)
-// const camelToSnakeCase = str => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+import { motion, AnimatePresence } from 'framer-motion'; // <-- Added for animations
 
 // Helper to format date string (YYYY-MM-DD) or return empty string
 const formatDateForInput = (dateString) => {
     if (!dateString) return '';
     try {
-        // Handles cases like "2023-10-26T00:00:00.000000Z" or just "2023-10-26"
         return new Date(dateString).toISOString().split('T')[0];
     } catch (e) {
         console.error("Error formatting date:", dateString, e);
@@ -32,9 +32,9 @@ function CreateCompany() {
 
     const initialCompanyInfo = {
         company_name: '',
-        company_type: 'Retail', // Default value
+        company_type: 'Retail',
         business_category: '',
-        company_logo: null, // Represents the file object for upload
+        company_logo: null,
         business_address: '',
         city: '',
         country: '',
@@ -50,24 +50,24 @@ function CreateCompany() {
         owner_name: '',
         owner_contact: '',
         admin_username: '',
-        admin_password: '', // Keep password empty when fetching/resetting
+        admin_password: '',
         user_role: 'Admin',
         invoice_prefix: 'INV-0001',
-        default_payment_methods: ['Cash'], // Array for multi-select
+        default_payment_methods: ['Cash'],
         multi_store_support: false,
         default_language: 'English',
         time_zone: '',
-        enable_2fa: false, // Changed from enable2FA
+        enable_2fa: false,
         auto_generate_qr: false,
         enable_notifications: false,
         integrate_accounting: false,
     };
 
     const [companyInfo, setCompanyInfo] = useState(initialCompanyInfo);
-    const [existingLogoUrl, setExistingLogoUrl] = useState(null); // To display current logo URL
-    const [logoPreviewUrl, setLogoPreviewUrl] = useState(null); // To preview newly selected logo
+    const [existingLogoUrl, setExistingLogoUrl] = useState(null);
+    const [logoPreviewUrl, setLogoPreviewUrl] = useState(null);
 
-    const refs = {
+    const refs = { /* ... (keep existing refs) ... */
         company_type: useRef(null),
         business_category: useRef(null),
         company_logo: useRef(null),
@@ -98,6 +98,7 @@ function CreateCompany() {
     const [companies, setCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState('');
     const [isEditing, setIsEditing] = useState(false);
+    const [isCompanyListVisible, setIsCompanyListVisible] = useState(false); // <-- State for modal visibility
 
     useEffect(() => {
         fetchCompanies();
@@ -105,7 +106,8 @@ function CreateCompany() {
 
     const fetchCompanies = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/api/companies');
+            // Fetch full details if needed for the list, or just names
+            const response = await axios.get('http://localhost:8000/api/companies?fields=id,company_name'); // Fetch only id and name
             setCompanies(response.data);
         } catch (error) {
             console.error('Error fetching companies:', error);
@@ -118,41 +120,39 @@ function CreateCompany() {
             const response = await axios.get(`http://localhost:8000/api/companies/${companyName}`);
             const data = response.data;
 
-            // Prepare data for state update (handle types)
             const preparedData = {
-                ...initialCompanyInfo, // Start with defaults
-                ...data, // Override with fetched data
-                // Ensure correct types
-                company_logo: null, // Reset file input, use existingLogoUrl for display
-                admin_password: '', // Don't populate password field
+                 ...initialCompanyInfo,
+                ...data,
+                company_logo: null,
+                admin_password: '',
                 default_payment_methods: Array.isArray(data.default_payment_methods)
                     ? data.default_payment_methods
-                    : (data.default_payment_methods ? JSON.parse(data.default_payment_methods) : []), // Ensure array
-                multi_store_support: !!data.multi_store_support, // Ensure boolean
-                enable_2fa: !!data.enable_2fa,                 // Ensure boolean
-                auto_generate_qr: !!data.auto_generate_qr,         // Ensure boolean
-                enable_notifications: !!data.enable_notifications,   // Ensure boolean
-                integrate_accounting: !!data.integrate_accounting,   // Ensure boolean
-                // Format dates for input fields
+                    : (data.default_payment_methods ? JSON.parse(data.default_payment_methods) : []),
+                multi_store_support: !!data.multi_store_support,
+                enable_2fa: !!data.enable_2fa,
+                auto_generate_qr: !!data.auto_generate_qr,
+                enable_notifications: !!data.enable_notifications,
+                integrate_accounting: !!data.integrate_accounting,
                 fiscal_year_start: formatDateForInput(data.fiscal_year_start),
                 fiscal_year_end: formatDateForInput(data.fiscal_year_end),
             };
 
             setCompanyInfo(preparedData);
 
-            // Set URL for existing logo display (adjust path if needed)
             if (data.company_logo) {
-                // Assuming '/storage/' is the public link prefix for your storage
-                setExistingLogoUrl(`/storage/${data.company_logo}`);
+                // Ensure correct base URL if your storage isn't directly mapped to /storage
+                // Example: const baseUrl = 'http://localhost:8000';
+                // setExistingLogoUrl(`${baseUrl}/storage/${data.company_logo}`);
+                 setExistingLogoUrl(`/storage/${data.company_logo}`); // Adjust if needed
             } else {
                 setExistingLogoUrl(null);
             }
-            setLogoPreviewUrl(null); // Clear any previous new logo preview
+            setLogoPreviewUrl(null);
             setIsEditing(true);
         } catch (error) {
             console.error('Error fetching company details:', error);
             alert('Failed to fetch company details.');
-            resetForm(); // Reset if fetch fails
+            resetForm();
         }
     };
 
@@ -167,12 +167,11 @@ function CreateCompany() {
     };
 
     const handleChange = (e) => {
-        const { name, value, type, checked, files, options } = e.target;
+         const { name, value, type, checked, files, options } = e.target;
 
         if (type === 'file') {
             const file = files[0];
             setCompanyInfo({ ...companyInfo, [name]: file });
-            // Create a preview URL for the newly selected file
             if (file) {
                 setLogoPreviewUrl(URL.createObjectURL(file));
             } else {
@@ -181,89 +180,68 @@ function CreateCompany() {
         } else if (type === 'checkbox') {
             setCompanyInfo({ ...companyInfo, [name]: checked });
         } else if (type === 'select-multiple') {
-            // Handle multiple select
             const selectedValues = Array.from(options)
                 .filter(option => option.selected)
                 .map(option => option.value);
             setCompanyInfo({ ...companyInfo, [name]: selectedValues });
-        }
-         else {
+        } else {
             setCompanyInfo({ ...companyInfo, [name]: value });
         }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
         const formData = new FormData();
 
-        // Append all fields from companyInfo state
         Object.keys(companyInfo).forEach((key) => {
-             // Skip password if it's empty during an update unless it was intentionally changed
              if (isEditing && key === 'admin_password' && !companyInfo[key]) {
                  return;
              }
-
             if (key === 'company_logo') {
                 if (companyInfo[key] instanceof File) {
                     formData.append(key, companyInfo[key]);
                 }
-                // Don't append if null or not a file (backend handles keeping old logo)
             } else if (key === 'default_payment_methods' && Array.isArray(companyInfo[key])) {
-                 // Send array as JSON string for backend compatibility if needed,
-                 // or let backend handle array if configured. Laravel often expects JSON string for JSON DB columns via FormData.
                  formData.append(key, JSON.stringify(companyInfo[key]));
             } else if (typeof companyInfo[key] === 'boolean') {
-                formData.append(key, companyInfo[key] ? '1' : '0'); // Send booleans as 1 or 0
-            }
-             else if (companyInfo[key] !== null && companyInfo[key] !== undefined) {
-                // Append other non-null/undefined fields
+                formData.append(key, companyInfo[key] ? '1' : '0');
+            } else if (companyInfo[key] !== null && companyInfo[key] !== undefined) {
                 formData.append(key, companyInfo[key]);
             }
         });
 
-        // --- Crucial for Update ---
         if (isEditing) {
-            formData.append('_method', 'PUT'); // Simulate PUT request using POST
+            formData.append('_method', 'PUT');
         }
-        // -------------------------
 
         const url = isEditing
-            ? `http://localhost:8000/api/companies/${selectedCompany}` // Use selectedCompany (original name) for URL
+            ? `http://localhost:8000/api/companies/${selectedCompany}`
             : 'http://localhost:8000/api/companies';
-
-        const method = isEditing ? 'post' : 'post'; // Always use POST, but add _method for PUT
+        const method = 'post'; // Always POST for FormData with _method PUT
 
         try {
             console.log("Submitting FormData:");
-            for (let [key, value] of formData.entries()) {
-                console.log(`${key}: ${value}`);
-            }
-            console.log("URL:", url);
-            console.log("Method:", method);
-            console.log("Is Editing:", isEditing);
-
+            for (let [key, value] of formData.entries()) { console.log(`${key}: ${value}`); }
+            console.log("URL:", url); console.log("Method:", method); console.log("Is Editing:", isEditing);
 
             const response = await axios({
                 method: method,
                 url: url,
                 data: formData,
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Accept': 'application/json' // Important for Laravel validation errors
-                },
+                headers: { 'Content-Type': 'multipart/form-data', 'Accept': 'application/json' },
             });
 
             alert(`Company ${isEditing ? 'updated' : 'created'} successfully!`);
             console.log('Company saved successfully:', response.data);
             resetForm();
-            fetchCompanies(); // Refresh dropdown list
+            fetchCompanies(); // Refresh dropdown and potentially the modal list
+             setIsCompanyListVisible(false); // Close modal on successful save/update
 
         } catch (error) {
-            console.error('Error saving company:', error.response?.data || error.message);
+             console.error('Error saving company:', error.response?.data || error.message);
             let errorMsg = `Failed to ${isEditing ? 'update' : 'create'} company. `;
             if (error.response?.data?.errors) {
-                 errorMsg += Object.values(error.response.data.errors).flat().join(' '); // Display validation errors
+                 errorMsg += Object.values(error.response.data.errors).flat().join(' ');
             } else if (error.response?.data?.message) {
                 errorMsg += error.response.data.message;
             } else {
@@ -280,66 +258,97 @@ function CreateCompany() {
         setIsEditing(false);
         setExistingLogoUrl(null);
         setLogoPreviewUrl(null);
-        // Clear file input visually if needed (though state reset handles its value)
         if(refs.company_logo.current) {
             refs.company_logo.current.value = "";
         }
     };
 
-    const handleFiscalYearStartChange = (e) => {
-        const startDateString = e.target.value;
-        if (!startDateString) {
-             setCompanyInfo((prev) => ({
-                ...prev,
-                fiscal_year_start: '',
-                fiscal_year_end: '',
-            }));
+     // --- NEW: Handle Delete Company ---
+    const handleDeleteCompany = async (companyNameToDelete) => {
+        if (!window.confirm(`Are you sure you want to delete ${companyNameToDelete}? This action cannot be undone.`)) {
             return;
         }
 
+        try {
+            const response = await axios.delete(`http://localhost:8000/api/companies/${companyNameToDelete}`);
+            alert(response.data.message || 'Company deleted successfully!');
+            // Refresh the list in the modal and the dropdown
+            fetchCompanies();
+            // If the deleted company was the one being edited, reset the form
+            if (selectedCompany === companyNameToDelete) {
+                resetForm();
+            }
+             // Keep modal open after delete to see updated list, or close it:
+             // setIsCompanyListVisible(false);
+
+        } catch (error) {
+            console.error('Error deleting company:', error.response?.data || error.message);
+            alert(`Failed to delete company: ${error.response?.data?.message || 'Server error'}`);
+        }
+    };
+
+
+    const handleFiscalYearStartChange = (e) => {
+        // ... (keep existing logic) ...
+         const startDateString = e.target.value;
+        if (!startDateString) {
+             setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: '', fiscal_year_end: '' }));
+            return;
+        }
         try{
             const startDate = new Date(startDateString);
-             // Check if startDate is a valid date
             if (isNaN(startDate.getTime())) {
                  setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: startDateString, fiscal_year_end: '' }));
-                 return; // Exit if date is invalid
+                 return;
             }
-
             let endDate = new Date(startDate);
             endDate.setFullYear(endDate.getFullYear() + 1);
-            endDate.setDate(endDate.getDate() - 1); // Go to previous day
-
+            endDate.setDate(endDate.getDate() - 1);
             const formattedEndDate = endDate.toISOString().split('T')[0];
-
-            setCompanyInfo((prev) => ({
-                ...prev,
-                fiscal_year_start: startDateString,
-                fiscal_year_end: formattedEndDate,
-            }));
+            setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: startDateString, fiscal_year_end: formattedEndDate }));
         } catch (error) {
             console.error("Error calculating fiscal end date:", error);
              setCompanyInfo((prev) => ({ ...prev, fiscal_year_start: startDateString, fiscal_year_end: '' }));
         }
     };
 
-    // Simplified handleKeyDown - ensure 'refs' keys match state keys
     const handleKeyDown = (e, nextField) => {
-        if (e.key === "Enter" || e.key === "ArrowDown") {
+        // ... (keep existing logic) ...
+         if ((e.key === "Enter" || e.key === "ArrowDown") && refs[nextField]?.current) {
             e.preventDefault();
-            refs[nextField]?.current?.focus();
+            refs[nextField].current.focus();
         }
-        // Add ArrowUp logic if needed, requires mapping current field name to previous field name
     };
 
+    // --- Framer Motion Variants ---
+    const backdropVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1 },
+    };
+
+    const modalVariants = {
+        hidden: { y: "-100vh", opacity: 0 },
+        visible: { y: "0", opacity: 1, transition: { delay: 0.1, type: 'spring', stiffness: 100 } },
+        exit: { y: "100vh", opacity: 0, transition: { duration: 0.3 } }
+    };
 
     return (
-        <div className="min-h-screen px-4 py-8 bg-gray-100 dark:bg-gray-900 sm:px-6 lg:px-8">
+        <div className="relative min-h-screen px-4 py-8 bg-gray-100 dark:bg-gray-900 sm:px-6 lg:px-8">
             <div className="max-w-6xl p-6 mx-auto bg-white rounded-lg shadow-lg dark:bg-gray-800">
+                    <button
+                        onClick={() => setIsCompanyListVisible(true)}
+                        className="flex px-4 py-2 text-sm font-medium text-white transition duration-150 ease-in-out bg-purple-600 rounded-lg shadow-md ems-center le hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                        aria-label="View existing companies"
+                    >
+                        <EyeIcon className="w-5 h-5 mr-2" />
+                        View Companies
+                    </button>
                 <h1 className="flex items-center justify-center mb-8 text-3xl font-bold text-center text-gray-800 dark:text-white">
                     <BuildingOfficeIcon className="w-8 h-8 mr-3 text-indigo-500" />
                     {isEditing ? 'Update Company' : 'Create Company'}
                 </h1>
 
+                <p className="mb-6 text-center text-gray-600 dark:text-gray-400">Fill in the details below to create or update a company.</p>
                 {/* Company Selection Dropdown */}
                 <div className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                     <div className="flex flex-col">
@@ -351,7 +360,7 @@ function CreateCompany() {
                         >
                             <option value="">-- Create New Company --</option>
                             {companies.map((company) => (
-                                <option key={company.id} value={company.company_name}> {/* Use unique ID if available, value must be name */}
+                                <option key={company.id || company.company_name} value={company.company_name}> {/* Prefer ID if available */}
                                     {company.company_name}
                                 </option>
                             ))}
@@ -361,37 +370,30 @@ function CreateCompany() {
 
                 {/* --- FORM START --- */}
                 <form className="max-w-full mx-auto bg-transparent" onSubmit={handleSubmit}>
-                    {/* Company Information */}
-                    <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
-                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                    {/* ... (keep all your fieldsets: Company Info, Address, Tax, Owner, POS, Localization) ... */}
+
+                     {/* Company Information */}
+                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
+                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
                             <InformationCircleIcon className="w-6 h-6 mr-2 text-indigo-500" />
                             Company Information
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                            {/* Company Name */}
-                            <div className="flex flex-col">
+                             {/* Company Name */}
+                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Company Name <span className="text-red-500">*</span></label>
                                 <input
-                                    type="text"
-                                    name="company_name"
-                                    value={companyInfo.company_name}
-                                    onChange={handleChange}
+                                    type="text" name="company_name" value={companyInfo.company_name} onChange={handleChange}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    required
-                                    onKeyDown={(e) => handleKeyDown(e, 'company_type')} // Example nav
+                                    required onKeyDown={(e) => handleKeyDown(e, 'company_type')}
                                 />
                             </div>
                             {/* Company Type */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Company Type</label>
-                                <select
-                                    name="company_type"
-                                    value={companyInfo.company_type}
-                                    onChange={handleChange}
-                                    ref={refs.company_type}
+                                <select name="company_type" value={companyInfo.company_type} onChange={handleChange} ref={refs.company_type}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'business_category')}
-                                >
+                                    onKeyDown={(e) => handleKeyDown(e, 'business_category')}>
                                     <option value="">Select Type</option>
                                     <option value="Retail">Retail</option>
                                     <option value="Wholesale">Wholesale</option>
@@ -403,38 +405,23 @@ function CreateCompany() {
                              {/* Business Category */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Business Category</label>
-                                <input
-                                    type="text"
-                                    name="business_category"
-                                    value={companyInfo.business_category}
-                                    onChange={handleChange}
-                                    ref={refs.business_category}
+                                <input type="text" name="business_category" value={companyInfo.business_category} onChange={handleChange} ref={refs.business_category}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'company_logo')}
-                                />
+                                    onKeyDown={(e) => handleKeyDown(e, 'company_logo')} />
                             </div>
                              {/* Company Logo */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Company Logo</label>
-                                <input
-                                    type="file"
-                                    name="company_logo"
-                                    accept="image/*" // Specify acceptable file types
-                                    onChange={handleChange}
-                                    ref={refs.company_logo}
+                                <input type="file" name="company_logo" accept="image/*" onChange={handleChange} ref={refs.company_logo}
                                     className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
-                                    onKeyDown={(e) => handleKeyDown(e, 'business_address')}
-                                />
-                                {/* Logo Preview Area */}
+                                    onKeyDown={(e) => handleKeyDown(e, 'business_address')} />
                                 <div className="mt-4">
                                     {logoPreviewUrl ? (
                                         <img src={logoPreviewUrl} alt="New Logo Preview" className="object-cover w-20 h-20 rounded-lg shadow-md" />
                                     ) : isEditing && existingLogoUrl ? (
                                         <img src={existingLogoUrl} alt="Current Company Logo" className="object-cover w-20 h-20 rounded-lg shadow-md" />
                                     ) : (
-                                         <div className="flex items-center justify-center w-20 h-20 text-gray-500 bg-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-400">
-                                            No Logo
-                                        </div>
+                                         <div className="flex items-center justify-center w-20 h-20 text-gray-500 bg-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-400">No Logo</div>
                                     )}
                                 </div>
                             </div>
@@ -443,89 +430,33 @@ function CreateCompany() {
 
                     {/* Address & Contact Details */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
-                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                             <MapPinIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Address & Contact Details
+                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                             <MapPinIcon className="w-6 h-6 mr-2 text-indigo-500" /> Address & Contact Details
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                             {/* Business Address */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Business Address</label>
-                                <input
-                                    type="text"
-                                    name="business_address"
-                                    value={companyInfo.business_address}
-                                    onChange={handleChange}
-                                    ref={refs.business_address}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'city')}
-                                />
+                                <input type="text" name="business_address" value={companyInfo.business_address} onChange={handleChange} ref={refs.business_address} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'city')} />
                             </div>
-                             {/* City */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">City</label>
-                                <input
-                                    type="text"
-                                    name="city"
-                                    value={companyInfo.city}
-                                    onChange={handleChange}
-                                    ref={refs.city}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                     onKeyDown={(e) => handleKeyDown(e, 'country')}
-                                />
+                                <input type="text" name="city" value={companyInfo.city} onChange={handleChange} ref={refs.city} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'country')} />
                             </div>
-                            {/* Country */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Country</label>
-                                <input
-                                    type="text"
-                                    name="country"
-                                    value={companyInfo.country}
-                                    onChange={handleChange}
-                                    ref={refs.country}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'contact_number')}
-                                />
+                                <input type="text" name="country" value={companyInfo.country} onChange={handleChange} ref={refs.country} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'contact_number')} />
                             </div>
-                             {/* Contact Number */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Contact Number</label>
-                                <input
-                                    type="tel" // Use type 'tel' for phone numbers
-                                    name="contact_number"
-                                    value={companyInfo.contact_number}
-                                    onChange={handleChange}
-                                    ref={refs.contact_number}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                     onKeyDown={(e) => handleKeyDown(e, 'email')}
-                                />
+                                <input type="tel" name="contact_number" value={companyInfo.contact_number} onChange={handleChange} ref={refs.contact_number} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'email')} />
                             </div>
-                            {/* Email Address */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Email Address</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={companyInfo.email}
-                                    onChange={handleChange}
-                                    ref={refs.email}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                     onKeyDown={(e) => handleKeyDown(e, 'website')}
-                                />
+                                <input type="email" name="email" value={companyInfo.email} onChange={handleChange} ref={refs.email} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'website')} />
                             </div>
-                            {/* Website */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Website (Optional)</label>
-                                <input
-                                    type="url"
-                                    name="website"
-                                    value={companyInfo.website}
-                                    onChange={handleChange}
-                                    ref={refs.website}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    placeholder="https://example.com"
-                                     onKeyDown={(e) => handleKeyDown(e, 'vat_gst_number')}
-                                />
+                                <input type="url" name="website" value={companyInfo.website} onChange={handleChange} ref={refs.website} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" placeholder="https://example.com" onKeyDown={(e) => handleKeyDown(e, 'vat_gst_number')} />
                             </div>
                         </div>
                     </fieldset>
@@ -533,47 +464,20 @@ function CreateCompany() {
                     {/* Tax & Financial Details */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                             <CreditCardIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Tax & Financial Details
+                             <CreditCardIcon className="w-6 h-6 mr-2 text-indigo-500" /> Tax & Financial Details
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                             {/* VAT/GST */}
-                            <div className="flex flex-col">
+                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">VAT / GST Number</label>
-                                <input
-                                    type="text"
-                                    name="vat_gst_number"
-                                    value={companyInfo.vat_gst_number}
-                                    onChange={handleChange}
-                                    ref={refs.vat_gst_number}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                     onKeyDown={(e) => handleKeyDown(e, 'tax_id')}
-                                />
+                                <input type="text" name="vat_gst_number" value={companyInfo.vat_gst_number} onChange={handleChange} ref={refs.vat_gst_number} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'tax_id')} />
                             </div>
-                             {/* Tax ID */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Tax ID</label>
-                                <input
-                                    type="text"
-                                    name="tax_id"
-                                    value={companyInfo.tax_id}
-                                    onChange={handleChange}
-                                    ref={refs.tax_id}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'default_currency')}
-                                />
+                                <input type="text" name="tax_id" value={companyInfo.tax_id} onChange={handleChange} ref={refs.tax_id} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'default_currency')} />
                             </div>
-                             {/* Default Currency */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Default Currency</label>
-                                <select
-                                    name="default_currency"
-                                    value={companyInfo.default_currency}
-                                    onChange={handleChange}
-                                    ref={refs.default_currency}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'fiscal_year_start')}
-                                >
+                                <select name="default_currency" value={companyInfo.default_currency} onChange={handleChange} ref={refs.default_currency} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'fiscal_year_start')}>
                                     <option value="LKR">LKR (Sri Lankan Rupee)</option>
                                     <option value="USD">USD (US Dollar)</option>
                                     <option value="EUR">EUR (Euro)</option>
@@ -581,160 +485,66 @@ function CreateCompany() {
                                     <option value="INR">INR (Indian Rupee)</option>
                                 </select>
                             </div>
-                             {/* Fiscal Year Start */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Fiscal Year Start</label>
-                                <input
-                                    type="date"
-                                    name="fiscal_year_start"
-                                    value={companyInfo.fiscal_year_start}
-                                    onChange={handleFiscalYearStartChange} // Use combined handler
-                                    ref={refs.fiscal_year_start}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'chart_of_accounts')} // Navigate from here
-                                />
+                                <input type="date" name="fiscal_year_start" value={companyInfo.fiscal_year_start} onChange={handleFiscalYearStartChange} ref={refs.fiscal_year_start} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'chart_of_accounts')} />
                             </div>
-                            {/* Fiscal Year End (Read Only) */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Fiscal Year End</label>
-                                <input
-                                    type="date"
-                                    name="fiscal_year_end"
-                                    value={companyInfo.fiscal_year_end}
-                                    readOnly
-                                    className="p-3 mt-2 bg-gray-100 border border-gray-300 rounded-lg shadow-sm cursor-not-allowed dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400"
-                                    tabIndex={-1} // Prevent tabbing into read-only field
-                                />
+                                <input type="date" name="fiscal_year_end" value={companyInfo.fiscal_year_end} readOnly className="p-3 mt-2 bg-gray-100 border border-gray-300 rounded-lg shadow-sm cursor-not-allowed dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400" tabIndex={-1} />
                             </div>
-                            {/* Chart of Accounts */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Chart of Accounts (Optional)</label>
-                                <input
-                                    type="text"
-                                    name="chart_of_accounts"
-                                    value={companyInfo.chart_of_accounts}
-                                    onChange={handleChange}
-                                    ref={refs.chart_of_accounts}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'owner_name')}
-                                />
+                                <input type="text" name="chart_of_accounts" value={companyInfo.chart_of_accounts} onChange={handleChange} ref={refs.chart_of_accounts} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'owner_name')} />
                             </div>
                         </div>
                     </fieldset>
 
                     {/* Owner & User Setup */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
-                        <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                             <UserCircleIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            Owner & User Setup
+                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
+                             <UserCircleIcon className="w-6 h-6 mr-2 text-indigo-500" /> Owner & User Setup
                         </legend>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {/* Owner Name */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Owner Name</label>
-                                <input
-                                    type="text"
-                                    name="owner_name"
-                                    value={companyInfo.owner_name}
-                                    onChange={handleChange}
-                                    ref={refs.owner_name}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'owner_contact')}
-                                />
+                                <input type="text" name="owner_name" value={companyInfo.owner_name} onChange={handleChange} ref={refs.owner_name} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'owner_contact')} />
                             </div>
-                             {/* Owner Contact */}
-                            <div className="flex flex-col">
+                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Owner Contact</label>
-                                <input
-                                    type="text"
-                                    name="owner_contact"
-                                    value={companyInfo.owner_contact}
-                                    onChange={handleChange}
-                                    ref={refs.owner_contact}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'admin_username')}
-                                />
+                                <input type="text" name="owner_contact" value={companyInfo.owner_contact} onChange={handleChange} ref={refs.owner_contact} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'admin_username')} />
                             </div>
-                            {/* Admin Username */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Admin Username</label>
-                                <input
-                                    type="text"
-                                    name="admin_username"
-                                    value={companyInfo.admin_username}
-                                    onChange={handleChange}
-                                    ref={refs.admin_username}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'admin_password')}
-                                />
+                                <input type="text" name="admin_username" value={companyInfo.admin_username} onChange={handleChange} ref={refs.admin_username} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'admin_password')} />
                             </div>
-                             {/* Admin Password */}
                             <div className="flex flex-col">
-                                <label className="font-medium text-gray-700 dark:text-gray-300">
-                                    Admin Password {isEditing ? '(Leave blank to keep current)' : ''}
-                                </label>
-                                <input
-                                    type="password"
-                                    name="admin_password"
-                                    value={companyInfo.admin_password}
-                                    onChange={handleChange}
-                                    ref={refs.admin_password}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    placeholder={isEditing ? 'Enter new password to change' : 'Required'}
-                                    onKeyDown={(e) => handleKeyDown(e, 'user_role')}
-                                />
+                                <label className="font-medium text-gray-700 dark:text-gray-300">Admin Password {isEditing ? '(Leave blank to keep current)' : ''}</label>
+                                <input type="password" name="admin_password" value={companyInfo.admin_password} onChange={handleChange} ref={refs.admin_password} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" placeholder={isEditing ? 'Enter new password to change' : 'Required'} onKeyDown={(e) => handleKeyDown(e, 'user_role')} />
                             </div>
-                            {/* User Role */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Default Admin User Role</label>
-                                <select
-                                    name="user_role"
-                                    value={companyInfo.user_role}
-                                    onChange={handleChange}
-                                    ref={refs.user_role}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'invoice_prefix')}
-                                >
+                                <select name="user_role" value={companyInfo.user_role} onChange={handleChange} ref={refs.user_role} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'invoice_prefix')}>
                                     <option value="Admin">Admin</option>
                                     <option value="Manager">Manager</option>
-                                    {/* Add other relevant roles if needed */}
                                 </select>
                             </div>
                         </div>
                     </fieldset>
 
-                    {/* POS Settings */}
+                     {/* POS Settings */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                          <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                            <CogIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                            POS & System Settings
+                            <CogIcon className="w-6 h-6 mr-2 text-indigo-500" /> POS & System Settings
                         </legend>
                          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                             {/* Invoice Prefix */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Default Invoice Prefix</label>
-                                <input
-                                    type="text"
-                                    name="invoice_prefix"
-                                    value={companyInfo.invoice_prefix}
-                                    onChange={handleChange}
-                                    ref={refs.invoice_prefix}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'default_payment_methods')}
-                                />
+                                <input type="text" name="invoice_prefix" value={companyInfo.invoice_prefix} onChange={handleChange} ref={refs.invoice_prefix} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'default_payment_methods')} />
                             </div>
-                             {/* Default Payment Methods */}
                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Default Payment Methods</label>
-                                <select
-                                    multiple // Enable multiple selections
-                                    name="default_payment_methods"
-                                    value={companyInfo.default_payment_methods} // Bind to the array state
-                                    onChange={handleChange} // Use updated handleChange
-                                    ref={refs.default_payment_methods}
-                                    className="h-32 p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" // Adjust height for multiple
-                                    onKeyDown={(e) => handleKeyDown(e, 'multi_store_support')}
-                                >
+                                <select multiple name="default_payment_methods" value={companyInfo.default_payment_methods} onChange={handleChange} ref={refs.default_payment_methods} className="h-32 p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'multi_store_support')}>
                                     <option value="Cash">Cash</option>
                                     <option value="Card">Card</option>
                                     <option value="Bank Transfer">Bank Transfer</option>
@@ -743,18 +553,9 @@ function CreateCompany() {
                                 </select>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Hold Ctrl/Cmd to select multiple.</p>
                             </div>
-                            {/* Multi-store Support */}
-                            <div className="flex flex-col justify-center pt-6"> {/* Adjust alignment */}
+                            <div className="flex flex-col justify-center pt-6">
                                 <label className="flex items-center font-medium text-gray-700 cursor-pointer dark:text-gray-300">
-                                    <input
-                                        type="checkbox"
-                                        name="multi_store_support"
-                                        checked={companyInfo.multi_store_support}
-                                        onChange={handleChange}
-                                        ref={refs.multi_store_support}
-                                        className="w-5 h-5 mr-3 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:ring-indigo-600 dark:ring-offset-gray-800"
-                                        onKeyDown={(e) => handleKeyDown(e, 'default_language')}
-                                    />
+                                    <input type="checkbox" name="multi_store_support" checked={companyInfo.multi_store_support} onChange={handleChange} ref={refs.multi_store_support} className="w-5 h-5 mr-3 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:ring-indigo-600 dark:ring-offset-gray-800" onKeyDown={(e) => handleKeyDown(e, 'default_language')} />
                                     Enable Multi-store Support
                                 </label>
                             </div>
@@ -764,60 +565,27 @@ function CreateCompany() {
                     {/* Localization & Security */}
                     <fieldset className="p-6 mb-8 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700">
                         <legend className="flex items-center mb-4 text-2xl font-semibold text-gray-800 dark:text-white">
-                             <GlobeAltIcon className="w-6 h-6 mr-2 text-indigo-500" />
-                             <span className='mr-6'>Localization & Security</span>
-                             <LockClosedIcon className="w-6 h-6 mr-2 text-indigo-500" />
+                             <GlobeAltIcon className="w-6 h-6 mr-2 text-indigo-500" /> <span className='mr-6'>Localization & Security</span> <LockClosedIcon className="w-6 h-6 mr-2 text-indigo-500" />
                         </legend>
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                             {/* Default Language */}
-                            <div className="flex flex-col">
+                             <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Default Language</label>
-                                <select
-                                    name="default_language"
-                                    value={companyInfo.default_language}
-                                    onChange={handleChange}
-                                    ref={refs.default_language}
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'time_zone')}
-                                >
+                                <select name="default_language" value={companyInfo.default_language} onChange={handleChange} ref={refs.default_language} className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'time_zone')}>
                                     <option value="English">English</option>
                                     <option value="Sinhala">Sinhala</option>
                                     <option value="Tamil">Tamil</option>
                                 </select>
                             </div>
-                             {/* Time Zone */}
                              <div className="flex flex-col">
                                 <label className="font-medium text-gray-700 dark:text-gray-300">Time Zone</label>
-                                {/* Consider using a dropdown for timezones */}
-                                <input
-                                    type="text"
-                                    name="time_zone"
-                                    value={companyInfo.time_zone}
-                                    onChange={handleChange}
-                                    ref={refs.time_zone}
-                                    placeholder="e.g., Asia/Colombo"
-                                    className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                    onKeyDown={(e) => handleKeyDown(e, 'enable_2fa')}
-                                />
+                                <input type="text" name="time_zone" value={companyInfo.time_zone} onChange={handleChange} ref={refs.time_zone} placeholder="e.g., Asia/Colombo" className="p-3 mt-2 border border-gray-300 rounded-lg shadow-sm dark:border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:focus:ring-blue-500 dark:bg-gray-800 dark:text-white" onKeyDown={(e) => handleKeyDown(e, 'enable_2fa')} />
                             </div>
-                            {/* Enable 2FA */}
-                             <div className="flex flex-col justify-center pt-6"> {/* Adjust alignment */}
+                             <div className="flex flex-col justify-center pt-6">
                                 <label className="flex items-center font-medium text-gray-700 cursor-pointer dark:text-gray-300">
-                                    <input
-                                        type="checkbox"
-                                        name="enable_2fa" // Changed from enable2FA
-                                        checked={companyInfo.enable_2fa}
-                                        onChange={handleChange}
-                                        ref={refs.enable_2fa}
-                                         className="w-5 h-5 mr-3 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:ring-indigo-600 dark:ring-offset-gray-800"
-                                        // Add onKeyDown if needed for next field
-                                    />
+                                    <input type="checkbox" name="enable_2fa" checked={companyInfo.enable_2fa} onChange={handleChange} ref={refs.enable_2fa} className="w-5 h-5 mr-3 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:focus:ring-indigo-600 dark:ring-offset-gray-800" />
                                     Enable Two-Factor Auth (2FA)
                                 </label>
                              </div>
-
-                             {/* Optional: Add other checkboxes here if needed (auto_generate_qr, etc.) */}
-
                         </div>
                     </fieldset>
 
@@ -825,7 +593,7 @@ function CreateCompany() {
                     {/* Submit Button */}
                     <div className="flex justify-end space-x-4">
                          <button
-                            type="button" // Important: type="button" to prevent form submission
+                            type="button"
                             onClick={resetForm}
                             className="px-6 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
                         >
@@ -834,7 +602,7 @@ function CreateCompany() {
                         <button
                             type="submit"
                             className="px-6 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-                            disabled={!companyInfo.company_name} // Basic validation example
+                            disabled={!companyInfo.company_name}
                         >
                             {isEditing ? 'Update Company' : 'Create Company'}
                         </button>
@@ -842,6 +610,69 @@ function CreateCompany() {
                 </form>
                  {/* --- FORM END --- */}
             </div>
+
+             {/* --- Company List Modal --- */}
+            <AnimatePresence>
+                {isCompanyListVisible && (
+                    <motion.div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
+                        variants={backdropVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
+                        onClick={() => setIsCompanyListVisible(false)} // Close on backdrop click
+                    >
+                        <motion.div
+                            className="w-full max-w-lg p-6 mx-4 bg-white rounded-xl shadow-2xl dark:bg-gray-800 max-h-[80vh] overflow-y-auto"
+                            variants={modalVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
+                        >
+                            <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-200 dark:border-gray-600">
+                                <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Manage Companies</h2>
+                                <button
+                                    onClick={() => setIsCompanyListVisible(false)}
+                                    className="text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+                                    aria-label="Close modal"
+                                >
+                                    <XMarkIcon className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            {/* Company List */}
+                            {companies.length > 0 ? (
+                                <ul className="space-y-3">
+                                    {companies.map((company) => (
+                                        <motion.li
+                                            key={company.id || company.company_name}
+                                            className="flex items-center justify-between p-3 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700"
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <span className="font-medium text-gray-800 dark:text-gray-100">{company.company_name}</span>
+                                            <button
+                                                onClick={() => handleDeleteCompany(company.company_name)}
+                                                className="p-1 text-red-500 transition duration-150 ease-in-out rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 dark:focus:ring-offset-gray-700"
+                                                title={`Delete ${company.company_name}`}
+                                                aria-label={`Delete ${company.company_name}`}
+                                            >
+                                                <TrashIcon className="w-5 h-5" />
+                                            </button>
+                                        </motion.li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-center text-gray-500 dark:text-gray-400">No companies found.</p>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+             {/* --- END Company List Modal --- */}
+
         </div>
     );
 }
