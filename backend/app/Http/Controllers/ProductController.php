@@ -6,6 +6,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Validator;
@@ -22,21 +23,42 @@ class ProductController extends Controller
         }
     }
 
+    // public function store(Request $request)
+    // {
+    //     Log::info('Creating new product:', $request->all());
+
+    //     try {
+    //         $validatedData = $request->validate($this->storeRules());
+    //         $product = Product::create($validatedData);
+
+    //         return response()->json(['message' => 'Product created successfully', 'data' => $product], 201);
+    //     } catch (\Illuminate\Validation\ValidationException $e) {
+    //         return response()->json(['message' => 'Validation error', 'errors' => $e->errors()], 422);
+    //     } catch (\Exception $e) {
+    //         return $this->handleException($e, 'Error creating product');
+    //     }
+    // }
+
+
     public function store(Request $request)
-    {
-        Log::info('Creating new product:', $request->all());
-
-        try {
-            $validatedData = $request->validate($this->storeRules());
-            $product = Product::create($validatedData);
-
-            return response()->json(['message' => 'Product created successfully', 'data' => $product], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json(['message' => 'Validation error', 'errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            return $this->handleException($e, 'Error creating product');
-        }
+{
+    Log::info('Creating new product:', $request->all());
+    if ($request->has('product_id') || $request->has('id')) {
+        Log::warning('Unexpected product_id or id in store request', [
+            'product_id' => $request->input('product_id'),
+            'id' => $request->input('id'),
+        ]);
     }
+    try {
+        $validatedData = $request->validate($this->storeRules());
+        $product = Product::create($validatedData);
+        return response()->json(['message' => 'Product created successfully', 'data' => $product], 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json(['message' => 'Validation error', 'errors' => $e->errors()], 422);
+    } catch (\Exception $e) {
+        return $this->handleException($e, 'Error creating product');
+    }
+}
 
     public function show($id)
     {
@@ -187,6 +209,28 @@ class ProductController extends Controller
         }
     }
 
+    public function checkNames(Request $request)
+{
+    try {
+        \Log::info('checkNames called', ['names' => $request->query('names')]);
+        $names = $request->query('names', []);
+        if (!is_array($names) || empty($names)) {
+            \Log::warning('Invalid names parameter', ['names' => $names]);
+            return response()->json(['message' => 'Names must be an array and cannot be empty'], 400);
+        }
+
+        $existingProducts = Product::whereIn('product_name', $names)
+            ->pluck('product_name')
+            ->toArray();
+
+        \Log::info('checkNames response', ['existing' => $existingProducts]);
+        return response()->json(['existing' => $existingProducts], 200);
+    } catch (\Exception $e) {
+        \Log::error('checkNames error', ['message' => $e->getMessage()]);
+        return $this->handleException($e, 'Error checking product names');
+    }
+}
+
     private function storeRules()
     {
         return [
@@ -194,7 +238,7 @@ class ProductController extends Controller
             'item_code' => 'nullable|string|unique:products,item_code',
             'batch_number' => 'nullable|string',
             'expiry_date' => 'nullable|date',
-            'buying_cost' => 'required|numeric|min:0',
+            'buying_cost' => 'nullable|numeric|min:0', // Changed to nullable
             'sales_price' => 'required|numeric|min:0',
             'minimum_price' => 'nullable|numeric|min:0',
             'wholesale_price' => 'nullable|numeric|min:0',

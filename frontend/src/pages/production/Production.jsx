@@ -6,6 +6,9 @@ import "react-toastify/dist/ReactToastify.css";
 import MakeProductForm from "./MakeProductForm";
 import RawMaterialModal from "./RawMaterialModal";
 import ProductionCategoryModal from "./ProductionCategoryModal";
+import ItemForm from "../../components/item Form/ItemForm";
+import axios from "axios";
+import { useAuth } from "../../context/NewAuthContext";
 import {
   getRawMaterials,
   getProductionCategories,
@@ -13,18 +16,32 @@ import {
   createRawMaterial,
   createProductionCategory,
   createProductionItem,
+  updateProductionItem,
 } from "../../services/productionapi";
 import "./style.css";
 
 function ProductionManagement() {
+  const { currentUser } = useAuth();
   const [rawMaterials, setRawMaterials] = useState([]);
   const [productionCategories, setProductionCategories] = useState([]);
   const [productionItems, setProductionItems] = useState([]);
+  const [existingItems, setExistingItems] = useState([]);
   const [showMakeProductForm, setShowMakeProductForm] = useState(false);
   const [showRawMaterialModal, setShowRawMaterialModal] = useState(false);
   const [showProductionCategoryModal, setShowProductionCategoryModal] =
     useState(false);
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [selectedProductionItem, setSelectedProductionItem] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
+
+  // Axios instance for products API
+  const api = axios.create({
+    baseURL: "http://127.0.0.1:8000/api",
+    headers: {
+      Authorization: `Bearer ${currentUser?.token}`,
+      "Content-Type": "application/json",
+    },
+  });
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -48,6 +65,51 @@ function ProductionManagement() {
     };
     fetchData();
   }, []);
+
+  // Check existing products when productionItems change
+  useEffect(() => {
+    const checkExistingItems = async () => {
+      try {
+        const names = productionItems
+          .map((item) => item.name)
+          .filter((name) => name.trim());
+        if (names.length > 0) {
+          const response = await api.get("/products/check-names", {
+            params: { names },
+            paramsSerializer: (params) => {
+              return Object.entries(params)
+                .map(([key, value]) =>
+                  Array.isArray(value)
+                    ? value
+                        .map((v) => `${key}[]=${encodeURIComponent(v)}`)
+                        .join("&")
+                    : `${key}=${encodeURIComponent(value)}`
+                )
+                .join("&");
+            },
+          });
+          setExistingItems(response.data.existing);
+        } else {
+          setExistingItems([]);
+        }
+      } catch (error) {
+        console.error("Error checking existing items:", {
+          message: error.message,
+          status: error.response?.status,
+          response: error.response?.data,
+        });
+        if (error.response?.status === 404) {
+          setExistingItems([]);
+          toast.warn(
+            "Product check endpoint not found, all items shown as addable."
+          );
+        } else {
+          toast.error("Failed to check existing items: " + error.message);
+        }
+      }
+    };
+    checkExistingItems();
+  }, [productionItems]);
 
   // Refresh all data after adding/updating
   const refreshData = async () => {
@@ -143,6 +205,63 @@ function ProductionManagement() {
     }
   };
 
+  // Handle adding to items
+  const handleAddToItems = (item) => {
+    console.log("Preparing ItemForm for:", item);
+    setSelectedProductionItem({
+      product_name: item.name,
+      sales_price: parseFloat(item.sales_price) || 0,
+      wholesale_price: parseFloat(item.wholesale_price) || 0,
+      mrp: parseFloat(item.mrp_price) || 0,
+      category: item.category?.name || "",
+    });
+    setShowItemForm(true);
+  };
+
+  // Handle ItemForm submission
+  const handleItemFormSubmit = async (itemData) => {
+    try {
+      console.log("Original itemData:", itemData);
+      const cleanedData = { ...itemData };
+      delete cleanedData.product_id; // Remove product_id
+      delete cleanedData.id; // Remove id if present
+      console.log("Submitting to /products:", cleanedData);
+      const response = await api.post("/products", cleanedData);
+      toast.success(response.data.message);
+      setShowItemForm(false);
+      setSelectedProductionItem(null);
+      const names = productionItems
+        .map((item) => item.name)
+        .filter((name) => name.trim());
+      if (names.length > 0) {
+        const res = await api.get("/products/check-names", {
+          params: { names },
+          paramsSerializer: (params) => {
+            return Object.entries(params)
+              .map(([key, value]) =>
+                Array.isArray(value)
+                  ? value
+                      .map((v) => `${key}[]=${encodeURIComponent(v)}`)
+                      .join("&")
+                  : `${key}=${encodeURIComponent(value)}`
+              )
+              .join("&");
+          },
+        });
+        setExistingItems(res.data.existing);
+      }
+    } catch (error) {
+      console.error("Error adding item:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      toast.error(
+        "Error adding item: " + (error.response?.data?.message || error.message)
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
       <ToastContainer />
@@ -191,6 +310,18 @@ function ProductionManagement() {
         <ProductionCategoryModal
           onClose={() => setShowProductionCategoryModal(false)}
           onSubmit={handleAddProductionCategory}
+        />
+      )}
+
+      {showItemForm && (
+        <ItemForm
+          onSubmit={handleItemFormSubmit}
+          initialData={selectedProductionItem}
+          onClose={() => {
+            setShowItemForm(false);
+            setSelectedProductionItem(null);
+          }}
+          isEdit={false} // Explicitly set to add mode
         />
       )}
 
@@ -359,6 +490,9 @@ function ProductionManagement() {
                 <th className="p-3 text-left border-b dark:border-gray-600">
                   Ingredients
                 </th>
+                <th className="p-3 text-left border-b dark:border-gray-600">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -382,6 +516,18 @@ function ProductionManagement() {
                   <td className="p-3 dark:text-gray-300">{item.mrp_price}</td>
                   <td className="p-3 dark:text-gray-300">
                     {item.formulas?.length || 0} items
+                  </td>
+                  <td className="p-3 dark:text-gray-300">
+                    {existingItems.includes(item.name) ? (
+                      <span className="text-green-500">In Items</span>
+                    ) : (
+                      <button
+                        onClick={() => handleAddToItems(item)}
+                        className="text-blue-500 hover:text-blue-700"
+                      >
+                        Add to Items
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

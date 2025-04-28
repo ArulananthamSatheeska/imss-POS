@@ -6,6 +6,10 @@ import { useAuth } from '../../context/NewAuthContext';
 import RoleModal from './RoleModal';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
+// Set axios base URL to backend server
+axios.defaults.baseURL = 'http://localhost:8000';
+
 const RoleList = () => {
     const navigate = useNavigate();
     const [roles, setRoles] = useState([]);
@@ -16,6 +20,7 @@ const RoleList = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedRole, setSelectedRole] = useState(null);
+    const [lastFetchTime, setLastFetchTime] = useState(null);
     const { checkPermission } = useAuth();
 
     useEffect(() => {
@@ -31,17 +36,39 @@ const RoleList = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
+            let rolesData = [];
+            let lastPage = 1;
+
             if (response.data && Array.isArray(response.data)) {
-                setRoles(response.data);
-                setTotalPages(1);
+                rolesData = response.data;
+                lastPage = 1;
             } else if (response.data && response.data.data) {
-                setRoles(response.data.data || []);
-                setTotalPages(response.data.last_page || 1);
-            } else {
-                setRoles([]);
-                setTotalPages(1);
+                rolesData = response.data.data || [];
+                lastPage = response.data.last_page || 1;
             }
+
+            // Transform permissions object to array of strings "page.action" for display
+            const transformedRoles = rolesData.map(role => {
+                let permissionsArray = [];
+                if (role.permissions && typeof role.permissions === 'object') {
+                    Object.entries(role.permissions).forEach(([page, actions]) => {
+                        if (Array.isArray(actions)) {
+                            actions.forEach(action => {
+                                permissionsArray.push(`${page}.${action}`);
+                            });
+                        } else if (typeof actions === 'string') {
+                            permissionsArray.push(`${page}.${actions}`);
+                        }
+                    });
+                }
+                return { ...role, permissionsArray, permissionsOriginal: role.permissions };
+            });
+
+            setRoles(transformedRoles);
+            setTotalPages(lastPage);
+            setLastFetchTime(new Date().toLocaleTimeString());
         } catch (err) {
+            console.error('Fetch roles error:', err.response || err);
             setError(err.response?.data?.message || 'Failed to fetch roles');
             toast.error(err.response?.data?.message || 'Failed to fetch roles');
         } finally {
@@ -49,7 +76,11 @@ const RoleList = () => {
         }
     };
 
-    const handleDeleteRole = async (roleId) => {
+    const handleDeleteRole = async (roleId, roleName) => {
+        if (roleName.toLowerCase() === 'admin' || roleName.toLowerCase() === 'superadmin') {
+            toast.error('Admin and Super Admin roles cannot be deleted.');
+            return;
+        }
         if (!window.confirm('Are you sure you want to delete this role?')) return;
 
         try {
@@ -65,12 +96,18 @@ const RoleList = () => {
     };
 
     const handleEditRole = (role) => {
-        setSelectedRole(role);
+        // Admin and Super Admin have all permissions, no need to edit permissions
+        if (role.name.toLowerCase() === 'admin' || role.name.toLowerCase() === 'super admin') {
+            toast.info('Admin and Super Admin roles have all permissions and cannot be edited.');
+            return;
+        }
+        // Pass the original permissions object to RoleModal
+        setSelectedRole({ ...role, permissions: role.permissionsOriginal || {} });
         setIsModalOpen(true);
     };
 
     const handleAddRole = () => {
-        setSelectedRole(null);
+        setSelectedRole({ permissions: {} });
         setIsModalOpen(true);
     };
 
@@ -85,7 +122,7 @@ const RoleList = () => {
             const payload = {
                 name: roleData.name,
                 description: roleData.description || '',
-                permissions: roleData.permissions || []
+                permissions: roleData.permissions || {}
             };
 
             if (roleData.id) {
@@ -103,6 +140,7 @@ const RoleList = () => {
             fetchRoles();
             handleModalClose();
         } catch (error) {
+            console.error('Submit role error:', error.response || error);
             toast.error(error.response?.data?.message || 'Failed to submit role');
         }
     };
@@ -120,6 +158,12 @@ const RoleList = () => {
                 </button>
             </div>
 
+            <div className="mb-2 text-sm text-gray-600">
+                {loading && <span>Loading roles...</span>}
+                {!loading && lastFetchTime && <span>Last updated at: {lastFetchTime}</span>}
+                {error && <span className="text-red-600">Error: {error}</span>}
+            </div>
+
             <div className="mb-4">
                 <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -135,7 +179,6 @@ const RoleList = () => {
                 </div>
             </div>
 
-            {loading && <div className="text-center py-4">Loading roles...</div>}
             {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>}
 
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -143,7 +186,7 @@ const RoleList = () => {
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permissions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permissions Count</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -161,24 +204,22 @@ const RoleList = () => {
                                         <div className="text-sm font-medium text-gray-900">{role.name}</div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="flex flex-wrap gap-1">
-                                            {role.permissions?.map(permission => (
-                                                <span key={permission} className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">
-                                                    {permission}
-                                                </span>
-                                            ))}
+                                        <div className="text-sm text-gray-700">
+                                            {(role.name.toLowerCase() === 'admin' || role.name.toLowerCase() === 'super admin') ? 'All permissions' : role.permissionsArray?.length || 0}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                         <button
                                             onClick={() => handleEditRole(role)}
-                                            className="text-blue-600 hover:text-blue-900"
+                                            className={`text-blue-600 hover:text-blue-900 ${role.name.toLowerCase() === 'admin' || role.name.toLowerCase() === 'super admin' ? 'cursor-not-allowed opacity-50' : ''}`}
+                                            disabled={role.name.toLowerCase() === 'admin' || role.name.toLowerCase() === 'super admin'}
                                         >
                                             <FiEdit2 className="inline" />
                                         </button>
                                         <button
-                                            onClick={() => handleDeleteRole(role.id)}
-                                            className="text-red-600 hover:text-red-900"
+                                            onClick={() => handleDeleteRole(role.id, role.name)}
+                                            className={`text-red-600 hover:text-red-900 ${role.name.toLowerCase() === 'admin' || role.name.toLowerCase() === 'super admin' ? 'cursor-not-allowed opacity-50' : ''}`}
+                                            disabled={role.name.toLowerCase() === 'admin' || role.name.toLowerCase() === 'super admin'}
                                         >
                                             <FiTrash2 className="inline" />
                                         </button>

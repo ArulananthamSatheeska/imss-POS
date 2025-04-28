@@ -19,6 +19,17 @@ class SaleController extends Controller
         return response()->json($sales);
     }
 
+    public function show($id)
+    {
+        Log::info('Fetching sale with ID: ' . $id);
+        $sale = Sale::with('items')->find($id);
+        if ($sale) {
+            return response()->json($sale);
+        } else {
+            return response()->json(['message' => 'Sale not found'], 404);
+        }
+    }
+
     public function store(Request $request)
     {
         $request->validate([
@@ -259,6 +270,11 @@ class SaleController extends Controller
                     $unitPrice = max(0, $unitPrice);
                     $totalPrice = $unitPrice * $item['quantity'];
 
+                    if ($item['quantity'] <= 0) {
+                        Log::warning('Invalid quantity for product ' . $item['product_name'] . ': ' . $item['quantity']);
+                        continue; // Skip invalid quantity
+                    }
+
                     $product->updateStock($item['quantity'], 'subtract');
 
                     SaleItem::create([
@@ -272,6 +288,7 @@ class SaleController extends Controller
                         'total' => $totalPrice,
                     ]);
                 } else {
+                    Log::warning('Product not found: ' . $item['product_name']);
                     SaleItem::create([
                         'sale_id' => $sale->id,
                         'product_id' => null,

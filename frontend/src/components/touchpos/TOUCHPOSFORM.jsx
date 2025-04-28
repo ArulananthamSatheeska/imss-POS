@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
@@ -11,9 +11,6 @@ import {
   Minimize,
   Calculator,
   LayoutDashboard,
-  PauseCircle,
-  RefreshCw,
-  Printer,
   Plus,
   Minus,
   ArrowLeft,
@@ -26,107 +23,97 @@ import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
 
-// Default products for demo purposes (expanded for demo)
-const defaultProducts = [
-  {
-    id: 1,
-    product_name: "Anchor 400g",
-    barcode: "12345",
-    sales_price: 10000,
-    wholesale_price: 9500,
-    mrp: 10500,
-    stock: 17,
-    category: "Milk Powder",
-    brand: "Anchor",
-    image: "https://via.placeholder.com/50",
-  },
-  {
-    id: 2,
-    product_name: "Nestle Milk 500g",
-    barcode: "67890",
-    sales_price: 12000,
-    wholesale_price: 11000,
-    mrp: 12500,
-    stock: 25,
-    category: "Milk Powder",
-    brand: "Nestle",
-    image: "https://via.placeholder.com/50",
-  },
-  {
-    id: 3,
-    product_name: "Pepsi 1L",
-    barcode: "54321",
-    sales_price: 5000,
-    wholesale_price: 4500,
-    mrp: 5500,
-    stock: 50,
-    category: "Beverages",
-    brand: "Pepsi",
-    image: "https://via.placeholder.com/50",
-  },
-  {
-    id: 4,
-    product_name: "Coca-Cola 1L",
-    barcode: "98765",
-    sales_price: 5200,
-    wholesale_price: 4700,
-    mrp: 5600,
-    stock: 40,
-    category: "Beverages",
-    brand: "Coca-Cola",
-    image: "https://via.placeholder.com/50",
-  },
-  {
-    id: 5,
-    product_name: "Lays Chips 50g",
-    barcode: "11223",
-    sales_price: 2000,
-    wholesale_price: 1800,
-    mrp: 2200,
-    stock: 60,
-    category: "Snacks",
-    brand: "Lays",
-    image: "https://via.placeholder.com/50",
-  },
-  {
-    id: 6,
-    product_name: "KitKat 40g",
-    barcode: "44556",
-    sales_price: 3000,
-    wholesale_price: 2800,
-    mrp: 3200,
-    stock: 30,
-    category: "Chocolates",
-    brand: "Nestle",
-    image: "https://via.placeholder.com/50",
-  },
-  {
-    id: 7,
-    product_name: "Maggi Noodles 70g",
-    barcode: "55667",
-    sales_price: 1500,
-    wholesale_price: 1300,
-    mrp: 1600,
-    stock: 70,
-    category: "Instant Food",
-    brand: "Nestle",
-    image: "https://via.placeholder.com/50",
-  },
-  {
-    id: 8,
-    product_name: "Sprite 1L",
-    barcode: "22334",
-    sales_price: 5100,
-    wholesale_price: 4600,
-    mrp: 5400,
-    stock: 35,
-    category: "Beverages",
-    brand: "Sprite",
-    image: "https://via.placeholder.com/50",
-  },
-];
+// --- Helper Function to Apply Discount Schemes ---
+const applyDiscountScheme = (product, saleType, schemes) => {
+  if (!product || !product.id || !Array.isArray(schemes)) {
+    const fallbackPrice =
+      saleType === "Wholesale"
+        ? parseFloat(product?.wholesale_price || product?.sales_price || 0)
+        : parseFloat(product?.sales_price || 0);
+    return Math.max(0, fallbackPrice);
+  }
 
-// Virtual Keyboard Component
+  const basePrice =
+    saleType === "Wholesale"
+      ? parseFloat(product.wholesale_price || product.sales_price || 0)
+      : parseFloat(product.sales_price || 0);
+
+  if (isNaN(basePrice) || basePrice <= 0) {
+    return 0;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let bestScheme = null;
+  let maxDiscountValue = -1;
+
+  const findBestScheme = (schemeList) => {
+    schemeList.forEach((scheme) => {
+      if (
+        !scheme.active ||
+        !scheme.type ||
+        scheme.value === null ||
+        scheme.value === undefined
+      )
+        return;
+
+      const startDate = scheme.start_date ? new Date(scheme.start_date) : null;
+      const endDate = scheme.end_date ? new Date(scheme.end_date) : null;
+      if (startDate && startDate > today) return;
+      if (endDate) {
+        endDate.setHours(23, 59, 59, 999);
+        if (endDate < today) return;
+      }
+
+      let currentDiscountValue = 0;
+      const schemeValue = parseFloat(scheme.value || 0);
+
+      if (scheme.type === "percentage" && schemeValue > 0) {
+        currentDiscountValue = (basePrice * schemeValue) / 100;
+      } else if (scheme.type === "amount" && schemeValue > 0) {
+        currentDiscountValue = schemeValue;
+      } else {
+        return;
+      }
+
+      currentDiscountValue = Math.min(currentDiscountValue, basePrice);
+
+      if (currentDiscountValue > maxDiscountValue) {
+        maxDiscountValue = currentDiscountValue;
+        bestScheme = scheme;
+      }
+    });
+  };
+
+  const productSchemes = schemes.filter(
+    (s) => s.applies_to === "product" && s.target === product.product_name
+  );
+  findBestScheme(productSchemes);
+
+  if ((!bestScheme || maxDiscountValue <= 0) && product.category) {
+    const categorySchemes = schemes.filter(
+      (s) => s.applies_to === "category" && s.target === product.category
+    );
+    findBestScheme(categorySchemes);
+  }
+
+  if (bestScheme && maxDiscountValue > 0) {
+    let discountedPrice = basePrice;
+    const schemeValue = parseFloat(bestScheme.value || 0);
+
+    if (bestScheme.type === "percentage") {
+      discountedPrice = basePrice * (1 - schemeValue / 100);
+    } else if (bestScheme.type === "amount") {
+      discountedPrice = basePrice - schemeValue;
+    }
+    return Math.max(0, discountedPrice);
+  }
+
+  return basePrice;
+};
+
+// Virtual Keyboard Component (Unchanged)
 const VirtualKeyboard = ({ value, onChange, onClose, isNumericOnly }) => {
   const [isShift, setIsShift] = useState(false);
 
@@ -194,15 +181,17 @@ const VirtualKeyboard = ({ value, onChange, onClose, isNumericOnly }) => {
                   ${key === "space" ? "flex-1" : "w-14 h-14"}
                   ${key === "done" ? "bg-green-500 text-white" : ""}
                   ${key === "backspace" ? "bg-red-500 text-white" : ""}
-                  ${key === "shift"
-                    ? isShift
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-600 text-white"
-                    : ""
+                  ${
+                    key === "shift"
+                      ? isShift
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-600 text-white"
+                      : ""
                   }
-                  ${key !== "done" && key !== "backspace" && key !== "shift"
-                    ? "bg-gray-600 text-white"
-                    : ""
+                  ${
+                    key !== "done" && key !== "backspace" && key !== "shift"
+                      ? "bg-gray-600 text-white"
+                      : ""
                   }
                   active:scale-95 transition-all duration-100 text-lg font-semibold
                 `}
@@ -232,12 +221,14 @@ const VirtualKeyboard = ({ value, onChange, onClose, isNumericOnly }) => {
 const TOUCHPOSFORM = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [saleType, setSaleType] = useState("Retail");
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState([]); // Products in the bill
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState(defaultProducts);
-  const [items, setItems] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [items, setItems] = useState([]); // All available products
+  const [activeSchemes, setActiveSchemes] = useState([]); // Discount schemes
   const [tax, setTax] = useState(0);
   const [billDiscount, setBillDiscount] = useState(0);
+  const [shipping, setShipping] = useState(0); // Added shipping
   const searchInputRef = useRef(null);
   const taxInputRef = useRef(null);
   const discountInputRef = useRef(null);
@@ -254,89 +245,22 @@ const TOUCHPOSFORM = () => {
     receivedAmount: 0,
   });
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(false);
+  const [loadingSchemes, setLoadingSchemes] = useState(false);
 
-  // State for virtual keyboard
+  // Virtual keyboard states
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [keyboardTarget, setKeyboardTarget] = useState(null);
   const [keyboardValue, setKeyboardValue] = useState("");
   const [isNumericKeyboard, setIsNumericKeyboard] = useState(false);
   const [editingBarcodeIndex, setEditingBarcodeIndex] = useState(null);
 
-  // State for category and brand filters
+  // Category and brand filters
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedBrand, setSelectedBrand] = useState("All Brands");
 
-  // Scroll the active input into view when the keyboard opens
+  // Fetch Next Bill Number
   useEffect(() => {
-    if (showKeyboard && keyboardTarget) {
-      let activeElement = null;
-      if (keyboardTarget === "search") {
-        activeElement = searchInputRef.current;
-      } else if (keyboardTarget === "tax") {
-        activeElement = taxInputRef.current;
-      } else if (keyboardTarget === "discount") {
-        activeElement = discountInputRef.current;
-      }
-
-      if (activeElement) {
-        setTimeout(() => {
-          activeElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }, 100);
-      }
-    }
-  }, [showKeyboard, keyboardTarget]);
-
-  // Customer search state
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
-  const [customerSearchResults, setCustomerSearchResults] = useState([]);
-  const [showCustomerSearch, setShowCustomerSearch] = useState(false);
-
-  // Fetch bill number and setup customer search
-  useEffect(() => {
-    // Fetch and search customers
-    const fetchCustomers = async (searchTerm = '') => {
-      try {
-        const response = await axios.get(
-          "http://127.0.0.1:8000/api/customers",
-          { params: { search: searchTerm } }
-        );
-        return response.data.data || [];
-      } catch (error) {
-        console.error("Error fetching customers:", error);
-        return [];
-      }
-    };
-
-    // Debounced customer search
-    const debouncedCustomerSearch = debounce(async (query) => {
-      if (query.trim() === "") {
-        setCustomerSearchResults([]);
-        return;
-      }
-      const results = await fetchCustomers(query);
-      setCustomerSearchResults(results);
-    }, 300);
-
-    const handleCustomerSearch = (query) => {
-      setCustomerSearchQuery(query);
-      debouncedCustomerSearch(query);
-    };
-
-    const selectCustomer = (customer) => {
-      setCustomerInfo({
-        ...customerInfo,
-        name: customer.name,
-        mobile: customer.phone,
-      });
-      setCustomerSearchQuery("");
-      setCustomerSearchResults([]);
-      setShowCustomerSearch(false);
-    };
-
-    // Enhanced bill number generation with better error handling
     const fetchNextBillNumber = async () => {
       try {
         const response = await axios.get(
@@ -349,152 +273,249 @@ const TOUCHPOSFORM = () => {
         }
       } catch (error) {
         console.error("Error fetching next bill number:", error);
-        // Fallback to local bill number generation with timestamp
         const timestamp = Date.now();
         const randomNum = Math.floor(1000 + Math.random() * 9000);
         setBillNumber(`BILL-${timestamp}-${randomNum}`);
       }
     };
-
     fetchNextBillNumber();
   }, []);
 
-  // Fetch products
-  const [loading, setLoading] = useState(false);
+  // Fetch Products
   useEffect(() => {
-    setLoading(true);
+    setLoadingItems(true);
     axios
       .get("http://127.0.0.1:8000/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
-          setItems(response.data.data);
+          const productsWithOpeningStock = response.data.data.map((p) => ({
+            ...p,
+            id: p.id || p.product_id, // Ensure consistent ID field
+            stock: parseFloat(p.opening_stock_quantity || 0), // Use opening stock
+            category: p.category_name || "Unknown Category",
+            brand: p.brand || "Unknown Brand",
+          }));
+          setItems(productsWithOpeningStock);
+          setSearchResults(productsWithOpeningStock); // Initialize search results
+          console.log(
+            "Fetched Products (using opening_stock_quantity as 'stock'):",
+            productsWithOpeningStock
+          );
         } else {
-          console.error("Unexpected data format:", response.data);
+          console.error("Unexpected product data format:", response.data);
           setItems([]);
+          setSearchResults([]);
         }
       })
       .catch((error) => {
         console.error("Error fetching items:", error);
         setItems([]);
+        setSearchResults([]);
       })
       .finally(() => {
-        setLoading(false);
+        setLoadingItems(false);
       });
   }, []);
 
-  // Debounced search
-  const debouncedSearch = debounce((query, category, brand) => {
-    let filtered = items.length > 0 ? items : defaultProducts;
+  // Fetch Active Discount Schemes
+  useEffect(() => {
+    setLoadingSchemes(true);
+    axios
+      .get("http://127.0.0.1:8000/api/discount-schemes")
+      .then((response) => {
+        if (response.data && Array.isArray(response.data.data)) {
+          const formattedSchemes = response.data.data.map((s) => ({
+            ...s,
+            applies_to: s.applies_to || s.appliesTo,
+            start_date: s.start_date || s.startDate,
+            end_date: s.end_date || s.endDate,
+          }));
+          const active = formattedSchemes.filter((scheme) => scheme.active);
+          setActiveSchemes(active);
+          console.log("Fetched and Filtered Active Schemes:", active);
+        } else {
+          console.error("Unexpected scheme data format:", response.data);
+          setActiveSchemes([]);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching discount schemes:", error);
+        setActiveSchemes([]);
+      })
+      .finally(() => {
+        setLoadingSchemes(false);
+      });
+  }, []);
 
-    if (category !== "All Categories") {
-      filtered = filtered.filter((item) => item.category === category);
-    }
+  // Debounced Search
+  const debouncedSearch = useCallback(
+    debounce((query, category, brand) => {
+      if (!Array.isArray(items)) {
+        setSearchResults([]);
+        return;
+      }
 
-    if (brand !== "All Brands") {
-      filtered = filtered.filter((item) => item.brand === brand);
-    }
+      let filtered = [...items];
 
-    if (query.trim() !== "") {
-      filtered = filtered.filter(
-        (item) =>
-          (item.product_name &&
-            item.product_name.toLowerCase().includes(query.toLowerCase())) ||
-          (item.item_code && item.item_code.includes(query)) ||
-          (item.barcode && item.barcode.includes(query))
-      );
-    }
+      if (category !== "All Categories") {
+        filtered = filtered.filter((item) => item.category === category);
+      }
 
-    setSearchResults(filtered);
-  }, 300);
+      if (brand !== "All Brands") {
+        filtered = filtered.filter((item) => item.brand === brand);
+      }
+
+      if (query.trim() !== "") {
+        const lowerCaseQuery = query.toLowerCase();
+        filtered = filtered.filter(
+          (item) =>
+            (item.product_name &&
+              item.product_name.toLowerCase().includes(lowerCaseQuery)) ||
+            (item.item_code && String(item.item_code).includes(query)) ||
+            (item.barcode && String(item.barcode).includes(query))
+        );
+      }
+
+      setSearchResults(filtered);
+    }, 300),
+    [items]
+  );
 
   const handleSearch = (query) => {
     setSearchQuery(query);
     debouncedSearch(query, selectedCategory, selectedBrand);
   };
 
-  // Update product prices based on sale type
+  // Recalculate prices when saleType or schemes change
   useEffect(() => {
-    setProducts((prevProducts) =>
-      prevProducts.map((product) => {
-        const newPrice =
-          saleType === "Wholesale"
-            ? parseFloat(product.wholesale_price || 0)
-            : parseFloat(product.sales_price || 0);
+    if (activeSchemes.length > 0 || !loadingSchemes) {
+      setProducts((prevProducts) =>
+        prevProducts.map((product) => {
+          const newPrice = applyDiscountScheme(
+            product,
+            saleType,
+            activeSchemes
+          );
+          const mrp = parseFloat(product.mrp || 0);
+          const discountPerUnit = Math.max(0, mrp - newPrice);
 
-        const discountPerUnit = Math.max(
-          parseFloat(product.mrp || 0) - newPrice,
-          0
-        );
+          return {
+            ...product,
+            price: newPrice,
+            discount: discountPerUnit,
+            total: newPrice * (product.qty || 0),
+          };
+        })
+      );
+    }
+  }, [saleType, activeSchemes, loadingSchemes]);
 
-        return {
-          ...product,
-          price: newPrice,
-          discount: discountPerUnit,
-          total:
-            newPrice * (product.qty || 1) -
-            discountPerUnit * (product.qty || 1),
-        };
-      })
-    );
-  }, [saleType]);
-
-  // Add product to bill and decrease stock
+  // Add Product to Bill
   const addProductToTable = (item) => {
-    const price =
-      saleType === "Wholesale" ? item.wholesale_price : item.sales_price;
-    const discountPerUnit = Math.max(item.mrp - price, 0);
-
-    if (1 > item.stock) {
-      alert(`Insufficient stock! Only ${item.stock} available.`);
+    if (!item || !item.id) {
+      alert("Invalid product selected.");
       return;
     }
 
-    const existingProductIndex = products.findIndex(
-      (product) => product.product_name === item.product_name
-    );
+    const availableStock = parseFloat(item.stock || 0);
+    if (isNaN(availableStock) || availableStock <= 0) {
+      alert(`No opening stock available for ${item.product_name}.`);
+      return;
+    }
 
     const qtyToAdd = 1;
+    const existingProductIndex = products.findIndex((p) => p.id === item.id);
+    const newTotalQty =
+      existingProductIndex >= 0
+        ? products[existingProductIndex].qty + qtyToAdd
+        : qtyToAdd;
+
+    if (newTotalQty > availableStock) {
+      alert(
+        `Insufficient opening stock for ${item.product_name}! Only ${availableStock} available.`
+      );
+      return;
+    }
+
+    const finalUnitPrice = applyDiscountScheme(item, saleType, activeSchemes);
+    const mrp = parseFloat(item.mrp || 0);
+    const discountPerUnit = Math.max(0, mrp - finalUnitPrice);
+
+    let updatedProducts = [...products];
 
     if (existingProductIndex >= 0) {
-      const updatedProducts = [...products];
-      updatedProducts[existingProductIndex].qty += qtyToAdd;
-      updatedProducts[existingProductIndex].total =
-        updatedProducts[existingProductIndex].qty * price -
-        updatedProducts[existingProductIndex].qty * discountPerUnit;
-      updatedProducts[existingProductIndex].discount = discountPerUnit;
-
-      setProducts(updatedProducts);
+      updatedProducts[existingProductIndex] = {
+        ...updatedProducts[existingProductIndex],
+        qty: newTotalQty,
+        total: finalUnitPrice * newTotalQty,
+      };
     } else {
       const newProduct = {
         ...item,
         qty: qtyToAdd,
-        price: price,
-        total: price * qtyToAdd - discountPerUnit,
+        price: finalUnitPrice,
         discount: discountPerUnit,
+        total: finalUnitPrice * qtyToAdd,
         serialNumber: products.length + 1,
       };
-
-      setProducts([...products, newProduct]);
+      updatedProducts = [...products, newProduct];
     }
 
-    setSearchResults((prevResults) =>
-      prevResults.map((result) =>
-        result.id === item.id
-          ? { ...result, stock: result.stock - qtyToAdd }
-          : result
-      )
-    );
+    setProducts(updatedProducts);
 
-    setItems((prevItems) =>
-      prevItems.map((i) =>
+    // Update stock in items and searchResults
+    const updateStock = (list) =>
+      list.map((i) =>
         i.id === item.id ? { ...i, stock: i.stock - qtyToAdd } : i
-      )
-    );
+      );
+    setItems(updateStock);
+    setSearchResults(updateStock);
 
     setSearchQuery("");
   };
 
-  // Update product quantity with touch-friendly buttons
+  // Update Product Quantity
+  const updateProductQuantity = (index, newQty) => {
+    const parsedQty = parseFloat(newQty) || 0;
+    if (parsedQty < 0) {
+      return;
+    }
+
+    const product = products[index];
+    const availableStock = parseFloat(product.stock || 0);
+
+    if (parsedQty > availableStock) {
+      alert(
+        `Quantity exceeds opening stock! Only ${availableStock} available for ${product.product_name}.`
+      );
+      return;
+    }
+
+    const stockDifference = parsedQty - (product.qty || 0);
+
+    setProducts((prevProducts) =>
+      prevProducts.map((p, i) =>
+        i === index
+          ? {
+              ...p,
+              qty: parsedQty,
+              total: parsedQty * p.price,
+            }
+          : p
+      )
+    );
+
+    if (stockDifference !== 0) {
+      const updateStock = (list) =>
+        list.map((i) =>
+          i.id === product.id ? { ...i, stock: i.stock - stockDifference } : i
+        );
+      setItems(updateStock);
+      setSearchResults(updateStock);
+    }
+  };
+
+  // Increment/Decrement Quantity
   const incrementQuantity = (index) => {
     const product = products[index];
     const newQty = (product.qty || 0) + 1;
@@ -507,41 +528,7 @@ const TOUCHPOSFORM = () => {
     updateProductQuantity(index, newQty);
   };
 
-  const updateProductQuantity = (index, newQty) => {
-    const parsedQty = parseFloat(newQty) || 0;
-    const product = products[index];
-    const stockDifference = parsedQty - (product.qty || 0);
-
-    setProducts((prevProducts) =>
-      prevProducts.map((p, i) =>
-        i === index
-          ? {
-            ...p,
-            qty: parsedQty,
-            total: parsedQty * p.price,
-          }
-          : p
-      )
-    );
-
-    if (stockDifference !== 0) {
-      setSearchResults((prevResults) =>
-        prevResults.map((result) =>
-          result.id === product.id
-            ? { ...result, stock: result.stock - stockDifference }
-            : result
-        )
-      );
-
-      setItems((prevItems) =>
-        prevItems.map((i) =>
-          i.id === product.id ? { ...i, stock: i.stock - stockDifference } : i
-        )
-      );
-    }
-  };
-
-  // Delete product and restore stock
+  // Delete Product
   const handleDeleteClick = (index) => {
     setPendingDeleteIndex(index);
     setShowNotification(true);
@@ -552,24 +539,19 @@ const TOUCHPOSFORM = () => {
       const productToDelete = products[pendingDeleteIndex];
       const qtyToRestore = productToDelete.qty || 0;
 
-      setSearchResults((prevResults) =>
-        prevResults.map((result) =>
-          result.id === productToDelete.id
-            ? { ...result, stock: result.stock + qtyToRestore }
-            : result
-        )
-      );
-
-      setItems((prevItems) =>
-        prevItems.map((i) =>
+      const updateStock = (list) =>
+        list.map((i) =>
           i.id === productToDelete.id
             ? { ...i, stock: i.stock + qtyToRestore }
             : i
-        )
-      );
+        );
+      setItems(updateStock);
+      setSearchResults(updateStock);
 
       setProducts((prevProducts) =>
-        prevProducts.filter((_, i) => i !== pendingDeleteIndex)
+        prevProducts
+          .filter((_, i) => i !== pendingDeleteIndex)
+          .map((p, idx) => ({ ...p, serialNumber: idx + 1 }))
       );
     }
     setShowNotification(false);
@@ -581,94 +563,178 @@ const TOUCHPOSFORM = () => {
     setPendingDeleteIndex(null);
   };
 
-  // Calculate totals
-  const calculateTotals = () => {
-    const totalQty = products.reduce(
-      (acc, product) => acc + (product.qty || 0),
-      0
-    );
-    const subTotal = products.reduce(
-      (acc, product) => acc + (product.mrp || 0) * (product.qty || 0),
-      0
-    );
-    const totalItemDiscounts = products.reduce(
-      (acc, product) => acc + (product.discount || 0) * (product.qty || 0),
-      0
-    );
-    const taxAmount = subTotal * (tax / 100) || 0;
-    const totalDiscount = totalItemDiscounts + (billDiscount || 0);
-    const total = subTotal + taxAmount - totalDiscount;
+  // Calculate Totals
+  const calculateTotals = useCallback(() => {
+    let totalQty = 0;
+    let subTotalMRP = 0;
+    let totalItemDiscounts = 0;
+    let grandTotalBeforeAdjustments = 0;
+
+    products.forEach((p) => {
+      const qty = p.qty || 0;
+      const mrp = parseFloat(p.mrp || 0);
+      const unitDiscount = p.discount || 0;
+      const unitPrice = p.price || 0;
+
+      totalQty += qty;
+      subTotalMRP += mrp * qty;
+      totalItemDiscounts += unitDiscount * qty;
+      grandTotalBeforeAdjustments += p.total;
+    });
+
+    const currentTaxRate = parseFloat(tax || 0);
+    const currentBillDiscount = parseFloat(billDiscount || 0);
+    const currentShipping = parseFloat(shipping || 0);
+    const taxAmount = grandTotalBeforeAdjustments * (currentTaxRate / 100);
+    const finalTotalDiscount = totalItemDiscounts + currentBillDiscount;
+    const finalTotal =
+      grandTotalBeforeAdjustments +
+      taxAmount -
+      currentBillDiscount +
+      currentShipping;
 
     return {
       totalQty,
-      subTotal,
-      totalItemDiscounts,
-      totalDiscount,
-      taxAmount,
-      total,
+      subTotalMRP: isNaN(subTotalMRP) ? 0 : subTotalMRP,
+      totalItemDiscounts: isNaN(totalItemDiscounts) ? 0 : totalItemDiscounts,
+      totalBillDiscount: isNaN(currentBillDiscount) ? 0 : currentBillDiscount,
+      finalTotalDiscount: isNaN(finalTotalDiscount) ? 0 : finalTotalDiscount,
+      taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
+      grandTotalBeforeAdjustments: isNaN(grandTotalBeforeAdjustments)
+        ? 0
+        : grandTotalBeforeAdjustments,
+      finalTotal: isNaN(finalTotal) ? 0 : finalTotal,
     };
-  };
+  }, [products, tax, billDiscount, shipping]);
 
-  // Toggle fullscreen
+  // Toggle Fullscreen
   const toggleFullScreen = () => {
-    if (isFullScreen) {
-      document.exitFullscreen();
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(
+          `Error attempting to enable full-screen mode: ${err.message} (${err.name})`
+        );
+        alert(`Could not enter full-screen mode: ${err.message}`);
+      });
+      setIsFullScreen(true);
     } else {
-      document.documentElement.requestFullscreen();
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullScreen(false);
+      }
     }
-    setIsFullScreen((prev) => !prev);
   };
 
-  // Hold sale
-  const holdSale = () => {
-    const saleId = `BILL-${Date.now()}`;
+  // Hold Sale
+  const holdSale = useCallback(() => {
+    if (products.length === 0) {
+      alert("Cannot hold an empty sale.");
+      return;
+    }
+    const currentTotals = calculateTotals();
+    const saleId = `HELD-${Date.now()}`;
     const saleData = {
       saleId,
       products,
-      totals: calculateTotals(),
+      totals: currentTotals,
       tax,
       billDiscount,
+      shipping,
+      saleType,
+      customerInfo,
+      billNumber,
+      heldAt: new Date().toISOString(),
     };
-    localStorage.setItem(saleId, JSON.stringify(saleData));
-    alert(`Sale held with ID: ${saleId}`);
-  };
+    try {
+      const heldSales = JSON.parse(localStorage.getItem("heldSales") || "[]");
+      heldSales.push(saleData);
+      localStorage.setItem("heldSales", JSON.stringify(heldSales));
+      alert(`Sale held with ID: ${saleId}. Use 'View Hold List' to retrieve.`);
+      resetPOS(false);
+    } catch (error) {
+      console.error("Error holding sale:", error);
+      alert("Failed to hold sale. Check console for details.");
+    }
+  }, [
+    products,
+    calculateTotals,
+    tax,
+    billDiscount,
+    shipping,
+    saleType,
+    customerInfo,
+    billNumber,
+  ]);
 
-  // Open bill modal
-  const handelOpenBill = () => {
-    setShowBillModal(true);
-    const newBillNumber = generateNextBillNumber(billNumber);
-    setBillNumber(newBillNumber);
+  // Reset POS
+  const resetPOS = useCallback(
+    (fetchNewBill = true) => {
+      setProducts([]);
+      setTax(0);
+      setBillDiscount(0);
+      setShipping(0);
+      setSearchQuery("");
+      setSearchResults(items);
+      setCustomerInfo({
+        name: "",
+        mobile: "",
+        bill_number: "",
+        userId: "U-1",
+        receivedAmount: 0,
+      });
+
+      if (fetchNewBill) {
+        const fetchNextBillNumber = async () => {
+          try {
+            const response = await axios.get(
+              "http://127.0.0.1:8000/api/next-bill-number"
+            );
+            setBillNumber(response.data.next_bill_number);
+          } catch (error) {
+            console.error("Error fetching next bill number post-reset:", error);
+            setBillNumber("ERR-XXX");
+          }
+        };
+        fetchNextBillNumber();
+      } else {
+        setCustomerInfo((prev) => ({ ...prev, bill_number: "" }));
+      }
+    },
+    [items]
+  );
+
+  // Open Bill Modal
+  const handleOpenBill = useCallback(() => {
+    if (products.length === 0) {
+      alert("Cannot proceed to payment with an empty bill.");
+      return;
+    }
     setCustomerInfo((prevState) => ({
       ...prevState,
-      bill_number: newBillNumber,
-      receivedAmount: 0,
+      bill_number: billNumber,
     }));
-  };
+    setShowBillModal(true);
+  }, [products, billNumber]);
 
-  const closeBillModal = () => {
-    setShowBillModal(false);
-    setCustomerInfo({
-      name: "",
-      mobile: "",
-      bill_number: "",
-      userId: "U-1",
-      receivedAmount: 0,
-    });
-  };
+  // Close Bill Modal
+  const closeBillModal = useCallback(
+    (saleSaved = false) => {
+      setShowBillModal(false);
+      if (saleSaved) {
+        resetPOS(true);
+      }
+      setCustomerInfo((prevState) => ({
+        ...prevState,
+        name: "",
+        mobile: "",
+        bill_number: "",
+        receivedAmount: 0,
+      }));
+    },
+    [resetPOS]
+  );
 
-  const generateNextBillNumber = (currentBill) => {
-    const num = parseInt(currentBill.replace(/\D/g, "")) + 1;
-    return `BILL-${num.toString().padStart(4, "0")}`;
-  };
-
-  // Touch-friendly increment/decrement for tax and discount
-  const incrementTax = () => setTax((prev) => prev + 1);
-  const decrementTax = () => setTax((prev) => Math.max(prev - 1, 0));
-  const incrementDiscount = () => setBillDiscount((prev) => prev + 100);
-  const decrementDiscount = () =>
-    setBillDiscount((prev) => Math.max(prev - 100, 0));
-
-  // Handle keyboard open/close
+  // Keyboard Handling
   const openKeyboard = (
     target,
     initialValue,
@@ -699,15 +765,6 @@ const TOUCHPOSFORM = () => {
       setTax(parseFloat(newValue) || 0);
     } else if (keyboardTarget === "discount") {
       setBillDiscount(parseFloat(newValue) || 0);
-    } else if (keyboardTarget === "customerName") {
-      setCustomerInfo((prev) => ({ ...prev, name: newValue }));
-    } else if (keyboardTarget === "customerMobile") {
-      setCustomerInfo((prev) => ({ ...prev, mobile: newValue }));
-    } else if (keyboardTarget === "receivedAmount") {
-      setCustomerInfo((prev) => ({
-        ...prev,
-        receivedAmount: parseFloat(newValue) || 0,
-      }));
     } else if (keyboardTarget === "barcode" && editingBarcodeIndex !== null) {
       const updatedProducts = [...products];
       updatedProducts[editingBarcodeIndex].barcode = newValue;
@@ -731,26 +788,40 @@ const TOUCHPOSFORM = () => {
     }
   };
 
-  // Sample categories and brands
+  // Scroll active input into view
+  useEffect(() => {
+    if (showKeyboard && keyboardTarget) {
+      let activeElement = null;
+      if (keyboardTarget === "search") {
+        activeElement = searchInputRef.current;
+      } else if (keyboardTarget === "tax") {
+        activeElement = taxInputRef.current;
+      } else if (keyboardTarget === "discount") {
+        activeElement = discountInputRef.current;
+      }
+
+      if (activeElement) {
+        setTimeout(() => {
+          activeElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }, 100);
+      }
+    }
+  }, [showKeyboard, keyboardTarget]);
+
+  // Dynamic Categories and Brands
   const categories = [
     "All Categories",
-    "Milk Powder",
-    "Beverages",
-    "Snacks",
-    "Chocolates",
-    "Instant Food",
+    ...new Set(items.map((item) => item.category).filter(Boolean)),
   ];
   const brands = [
     "All Brands",
-    "Anchor",
-    "Nestle",
-    "Pepsi",
-    "Coca-Cola",
-    "Lays",
-    "Sprite",
+    ...new Set(items.map((item) => item.brand).filter(Boolean)),
   ];
 
-  // Define category-based background colors
+  // Category Colors
   const categoryColors = {
     "Milk Powder": "bg-gradient-to-br from-blue-50 to-blue-100",
     Beverages: "bg-gradient-to-br from-green-50 to-green-100",
@@ -759,32 +830,37 @@ const TOUCHPOSFORM = () => {
     "Instant Food": "bg-gradient-to-br from-orange-50 to-orange-100",
   };
 
+  const totals = calculateTotals();
+
   return (
     <div
-      className={`min-h-screen w-full p-2 sm:p-4 flex flex-col ${isFullScreen ? "fullscreen-mode" : ""
-        }`}
+      className={`min-h-screen w-full p-2 sm:p-4 flex flex-col ${
+        isFullScreen ? "fullscreen-mode" : ""
+      }`}
     >
       {/* Main Content */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[40%_60%] gap-2 sm:gap-4">
-        {/* Left Side: Billing System (40%) */}
+        {/* Left Side: Billing System */}
         <div className="p-2 sm:p-4 bg-white rounded-lg shadow-lg flex flex-col relative">
           <div className="flex items-center justify-between mb-2 sm:mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Billing</h2>
             <div className="flex gap-1 sm:gap-2">
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Retail"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-800"
-                  }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
+                  saleType === "Retail"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-800"
+                }`}
                 onClick={() => setSaleType("Retail")}
               >
                 Retail
               </button>
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Wholesale"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-800"
-                  }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
+                  saleType === "Wholesale"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-800"
+                }`}
                 onClick={() => setSaleType("Wholesale")}
               >
                 Wholesale
@@ -798,6 +874,9 @@ const TOUCHPOSFORM = () => {
               <thead className="bg-gray-200">
                 <tr>
                   <th className="p-1 sm:p-2 text-left text-xs sm:text-sm">
+                    S.No
+                  </th>
+                  <th className="p-1 sm:p-2 text-left text-xs sm:text-sm">
                     Product
                   </th>
                   <th className="p-1 sm:p-2 text-center text-xs sm:text-sm">
@@ -807,100 +886,110 @@ const TOUCHPOSFORM = () => {
                     Price
                   </th>
                   <th className="p-1 sm:p-2 text-right text-xs sm:text-sm">
-                    Sub Total
+                    Disc
+                  </th>
+                  <th className="p-1 sm:p-2 text-right text-xs sm:text-sm">
+                    Total
                   </th>
                   <th className="p-1 sm:p-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((product, index) => (
-                  <tr key={index} className="border-b">
-                    <td className="p-1 sm:p-2">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-xs sm:text-sm">
-                          {product.product_name}
-                        </span>
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <span className="text-xs text-gray-500">
-                            Barcode: {product.barcode}
-                          </span>
-                          <button
-                            onClick={() =>
-                              openKeyboard(
-                                "barcode",
-                                product.barcode,
-                                true,
-                                index
-                              )
-                            }
-                            className="text-blue-500 hover:text-blue-700"
-                          >
-                            <Edit2 size={12} className="sm:w-4 sm:h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-1 sm:p-2 text-center">
-                      <div className="flex items-center justify-center gap-1 sm:gap-2">
-                        <button
-                          onClick={() => decrementQuantity(index)}
-                          className="p-1 sm:p-2 bg-gray-300 rounded-lg"
-                        >
-                          <Minus size={16} className="sm:w-5 sm:h-5" />
-                        </button>
-                        <span className="text-sm sm:text-lg">
-                          {product.qty}
-                        </span>
-                        <button
-                          onClick={() => incrementQuantity(index)}
-                          className="p-1 sm:p-2 bg-gray-300 rounded-lg"
-                        >
-                          <Plus size={16} className="sm:w-5 sm:h-5" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="p-1 sm:p-2 text-right text-xs sm:text-sm">
-                      {formatNumberWithCommas(product.price)}
-                    </td>
-                    <td className="p-1 sm:p-2 text-right text-xs sm:text-sm">
-                      {formatNumberWithCommas(
-                        (product.qty * product.price).toFixed(2)
-                      )}
-                    </td>
-                    <td className="p-1 sm:p-2 text-center">
-                      <button
-                        onClick={() => handleDeleteClick(index)}
-                        className="p-1 sm:p-2 bg-red-500 text-white rounded-lg"
-                      >
-                        <Trash2 size={16} className="sm:w-5 sm:h-5" />
-                      </button>
+                {products.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="p-4 text-center text-gray-500">
+                      No items added to the bill yet.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  products.map((product, index) => (
+                    <tr key={product.id + "-" + index} className="border-b">
+                      <td className="p-1 sm:p-2 text-xs sm:text-sm">
+                        {product.serialNumber}
+                      </td>
+                      <td className="p-1 sm:p-2">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-xs sm:text-sm">
+                            {product.product_name}
+                          </span>
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <span className="text-xs text-gray-500">
+                              Barcode: {product.barcode}
+                            </span>
+                            <button
+                              onClick={() =>
+                                openKeyboard(
+                                  "barcode",
+                                  product.barcode,
+                                  true,
+                                  index
+                                )
+                              }
+                              className="text-blue-500 hover:text-blue-700"
+                            >
+                              <Edit2 size={12} className="sm:w-4 sm:h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-1 sm:p-2 text-center">
+                        <div className="flex items-center justify-center gap-1 sm:gap-2">
+                          <button
+                            onClick={() => decrementQuantity(index)}
+                            className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                          >
+                            <Minus size={16} className="sm:w-5 sm:h-5" />
+                          </button>
+                          <span className="text-sm sm:text-lg">
+                            {product.qty}
+                          </span>
+                          <button
+                            onClick={() => incrementQuantity(index)}
+                            className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                          >
+                            <Plus size={16} className="sm:w-5 sm:h-5" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="p-1 sm:p-2 text-right text-xs sm:text-sm">
+                        {formatNumberWithCommas(product.price.toFixed(2))}
+                      </td>
+                      <td className="p-1 sm:p-2 text-right text-xs sm:text-sm text-red-600">
+                        {formatNumberWithCommas(
+                          product.discount?.toFixed(2) ?? 0.0
+                        )}
+                      </td>
+                      <td className="p-1 sm:p-2 text-right text-xs sm:text-sm">
+                        {formatNumberWithCommas(
+                          product.total?.toFixed(2) ?? 0.0
+                        )}
+                      </td>
+                      <td className="p-1 sm:p-2 text-center">
+                        <button
+                          onClick={() => handleDeleteClick(index)}
+                          className="p-1 sm:p-2 bg-red-500 text-white rounded-lg"
+                        >
+                          <Trash2 size={16} className="sm:w-5 sm:h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
-          {/* Spacer to create a smaller blank gap */}
-          <div className="min-h-[100px] sm:min-h-[150px]"></div>
-
-          {/* Totals Section (Left-Right Structure) */}
+          {/* Totals Section */}
           <div className="mt-2 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-4">
-            {/* Left: Total Quantity */}
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm sm:text-lg font-semibold">
                 <span>Total Quantity:</span>
                 <span>
-                  {formatNumberWithCommas(
-                    calculateTotals().totalQty.toFixed(1)
-                  )}
+                  {formatNumberWithCommas(totals.totalQty.toFixed(1))}
                 </span>
               </div>
             </div>
-
-            {/* Right: Tax, Discount Inputs and Totals */}
             <div className="flex-1 space-y-2 sm:space-y-3">
-              {/* Tax and Discount Inputs */}
               <div className="grid grid-cols-2 gap-2 sm:gap-4">
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700">
@@ -908,7 +997,7 @@ const TOUCHPOSFORM = () => {
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
                     <button
-                      onClick={decrementTax}
+                      onClick={() => setTax((prev) => Math.max(prev - 1, 0))}
                       className="p-1 sm:p-2 bg-gray-300 rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
@@ -921,7 +1010,7 @@ const TOUCHPOSFORM = () => {
                       {tax}
                     </span>
                     <button
-                      onClick={incrementTax}
+                      onClick={() => setTax((prev) => prev + 1)}
                       className="p-1 sm:p-2 bg-gray-300 rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
@@ -934,7 +1023,9 @@ const TOUCHPOSFORM = () => {
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
                     <button
-                      onClick={decrementDiscount}
+                      onClick={() =>
+                        setBillDiscount((prev) => Math.max(prev - 100, 0))
+                      }
                       className="p-1 sm:p-2 bg-gray-300 rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
@@ -949,7 +1040,7 @@ const TOUCHPOSFORM = () => {
                       {billDiscount}
                     </span>
                     <button
-                      onClick={incrementDiscount}
+                      onClick={() => setBillDiscount((prev) => prev + 100)}
                       className="p-1 sm:p-2 bg-gray-300 rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
@@ -957,44 +1048,52 @@ const TOUCHPOSFORM = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Totals */}
               <div className="p-2 sm:p-4 bg-gray-100 rounded-lg border border-gray-200">
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between text-xs sm:text-sm">
-                    <span>Sub Total:</span>
+                    <span>Sub Total (MRP):</span>
                     <span>
+                      Rs.{" "}
+                      {formatNumberWithCommas(totals.subTotalMRP.toFixed(2))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm text-red-600">
+                    <span>(-) Item Discounts:</span>
+                    <span>
+                      Rs.{" "}
                       {formatNumberWithCommas(
-                        calculateTotals().subTotal.toFixed(2)
-                      )}{" "}
-                      Rs.
+                        totals.totalItemDiscounts.toFixed(2)
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs sm:text-sm">
-                    <span>Discount:</span>
+                    <span>Net Item Total:</span>
                     <span>
+                      Rs.{" "}
                       {formatNumberWithCommas(
-                        calculateTotals().totalDiscount.toFixed(2)
-                      )}{" "}
-                      Rs.
+                        totals.grandTotalBeforeAdjustments.toFixed(2)
+                      )}
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs sm:text-sm">
-                    <span>Tax:</span>
+                  <div className="flex justify-between text-xs sm:text-sm text-yellow-600">
+                    <span>(+) Tax ({parseFloat(tax || 0).toFixed(1)}%):</span>
                     <span>
+                      Rs. {formatNumberWithCommas(totals.taxAmount.toFixed(2))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm text-red-600">
+                    <span>(-) Bill Discount:</span>
+                    <span>
+                      Rs.{" "}
                       {formatNumberWithCommas(
-                        calculateTotals().taxAmount.toFixed(2)
-                      )}{" "}
-                      Rs.
+                        totals.totalBillDiscount.toFixed(2)
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between font-bold text-sm sm:text-lg">
                     <span>Grand Total:</span>
                     <span>
-                      {formatNumberWithCommas(
-                        calculateTotals().total.toFixed(2)
-                      )}{" "}
-                      Rs.
+                      Rs. {formatNumberWithCommas(totals.finalTotal.toFixed(2))}
                     </span>
                   </div>
                 </div>
@@ -1002,58 +1101,26 @@ const TOUCHPOSFORM = () => {
             </div>
           </div>
 
-          {/* Spacer to ensure buttons stay at the bottom */}
-          <div className="flex-1"></div>
-
-          {/* Action Buttons at Bottom of Left Side */}
-          {/* <div className="sticky bottom-0 bg-white pt-2 sm:pt-4">
-            <div className="flex gap-1 sm:gap-2">
-              <button
-                className="flex-1 p-2 sm:p-4 bg-pink-500 text-white rounded-lg text-sm sm:text-lg"
-                onClick={holdSale}
-              >
-                Hold
-              </button>
-              <button
-                className="flex-1 p-2 sm:p-4 bg-red-500 text-white rounded-lg text-sm sm:text-lg"
-                onClick={() => {
-                  setProducts([]);
-                  setTax(0);
-                  setBillDiscount(0);
-                }}
-              >
-                Reset
-              </button>
-              <button
-                className="flex-1 p-2 sm:p-4 bg-green-500 text-white rounded-lg text-sm sm:text-lg"
-                onClick={handelOpenBill}
-              >
-                Pay Now
-              </button>
-            </div>
-          </div> */}
-
+          {/* Action Buttons */}
           <div className="sticky bottom-0 bg-white pt-2 sm:pt-4">
             <div className="flex gap-1 sm:gap-2">
               <button
                 className="flex-1 p-2 sm:p-4 bg-pink-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
                 onClick={holdSale}
+                disabled={products.length === 0}
               >
                 <FaPause /> Hold
               </button>
               <button
                 className="flex-1 p-2 sm:p-4 bg-red-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
-                onClick={() => {
-                  setProducts([]);
-                  setTax(0);
-                  setBillDiscount(0);
-                }}
+                onClick={() => resetPOS(false)}
               >
                 <FaRedo /> Reset
               </button>
               <button
                 className="flex-1 p-2 sm:p-4 bg-green-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
-                onClick={handelOpenBill}
+                onClick={handleOpenBill}
+                disabled={products.length === 0}
               >
                 <FaCreditCard /> Pay Now
               </button>
@@ -1061,7 +1128,7 @@ const TOUCHPOSFORM = () => {
           </div>
         </div>
 
-        {/* Right Side: Product Selection (60%) */}
+        {/* Right Side: Product Selection */}
         <div className="p-2 sm:p-4 bg-white rounded-lg shadow-lg flex flex-col">
           {/* Search Bar */}
           <input
@@ -1072,7 +1139,11 @@ const TOUCHPOSFORM = () => {
             value={searchQuery}
             onFocus={() => openKeyboard("search", searchQuery, false)}
             readOnly
+            disabled={loadingItems || loadingSchemes}
           />
+          {(loadingItems || loadingSchemes) && (
+            <span className="text-xs text-gray-500">Loading...</span>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4">
@@ -1118,10 +1189,11 @@ const TOUCHPOSFORM = () => {
               {categories.map((category) => (
                 <button
                   key={category}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200"
-                    }`}
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
+                    selectedCategory === category
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200"
+                  }`}
                   onClick={() => {
                     setSelectedCategory(category);
                     debouncedSearch(searchQuery, category, selectedBrand);
@@ -1139,10 +1211,11 @@ const TOUCHPOSFORM = () => {
               {brands.map((brand) => (
                 <button
                   key={brand}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200"
-                    }`}
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
+                    selectedBrand === brand
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200"
+                  }`}
                   onClick={() => {
                     setSelectedBrand(brand);
                     debouncedSearch(searchQuery, selectedCategory, brand);
@@ -1156,66 +1229,71 @@ const TOUCHPOSFORM = () => {
 
           {/* Product Results */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 max-h-[50vh] sm:max-h-[60vh] overflow-auto">
-            {searchResults.map((item) => (
-              <div
-                key={item.id}
-                className={`
-                  relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer 
-                  border-4 border-purple-600 
-                  ${categoryColors[item.category] ||
-                  "bg-gradient-to-br from-gray-50 to-gray-100"
-                  }
-                  hover:shadow-xl hover:border-purple-800 
-                  active:scale-95 transition-all duration-200
-                  flex flex-col justify-between min-h-[140px] sm:min-h-[160px]
-                `}
-                onClick={() => addProductToTable(item)}
-              >
-                {/* Top Section: Price, Stock, and Category */}
-                <div className="flex justify-between items-start mb-1">
-                  <div className="flex flex-col">
-                    <div className="text-xs sm:text-sm font-semibold text-green-700">
-                      {formatNumberWithCommas(item.sales_price)} Rs.
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-gray-600">
-                      {item.category}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <div className="text-xs sm:text-sm font-semibold text-blue-700">
-                      Qty: {item.stock}
-                    </div>
-                    {item.stock < 10 && (
-                      <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full mt-0.5">
-                        Low Stock
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Middle Section: Image */}
-                <div className="flex justify-center mb-1">
-                  <img
-                    src={item.image}
-                    alt={item.product_name}
-                    className="h-10 sm:h-12 rounded-lg shadow-md object-cover"
-                  />
-                </div>
-
-                {/* Bottom Section: Product Name and Barcode */}
-                <div className="flex flex-col items-center">
-                  <h3
-                    className="text-center font-bold text-gray-800 text-xs sm:text-sm line-clamp-2 hover:line-clamp-none"
-                    title={item.product_name}
-                  >
-                    {item.product_name}
-                  </h3>
-                  <div className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
-                    Barcode: {item.barcode}
-                  </div>
-                </div>
+            {searchResults.length === 0 ? (
+              <div className="col-span-full text-center text-gray-500">
+                No products found.
               </div>
-            ))}
+            ) : (
+              searchResults.map((item) => (
+                <div
+                  key={item.id}
+                  className={`
+                    relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer 
+                    border-4 border-purple-600 
+                    ${
+                      categoryColors[item.category] ||
+                      "bg-gradient-to-br from-gray-50 to-gray-100"
+                    }
+                    hover:shadow-xl hover:border-purple-800 
+                    active:scale-95 transition-all duration-200
+                    flex flex-col justify-between min-h-[140px] sm:min-h-[160px]
+                  `}
+                  onClick={() => addProductToTable(item)}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="flex flex-col">
+                      <div className="text-xs sm:text-sm font-semibold text-green-700">
+                        {formatNumberWithCommas(
+                          applyDiscountScheme(item, saleType, activeSchemes)
+                        )}{" "}
+                        Rs.
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-gray-600">
+                        {item.category}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className="text-xs sm:text-sm font-semibold text-blue-700">
+                        Qty: {item.stock}
+                      </div>
+                      {item.stock < 10 && (
+                        <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full mt-0.5">
+                          Low Stock
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-center mb-1">
+                    <img
+                      src={item.image || "https://via.placeholder.com/50"}
+                      alt={item.product_name}
+                      className="h-10 sm:h-12 rounded-lg shadow-md object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <h3
+                      className="text-center font-bold text-gray-800 text-xs sm:text-sm line-clamp-2 hover:line-clamp-none"
+                      title={item.product_name}
+                    >
+                      {item.product_name}
+                    </h3>
+                    <div className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
+                      Barcode: {item.barcode}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -1223,10 +1301,12 @@ const TOUCHPOSFORM = () => {
       {/* Modals */}
       {showBillModal && (
         <BillPrintModal
-          initialProducts={products || []}
-          initialBillDiscount={billDiscount || 0}
+          initialProducts={products}
+          initialBillDiscount={parseFloat(billDiscount || 0)}
+          initialTax={parseFloat(tax || 0)}
+          initialShipping={parseFloat(shipping || 0)}
+          initialTotals={totals}
           initialCustomerInfo={{ ...customerInfo, bill_number: billNumber }}
-          total={calculateTotals().total}
           onClose={closeBillModal}
           openKeyboard={openKeyboard}
         />
@@ -1239,7 +1319,9 @@ const TOUCHPOSFORM = () => {
       )}
       {showNotification && (
         <Notification
-          message="Are you sure you want to delete this product?"
+          message={`Delete item "${
+            products[pendingDeleteIndex]?.product_name ?? "this item"
+          }"?`}
           onClose={cancelDelete}
         >
           <button

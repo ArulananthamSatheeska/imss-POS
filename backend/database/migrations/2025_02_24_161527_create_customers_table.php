@@ -10,9 +10,11 @@ class CreateCustomersTable extends Migration
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
             $table->string('customer_name');
-            $table->string('email')->nullable();
+            $table->string('email')->unique();
             $table->string('phone')->nullable();
-            $table->string('photo')->nullable(); // Store the path to the uploaded photo
+            $table->string('photo')->nullable();
+            $table->string('address')->unique();
+            $table->string('nic_number', 12)->unique();
             $table->timestamps();
         });
     }

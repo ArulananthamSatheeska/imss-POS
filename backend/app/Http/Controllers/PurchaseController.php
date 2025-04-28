@@ -2,359 +2,166 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Purchase;
-use App\Models\PurchaseItem;
+use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 
 class PurchaseController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $purchases = Purchase::with(['supplier', 'store', 'items.product'])->get();
-            $data = $purchases->map(function ($purchase) {
-                return [
-                    'id' => $purchase->id,
-                    'date_of_purchase' => $purchase->date_of_purchase,
-                    'bill_number' => $purchase->bill_number,
-                    'invoice_number' => $purchase->invoice_number,
-                    'payment_method' => $purchase->payment_method,
-                    'supplier_id' => $purchase->supplier_id,
-                    'supplier' => [
-                        'id' => $purchase->supplier->id,
-                        'supplier_name' => $purchase->supplier->supplier_name,
-                    ],
-                    'store_id' => $purchase->store_id,
-                    'store' => [
-                        'id' => $purchase->store->id,
-                        'store_name' => $purchase->store->store_name,
-                    ],
-                    'total' => $purchase->total,
-                    'paid_amount' => $purchase->paid_amount,
-                    'status' => $purchase->status,
-                    'items' => $purchase->items->map(function ($item) {
-                        return [
-                            'id' => $item->id,
-                            'purchase_id' => $item->purchase_id,
-                            'product_id' => $item->product_id,
-                            'product' => [
-                                'product_id' => $item->product->product_id,
-                                'product_name' => $item->product->product_name,
-                            ],
-                            'quantity' => $item->quantity,
-                            'buying_cost' => $item->buying_cost,
-                            'discount_percentage' => $item->discount_percentage,
-                            'discount_amount' => $item->discount_amount,
-                            'tax' => $item->tax,
-                            'created_at' => $item->created_at,
-                            'updated_at' => $item->updated_at,
-                        ];
-                    }),
-                    'created_at' => $purchase->created_at,
-                    'updated_at' => $purchase->updated_at,
-                ];
-            });
-
-            return response()->json([
-                'success' => true,
-                'data' => $data,
-            ], 200);
+            $query = Purchase::with(['supplier', 'store', 'items']);
+            if ($request->has('fromDate') && $request->has('toDate')) {
+                $query->whereBetween('date_of_purchase', [$request->fromDate, $request->toDate]);
+            }
+            $purchases = $query->get();
+            return response()->json(['success' => true, 'data' => $purchases], 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching purchases: ' . $e->getMessage(),
-            ], 500);
+            Log::error('Error fetching purchases: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error fetching purchases'], 500);
         }
     }
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'date_of_purchase' => 'required|date',
-            'bill_number' => 'required|string|unique:purchases,bill_number',
-            'invoice_number' => 'required|string|unique:purchases,invoice_number',
-            'payment_method' => 'required|string|in:Cash,Credit,Other',
-            'supplier_id' => 'required|exists:suppliers,id',
-            'store_id' => 'required|exists:store_locations,id',
-            'total' => 'required|numeric|min:0',
-            'paid_amount' => 'required|numeric|min:0',
-            'status' => 'required|in:pending,paid,cancelled',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,product_id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.buying_cost' => 'required|numeric|min:0',
-            'items.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
-            'items.*.discount_amount' => 'nullable|numeric|min:0',
-            'items.*.tax' => 'nullable|numeric|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+        Log::info('Creating new purchase:', $request->all());
 
         try {
+            $validatedData = $request->validate($this->validationRules());
+
             DB::beginTransaction();
 
             $purchase = Purchase::create([
-                'date_of_purchase' => $request->date_of_purchase,
-                'bill_number' => $request->bill_number,
-                'invoice_number' => $request->invoice_number,
-                'payment_method' => $request->payment_method,
-                'supplier_id' => $request->supplier_id,
-                'store_id' => $request->store_id,
-                'total' => $request->total,
-                'paid_amount' => $request->paid_amount,
-                'status' => $request->status,
+                'bill_number' => $validatedData['bill_number'],
+                'invoice_number' => $validatedData['invoice_number'],
+                'date_of_purchase' => $validatedData['date_of_purchase'],
+                'payment_method' => $validatedData['payment_method'],
+                'supplier_id' => $validatedData['supplier_id'],
+                'store_id' => $validatedData['store_id'],
+                'paid_amount' => $validatedData['paid_amount'],
+                'discount_percentage' => $validatedData['discount_percentage'],
+                'discount_amount' => $validatedData['discount_amount'],
+                'tax' => $validatedData['tax'],
+                'status' => $validatedData['status'],
+                'total' => $validatedData['total'],
             ]);
 
-            foreach ($request->items as $item) {
-                PurchaseItem::create([
-                    'purchase_id' => $purchase->id,
+            foreach ($validatedData['items'] as $item) {
+                $purchase->items()->create([
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
+                    'free_items' => $item['free_items'] ?? 0,
                     'buying_cost' => $item['buying_cost'],
-                    'discount_percentage' => $item['discount_percentage'] ?? 0,
-                    'discount_amount' => $item['discount_amount'] ?? 0,
-                    'tax' => $item['tax'] ?? 0,
                 ]);
+
+                // Update product stock
+                $product = Product::findOrFail($item['product_id']);
+                $totalQuantity = ($item['quantity'] ?? 0) + ($item['free_items'] ?? 0);
+                $product->updateStock($totalQuantity, 'add');
+                Log::info("Updated stock for product ID {$item['product_id']}: +{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
             }
 
             DB::commit();
 
-            $purchase->load(['supplier', 'store', 'items.product']);
-            $data = [
-                'id' => $purchase->id,
-                'date_of_purchase' => $purchase->date_of_purchase,
-                'bill_number' => $purchase->bill_number,
-                'invoice_number' => $purchase->invoice_number,
-                'payment_method' => $purchase->payment_method,
-                'supplier_id' => $purchase->supplier_id,
-                'supplier' => [
-                    'id' => $purchase->supplier->id,
-                    'supplier_name' => $purchase->supplier->supplier_name,
-                ],
-                'store_id' => $purchase->store_id,
-                'store' => [
-                    'id' => $purchase->store->id,
-                    'store_name' => $purchase->store->store_name,
-                ],
-                'total' => $purchase->total,
-                'paid_amount' => $purchase->paid_amount,
-                'status' => $purchase->status,
-                'items' => $purchase->items->map(function ($item) {
-                    return [
-                        'id' => $item->id,
-                        'purchase_id' => $item->purchase_id,
-                        'product_id' => $item->product_id,
-                        'product' => [
-                            'product_id' => $item->product->product_id,
-                            'product_name' => $item->product->product_name,
-                        ],
-                        'quantity' => $item->quantity,
-                        'buying_cost' => $item->buying_cost,
-                        'discount_percentage' => $item->discount_percentage,
-                        'discount_amount' => $item->discount_amount,
-                        'tax' => $item->tax,
-                        'created_at' => $item->created_at,
-                        'updated_at' => $item->updated_at,
-                    ];
-                }),
-                'created_at' => $purchase->created_at,
-                'updated_at' => $purchase->updated_at,
-            ];
+            return response()->json([
+                'success' => true,
+                'message' => 'Purchase created successfully',
+                'data' => $purchase->load(['supplier', 'store', 'items']),
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            Log::warning('Validation error creating purchase:', ['errors' => $e->errors()]);
+            return response()->json(['success' => false, 'message' => 'Validation error', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating purchase: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error creating purchase', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        Log::info("Updating purchase ID: $id", $request->all());
+
+        try {
+            $validatedData = $request->validate($this->validationRules());
+
+            DB::beginTransaction();
+
+            $purchase = Purchase::findOrFail($id);
+
+            // Reverse stock for existing items
+            foreach ($purchase->items as $item) {
+                $product = Product::findOrFail($item->product_id);
+                $totalQuantity = ($item->quantity ?? 0) + ($item->free_items ?? 0);
+                $product->updateStock($totalQuantity, 'subtract');
+                Log::info("Reversed stock for product ID {$item->product_id}: -{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
+            }
+
+            // Update purchase details
+            $purchase->update([
+                'bill_number' => $validatedData['bill_number'],
+                'invoice_number' => $validatedData['invoice_number'],
+                'date_of_purchase' => $validatedData['date_of_purchase'],
+                'payment_method' => $validatedData['payment_method'],
+                'supplier_id' => $validatedData['supplier_id'],
+                'store_id' => $validatedData['store_id'],
+                'paid_amount' => $validatedData['paid_amount'],
+                'discount_percentage' => $validatedData['discount_percentage'],
+                'discount_amount' => $validatedData['discount_amount'],
+                'tax' => $validatedData['tax'],
+                'status' => $validatedData['status'],
+                'total' => $validatedData['total'],
+            ]);
+
+            // Delete existing items
+            $purchase->items()->delete();
+
+            // Add new items and update stock
+            foreach ($validatedData['items'] as $item) {
+                $purchase->items()->create([
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'free_items' => $item['free_items'] ?? 0,
+                    'buying_cost' => $item['buying_cost'],
+                ]);
+
+                // Update product stock
+                $product = Product::findOrFail($item['product_id']);
+                $totalQuantity = ($item['quantity'] ?? 0) + ($item['free_items'] ?? 0);
+                $product->updateStock($totalQuantity, 'add');
+                Log::info("Updated stock for product ID {$item['product_id']}: +{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
+            }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase invoice created successfully',
-                'data' => $data,
-            ], 201);
+                'message' => 'Purchase updated successfully',
+                'data' => $purchase->load(['supplier', 'store', 'items']),
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            Log::warning('Validation error updating purchase:', ['errors' => $e->errors()]);
+            return response()->json(['success' => false, 'message' => 'Validation error', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Error creating purchase: ' . $e->getMessage(),
-            ], 500);
+            Log::error('Error updating purchase: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error updating purchase', 'error' => $e->getMessage()], 500);
         }
     }
 
     public function show($id)
     {
         try {
-            $purchase = Purchase::with(['supplier', 'store', 'items.product'])->findOrFail($id);
-            $data = [
-                'id' => $purchase->id,
-                'date_of_purchase' => $purchase->date_of_purchase,
-                'bill_number' => $purchase->bill_number,
-                'invoice_number' => $purchase->invoice_number,
-                'payment_method' => $purchase->payment_method,
-                'supplier_id' => $purchase->supplier_id,
-                'supplier' => [
-                    'id' => $purchase->supplier->id,
-                    'supplier_name' => $purchase->supplier->supplier_name,
-                ],
-                'store_id' => $purchase->store_id,
-                'store' => [
-                    'id' => $purchase->store->id,
-                    'store_name' => $purchase->store->store_name,
-                ],
-                'total' => $purchase->total,
-                'paid_amount' => $purchase->paid_amount,
-                'status' => $purchase->status,
-                'items' => $purchase->items->map(function ($item) {
-                    return [
-                        'id' => $item->id,
-                        'purchase_id' => $item->purchase_id,
-                        'product_id' => $item->product_id,
-                        'product' => [
-                            'product_id' => $item->product->product_id,
-                            'product_name' => $item->product->product_name,
-                        ],
-                        'quantity' => $item->quantity,
-                        'buying_cost' => $item->buying_cost,
-                        'discount_percentage' => $item->discount_percentage,
-                        'discount_amount' => $item->discount_amount,
-                        'tax' => $item->tax,
-                        'created_at' => $item->created_at,
-                        'updated_at' => $item->updated_at,
-                    ];
-                }),
-                'created_at' => $purchase->created_at,
-                'updated_at' => $purchase->updated_at,
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => $data,
-            ], 200);
+            $purchase = Purchase::with(['supplier', 'store', 'items'])->findOrFail($id);
+            return response()->json(['success' => true, 'data' => $purchase], 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Purchase not found or error: ' . $e->getMessage(),
-            ], 404);
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        $validator = Validator::make($request->all(), [
-            'date_of_purchase' => 'required|date',
-            'bill_number' => 'required|string|unique:purchases,bill_number,' . $id,
-            'invoice_number' => 'required|string|unique:purchases,invoice_number,' . $id,
-            'payment_method' => 'required|string|in:Cash,Credit,Other',
-            'supplier_id' => 'required|exists:suppliers,id',
-            'store_id' => 'required|exists:store_locations,id',
-            'total' => 'required|numeric|min:0',
-            'paid_amount' => 'required|numeric|min:0',
-            'status' => 'required|in:pending,paid,cancelled',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,product_id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.buying_cost' => 'required|numeric|min:0',
-            'items.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
-            'items.*.discount_amount' => 'nullable|numeric|min:0',
-            'items.*.tax' => 'nullable|numeric|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $purchase = Purchase::findOrFail($id);
-            $purchase->update([
-                'date_of_purchase' => $request->date_of_purchase,
-                'bill_number' => $request->bill_number,
-                'invoice_number' => $request->invoice_number,
-                'payment_method' => $request->payment_method,
-                'supplier_id' => $request->supplier_id,
-                'store_id' => $request->store_id,
-                'total' => $request->total,
-                'paid_amount' => $request->paid_amount,
-                'status' => $request->status,
-            ]);
-
-            // Delete existing items and create new ones
-            $purchase->items()->delete();
-            foreach ($request->items as $item) {
-                PurchaseItem::create([
-                    'purchase_id' => $purchase->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'buying_cost' => $item['buying_cost'],
-                    'discount_percentage' => $item['discount_percentage'] ?? 0,
-                    'discount_amount' => $item['discount_amount'] ?? 0,
-                    'tax' => $item['tax'] ?? 0,
-                ]);
-            }
-
-            DB::commit();
-
-            $purchase->load(['supplier', 'store', 'items.product']);
-            $data = [
-                'id' => $purchase->id,
-                'date_of_purchase' => $purchase->date_of_purchase,
-                'bill_number' => $purchase->bill_number,
-                'invoice_number' => $purchase->invoice_number,
-                'payment_method' => $purchase->payment_method,
-                'supplier_id' => $purchase->supplier_id,
-                'supplier' => [
-                    'id' => $purchase->supplier->id,
-                    'supplier_name' => $purchase->supplier->supplier_name,
-                ],
-                'store_id' => $purchase->store_id,
-                'store' => [
-                    'id' => $purchase->store->id,
-                    'store_name' => $purchase->store->store_name,
-                ],
-                'total' => $purchase->total,
-                'paid_amount' => $purchase->paid_amount,
-                'status' => $purchase->status,
-                'items' => $purchase->items->map(function ($item) {
-                    return [
-                        'id' => $item->id,
-                        'purchase_id' => $item->purchase_id,
-                        'product_id' => $item->product_id,
-                        'product' => [
-                            'product_id' => $item->product->product_id,
-                            'product_name' => $item->product->product_name,
-                        ],
-                        'quantity' => $item->quantity,
-                        'buying_cost' => $item->buying_cost,
-                        'discount_percentage' => $item->discount_percentage,
-                        'discount_amount' => $item->discount_amount,
-                        'tax' => $item->tax,
-                        'created_at' => $item->created_at,
-                        'updated_at' => $item->updated_at,
-                    ];
-                }),
-                'created_at' => $purchase->created_at,
-                'updated_at' => $purchase->updated_at,
-            ];
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Purchase invoice updated successfully',
-                'data' => $data,
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Error updating purchase: ' . $e->getMessage(),
-            ], 500);
+            Log::error('Error fetching purchase: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Purchase not found'], 404);
         }
     }
 
@@ -362,16 +169,50 @@ class PurchaseController extends Controller
     {
         try {
             $purchase = Purchase::findOrFail($id);
+
+            DB::beginTransaction();
+
+            // Reverse stock for all items
+            foreach ($purchase->items as $item) {
+                $product = Product::findOrFail($item->product_id);
+                $totalQuantity = ($item->quantity ?? 0) + ($item->free_items ?? 0);
+                $product->updateStock($totalQuantity, 'subtract');
+                Log::info("Reversed stock for product ID {$item->product_id}: -{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
+            }
+
+            $purchase->items()->delete();
             $purchase->delete();
-            return response()->json([
-                'success' => true,
-                'message' => 'Purchase invoice deleted successfully',
-            ], 200);
+
+            DB::commit();
+
+            return response()->json(['success' => true, 'message' => 'Purchase deleted successfully'], 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error deleting purchase: ' . $e->getMessage(),
-            ], 500);
+            DB::rollBack();
+            Log::error('Error deleting purchase: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error deleting purchase', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    private function validationRules()
+    {
+        return [
+            'bill_number' => 'required|string|max:255',
+            'invoice_number' => 'required|string|max:255',
+            'date_of_purchase' => 'required|date',
+            'payment_method' => 'required|string|in:Cash,Credit,Other',
+            'supplier_id' => 'required|exists:suppliers,id',
+            'store_id' => 'required|exists:store_locations,id',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'tax' => 'nullable|numeric|min:0',
+            'status' => 'required|in:pending,paid,cancelled',
+            'total' => 'required|numeric|min:0',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,product_id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.free_items' => 'nullable|integer|min:0',
+            'items.*.buying_cost' => 'required|numeric|min:0',
+        ];
     }
 }
