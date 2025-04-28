@@ -13,10 +13,8 @@ class PurchaseItem extends Model
         'purchase_id',
         'product_id',
         'quantity',
+        'free_items',
         'buying_cost',
-        'discount_percentage',
-        'discount_amount',
-        'tax',
     ];
 
     public function purchase()

@@ -53,6 +53,10 @@ Route::get('/test-auth', function() {
 
 // Routes without authentication middleware
 Route::middleware(['api'])->group(function () {
+
+    Route::get('/products/check-names', [ProductController::class, 'checkNames']);
+    Route::apiResource('products', ProductController::class);
+    Route::post('/products/import', [ProductController::class, 'import']);
     Route::get('/roles', [RoleController::class, 'index']);
     Route::post('/roles', [RoleController::class, 'store']);
     Route::get('/roles/{role}', [RoleController::class, 'show']);
@@ -75,8 +79,8 @@ Route::middleware(['api'])->group(function () {
     // Permission routes
     Route::apiResource('permissions', PermissionController::class)->except(['update']);
     // Other resource routes
-    Route::apiResource('products', ProductController::class);
-    Route::post('/products/import', [ProductController::class, 'import']);
+    
+    
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('store-locations', StoreLocationController::class);
     Route::apiResource('suppliers', SupplierController::class);
