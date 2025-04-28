@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/NewAuthContext";
 import { getApi } from "../../services/api";
+import { FiSearch } from "react-icons/fi";
 
 const PurchaseInvoiceForm = ({
   onGenerateInvoice,
@@ -21,6 +22,7 @@ const PurchaseInvoiceForm = ({
       status: "pending",
       discountPercentage: 0,
       discountAmount: 0,
+      taxPercentage: 0, // New field for tax percentage
       tax: 0,
     }
   );
@@ -28,6 +30,7 @@ const PurchaseInvoiceForm = ({
   const [items, setItems] = useState(existingInvoice?.items || []);
   const [itemForm, setItemForm] = useState({
     itemId: "",
+    searchQuery: "",
     quantity: 1,
     freeItems: 0,
     buyingCost: 0,
@@ -36,8 +39,21 @@ const PurchaseInvoiceForm = ({
   const [suppliers, setSuppliers] = useState([]);
   const [stores, setStores] = useState([]);
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Refs for input fields
+  const searchRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const quantityInputRef = useRef(null);
+  const freeItemsInputRef = useRef(null);
+  const buyingCostInputRef = useRef(null);
+  const discountPercentageInputRef = useRef(null);
+  const taxPercentageInputRef = useRef(null);
+  const taxInputRef = useRef(null);
 
   const api = getApi();
 
@@ -115,6 +131,38 @@ const PurchaseInvoiceForm = ({
     }
   };
 
+  // Handle clicks outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+        setHighlightedIndex(-1);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filter products based on search query
+  useEffect(() => {
+    if (itemForm.searchQuery.trim()) {
+      const query = itemForm.searchQuery.toLowerCase();
+      const filtered = products.filter(
+        (p) =>
+          p.product_name.toLowerCase().includes(query) ||
+          p.item_code?.toLowerCase().includes(query) ||
+          p.barcode?.toLowerCase().includes(query)
+      );
+      setFilteredProducts(filtered);
+      setShowSuggestions(true);
+      setHighlightedIndex(-1);
+    } else {
+      setFilteredProducts([]);
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+    }
+  }, [itemForm.searchQuery, products]);
+
   // Prefill buyingCost when selecting a product
   useEffect(() => {
     if (itemForm.itemId) {
@@ -125,6 +173,7 @@ const PurchaseInvoiceForm = ({
         setItemForm((prev) => ({
           ...prev,
           buyingCost: parseFloat(selectedProduct.buying_cost) || 0,
+          searchQuery: selectedProduct.product_name,
         }));
       }
     }
@@ -146,26 +195,121 @@ const PurchaseInvoiceForm = ({
     }
   }, [invoice.discountPercentage, items]);
 
+  // Update tax amount based on tax percentage
+  useEffect(() => {
+    if (invoice.taxPercentage > 0) {
+      const subtotal = calculateSubtotal();
+      const taxableAmount = subtotal - invoice.discountAmount;
+      setInvoice((prev) => ({
+        ...prev,
+        tax: (taxableAmount * invoice.taxPercentage) / 100,
+      }));
+    } else {
+      setInvoice((prev) => ({
+        ...prev,
+        tax: 0,
+      }));
+    }
+  }, [invoice.taxPercentage, invoice.discountAmount, items]);
+
   const handleItemFormChange = (e) => {
     const { name, value } = e.target;
     setItemForm({
       ...itemForm,
-      [name]: name === "itemId" ? value : parseFloat(value) || 0,
+      [name]:
+        name === "searchQuery"
+          ? value
+          : name === "itemId"
+          ? value
+          : parseFloat(value) || 0,
     });
+  };
+
+  const handleSelectProduct = (product) => {
+    setItemForm({
+      ...itemForm,
+      itemId: product.product_id.toString(),
+      searchQuery: product.product_name,
+      buyingCost: parseFloat(product.buying_cost) || 0,
+    });
+    setShowSuggestions(false);
+    setHighlightedIndex(-1);
+    quantityInputRef.current?.focus();
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) =>
+        prev < filteredProducts.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === "Enter" && highlightedIndex >= 0) {
+      e.preventDefault();
+      handleSelectProduct(filteredProducts[highlightedIndex]);
+    } else if (e.key === "Enter" && !showSuggestions && itemForm.itemId) {
+      e.preventDefault();
+      quantityInputRef.current?.focus();
+    }
+  };
+
+  const handleQuantityKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      freeItemsInputRef.current?.focus();
+    }
+  };
+
+  const handleFreeItemsKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      buyingCostInputRef.current?.focus();
+    }
+  };
+
+  const handleBuyingCostKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addItem();
+      searchInputRef.current?.focus();
+    }
+  };
+
+  const handleDiscountPercentageKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      taxPercentageInputRef.current?.focus();
+    }
+  };
+
+  const handleTaxPercentageKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      taxInputRef.current?.focus();
+    }
   };
 
   const handleInvoiceChange = (e) => {
     const { name, value } = e.target;
-    setInvoice({
-      ...invoice,
+    setInvoice((prev) => ({
+      ...prev,
       [name]:
         name === "paidAmount" ||
         name === "discountPercentage" ||
         name === "discountAmount" ||
+        name === "taxPercentage" ||
         name === "tax"
           ? parseFloat(value) || 0
           : value,
-    });
+      // Reset taxPercentage if tax is manually edited
+      ...(name === "tax" && value !== prev.tax ? { taxPercentage: 0 } : {}),
+      // Reset discountPercentage if discountAmount is manually edited
+      ...(name === "discountAmount" && value !== prev.discountAmount
+        ? { discountPercentage: 0 }
+        : {}),
+    }));
   };
 
   const addItem = () => {
@@ -193,15 +337,19 @@ const PurchaseInvoiceForm = ({
 
     setItems([...items, newItem]);
     resetItemForm();
+    searchInputRef.current?.focus();
   };
 
   const resetItemForm = () => {
     setItemForm({
       itemId: "",
+      searchQuery: "",
       quantity: 1,
       freeItems: 0,
       buyingCost: 0,
     });
+    setShowSuggestions(false);
+    setHighlightedIndex(-1);
     setErrors((prev) => ({ ...prev, item: undefined }));
   };
 
@@ -243,6 +391,8 @@ const PurchaseInvoiceForm = ({
       newErrors.discountPercentage = "Discount percentage cannot be negative";
     if (invoice.discountAmount < 0)
       newErrors.discountAmount = "Discount amount cannot be negative";
+    if (invoice.taxPercentage < 0)
+      newErrors.taxPercentage = "Tax percentage cannot be negative";
     if (invoice.tax < 0) newErrors.tax = "Tax cannot be negative";
     setErrors((prev) => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
@@ -267,10 +417,11 @@ const PurchaseInvoiceForm = ({
       status: invoice.status,
       discountPercentage: invoice.discountPercentage,
       discountAmount: invoice.discountAmount,
+      taxPercentage: invoice.taxPercentage,
       tax: invoice.tax,
       items: items.map((item) => ({
         productId: item.productId,
-        quantity: item.quantity + item.freeItems, // Combine for backward compatibility
+        quantity: item.quantity + item.freeItems,
         freeItems: item.freeItems,
         buyingCost: item.buyingCost,
       })),
@@ -463,38 +614,66 @@ const PurchaseInvoiceForm = ({
                   Add Item
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-                  <div>
+                  <div ref={searchRef} className="relative">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Select Item
+                      Search Item
                     </label>
-                    <select
-                      name="itemId"
-                      value={itemForm.itemId}
-                      onChange={handleItemFormChange}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                      disabled={loading}
-                    >
-                      <option value="">Select Item</option>
-                      {products.length === 0 ? (
-                        <option disabled>No products available</option>
-                      ) : (
-                        products.map((p) => (
-                          <option key={p.product_id} value={p.product_id}>
-                            {p.product_name}
-                          </option>
-                        ))
+                    <div className="relative">
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        name="searchQuery"
+                        value={itemForm.searchQuery}
+                        onChange={handleItemFormChange}
+                        onFocus={() =>
+                          itemForm.searchQuery && setShowSuggestions(true)
+                        }
+                        onKeyDown={handleSearchKeyDown}
+                        placeholder="Type to search products..."
+                        className="w-full p-2 pl-8 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        disabled={loading}
+                      />
+                      <FiSearch className="absolute left-2 top-3 text-gray-400" />
+                    </div>
+                    {showSuggestions && filteredProducts.length > 0 && (
+                      <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {filteredProducts.map((p, index) => (
+                          <li
+                            key={p.product_id}
+                            onClick={() => handleSelectProduct(p)}
+                            className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white flex justify-between items-center ${
+                              highlightedIndex === index
+                                ? "bg-gray-100 dark:bg-gray-600"
+                                : ""
+                            }`}
+                          >
+                            <span>{p.product_name}</span>
+                            <span className="text-sm text-gray-500 dark:text-gray-300">
+                              Stock: {p.opening_stock_quantity || 0}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {showSuggestions &&
+                      itemForm.searchQuery &&
+                      filteredProducts.length === 0 && (
+                        <div className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg p-4 text-gray-500 dark:text-gray-300">
+                          No products found
+                        </div>
                       )}
-                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Quantity
                     </label>
                     <input
+                      ref={quantityInputRef}
                       type="number"
                       name="quantity"
                       value={itemForm.quantity}
                       onChange={handleItemFormChange}
+                      onKeyDown={handleQuantityKeyDown}
                       className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                       min="1"
                       step="1"
@@ -506,10 +685,12 @@ const PurchaseInvoiceForm = ({
                       Free Items
                     </label>
                     <input
+                      ref={freeItemsInputRef}
                       type="number"
                       name="freeItems"
                       value={itemForm.freeItems}
                       onChange={handleItemFormChange}
+                      onKeyDown={handleFreeItemsKeyDown}
                       className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                       min="0"
                       step="1"
@@ -521,10 +702,12 @@ const PurchaseInvoiceForm = ({
                       Buying Cost
                     </label>
                     <input
+                      ref={buyingCostInputRef}
                       type="number"
                       name="buyingCost"
                       value={itemForm.buyingCost.toFixed(2)}
                       onChange={handleItemFormChange}
+                      onKeyDown={handleBuyingCostKeyDown}
                       className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                       min="0"
                       step="0.01"
@@ -613,10 +796,12 @@ const PurchaseInvoiceForm = ({
                       </label>
                       <div className="flex space-x-2">
                         <input
+                          ref={discountPercentageInputRef}
                           type="number"
                           name="discountPercentage"
                           value={invoice.discountPercentage}
                           onChange={handleInvoiceChange}
+                          onKeyDown={handleDiscountPercentageKeyDown}
                           className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                           placeholder="%"
                           min="0"
@@ -639,15 +824,30 @@ const PurchaseInvoiceForm = ({
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Tax
                       </label>
-                      <input
-                        type="number"
-                        name="tax"
-                        value={invoice.tax.toFixed(2)}
-                        onChange={handleInvoiceChange}
-                        className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                        min="0"
-                        step="0.01"
-                      />
+                      <div className="flex space-x-2">
+                        <input
+                          ref={taxPercentageInputRef}
+                          type="number"
+                          name="taxPercentage"
+                          value={invoice.taxPercentage}
+                          onChange={handleInvoiceChange}
+                          onKeyDown={handleTaxPercentageKeyDown}
+                          className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="%"
+                          min="0"
+                          step="0.1"
+                        />
+                        <input
+                          ref={taxInputRef}
+                          type="number"
+                          name="tax"
+                          value={invoice.tax.toFixed(2)}
+                          onChange={handleInvoiceChange}
+                          className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="text-right pr-4 space-y-2">
