@@ -78,20 +78,20 @@ Route::middleware(['api'])->group(function () {
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
     // Permission routes
     Route::apiResource('permissions', PermissionController::class)->except(['update']);
+
+    
     // Other resource routes
-    
-    
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('store-locations', StoreLocationController::class);
     Route::apiResource('suppliers', SupplierController::class);
     Route::apiResource('units', UnitController::class);
     Route::apiResource('customers', CustomerController::class);
-    Route::apiResource('sales', SaleController::class);
     Route::get('/next-bill-number', [SaleController::class, 'getLastBillNumber']);
     Route::get('/sales/daily-profit-report', [SaleController::class, 'getDailyProfitReport']);
     Route::get('/sales/bill-wise-profit-report', [SaleController::class, 'getBillWiseProfitReport']);
     Route::get('/sales/company-wise-profit-report', [SaleController::class, 'getCompanyWiseProfitReport']);
     Route::get('/sales/supplier-wise-profit-report', [SaleController::class, 'getSupplierWiseProfitReport']);
+    Route::apiResource('sales', SaleController::class);
     Route::get('/stock-reports', [StockReportController::class, 'index']);
     Route::get('/detailed-stock-reports', [StockReportController::class, 'detailedReport']);
     Route::get('/product/{id}', [ProductController::class, 'barcode']);
