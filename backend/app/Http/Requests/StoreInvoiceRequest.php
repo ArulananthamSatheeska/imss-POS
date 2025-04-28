@@ -3,32 +3,31 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule; // Import Rule
+use Illuminate\Validation\Rule;
 
 class StoreInvoiceRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * Set to true for now, implement proper authorization later if needed.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
+        // Get the invoice ID for update requests (null for store)
+        $invoiceId = $this->route('invoice') ? $this->route('invoice')->id : null;
+
         return [
             // Invoice Details
-            'invoice.no' => ['required', 'string', 'max:255', 'unique:invoices,invoice_no'],
+            'invoice.no' => [
+                'required',
+                'string',
+                'max:255',
+                // Unique rule: ignore the current invoice's ID for updates
+                Rule::unique('invoices', 'invoice_no')->ignore($invoiceId),
+            ],
             'invoice.date' => ['required', 'date_format:Y-m-d'],
-            'invoice.time' => ['required', 'date_format:H:i'], // Assumes HH:MM 24-hour format
+            'invoice.time' => ['required', 'date_format:H:i'],
 
             // Customer Details
             'customer.name' => ['required', 'string', 'max:255'],
@@ -39,45 +38,31 @@ class StoreInvoiceRequest extends FormRequest
             // Items Array
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['required', 'string', 'max:255'],
-            'items.*.qty' => ['required', 'numeric', 'gt:0'], // Must be greater than 0
+            'items.*.qty' => ['required', 'numeric', 'gt:0'],
             'items.*.unitPrice' => ['required', 'numeric', 'min:0'],
             'items.*.discountAmount' => ['required', 'numeric', 'min:0'],
-            // Optional: Validate consistency between discount amount and percentage if needed
             'items.*.discountPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
-            // 'items.*.total' -> We will calculate this on the backend, do not validate input for it.
 
             // Purchase Details
             'purchaseDetails.method' => ['required', 'string', Rule::in(['cash', 'card', 'bank', 'cheque'])],
             'purchaseDetails.amount' => ['required', 'numeric', 'min:0'],
 
-            // We don't validate calculated fields like subtotal, total, balance from input
-            'status' => ['required', 'string', Rule::in(['pending', 'paid', 'cancelled'])], // Example statuses
+            // Status
+            'status' => ['required', 'string', Rule::in(['pending', 'paid', 'cancelled'])],
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     *
-     * @return array<string, string>
-     */
     public function messages(): array
     {
         return [
             'invoice.no.unique' => 'This invoice number has already been used.',
             'items.*.qty.gt' => 'The quantity for :attribute must be greater than zero.',
             'items.*.description.required' => 'The description for item #:position is required.',
-            // Add more specific messages if needed, :position will be replaced by item index + 1
         ];
     }
 
-    /**
-     * Get custom attributes for validator errors.
-     *
-     * @return array<string, string>
-     */
     public function attributes(): array
     {
-        // Helps make error messages more user-friendly for nested array items
         $attributes = [
             'invoice.no' => 'invoice number',
             'invoice.date' => 'invoice date',
@@ -88,7 +73,6 @@ class StoreInvoiceRequest extends FormRequest
             'purchaseDetails.amount' => 'purchase amount',
         ];
 
-        // Dynamically add attributes for items
         foreach ($this->input('items', []) as $index => $item) {
             $itemNumber = $index + 1;
             $attributes["items.{$index}.description"] = "item #{$itemNumber} description";
