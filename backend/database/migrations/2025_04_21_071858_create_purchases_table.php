@@ -18,6 +18,9 @@ class CreatePurchasesTable extends Migration
             $table->foreignId('store_id')->constrained('store_locations')->onDelete('restrict');
             $table->decimal('total', 10, 2);
             $table->decimal('paid_amount', 10, 2)->default(0);
+            $table->decimal('discount_percentage', 5, 2)->default(0);
+            $table->decimal('discount_amount', 10, 2)->default(0);
+            $table->decimal('tax', 10, 2)->default(0);
             $table->enum('status', ['pending', 'paid', 'cancelled'])->default('pending');
             $table->timestamps();
         });

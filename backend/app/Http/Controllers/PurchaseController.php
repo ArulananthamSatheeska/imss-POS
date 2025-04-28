@@ -34,6 +34,9 @@ class PurchaseController extends Controller
                     ],
                     'total' => $purchase->total,
                     'paid_amount' => $purchase->paid_amount,
+                    'discount_percentage' => $purchase->discount_percentage,
+                    'discount_amount' => $purchase->discount_amount,
+                    'tax' => $purchase->tax,
                     'status' => $purchase->status,
                     'items' => $purchase->items->map(function ($item) {
                         return [
@@ -45,10 +48,8 @@ class PurchaseController extends Controller
                                 'product_name' => $item->product->product_name,
                             ],
                             'quantity' => $item->quantity,
+                            'free_items' => $item->free_items,
                             'buying_cost' => $item->buying_cost,
-                            'discount_percentage' => $item->discount_percentage,
-                            'discount_amount' => $item->discount_amount,
-                            'tax' => $item->tax,
                             'created_at' => $item->created_at,
                             'updated_at' => $item->updated_at,
                         ];
@@ -81,14 +82,15 @@ class PurchaseController extends Controller
             'store_id' => 'required|exists:store_locations,id',
             'total' => 'required|numeric|min:0',
             'paid_amount' => 'required|numeric|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'tax' => 'nullable|numeric|min:0',
             'status' => 'required|in:pending,paid,cancelled',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,product_id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.free_items' => 'nullable|integer|min:0',
             'items.*.buying_cost' => 'required|numeric|min:0',
-            'items.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
-            'items.*.discount_amount' => 'nullable|numeric|min:0',
-            'items.*.tax' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -111,6 +113,9 @@ class PurchaseController extends Controller
                 'store_id' => $request->store_id,
                 'total' => $request->total,
                 'paid_amount' => $request->paid_amount,
+                'discount_percentage' => $request->discount_percentage ?? 0,
+                'discount_amount' => $request->discount_amount ?? 0,
+                'tax' => $request->tax ?? 0,
                 'status' => $request->status,
             ]);
 
@@ -119,10 +124,8 @@ class PurchaseController extends Controller
                     'purchase_id' => $purchase->id,
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
+                    'free_items' => $item['free_items'] ?? 0,
                     'buying_cost' => $item['buying_cost'],
-                    'discount_percentage' => $item['discount_percentage'] ?? 0,
-                    'discount_amount' => $item['discount_amount'] ?? 0,
-                    'tax' => $item['tax'] ?? 0,
                 ]);
             }
 
@@ -147,6 +150,9 @@ class PurchaseController extends Controller
                 ],
                 'total' => $purchase->total,
                 'paid_amount' => $purchase->paid_amount,
+                'discount_percentage' => $purchase->discount_percentage,
+                'discount_amount' => $purchase->discount_amount,
+                'tax' => $purchase->tax,
                 'status' => $purchase->status,
                 'items' => $purchase->items->map(function ($item) {
                     return [
@@ -158,10 +164,8 @@ class PurchaseController extends Controller
                             'product_name' => $item->product->product_name,
                         ],
                         'quantity' => $item->quantity,
+                        'free_items' => $item->free_items,
                         'buying_cost' => $item->buying_cost,
-                        'discount_percentage' => $item->discount_percentage,
-                        'discount_amount' => $item->discount_amount,
-                        'tax' => $item->tax,
                         'created_at' => $item->created_at,
                         'updated_at' => $item->updated_at,
                     ];
@@ -206,6 +210,9 @@ class PurchaseController extends Controller
                 ],
                 'total' => $purchase->total,
                 'paid_amount' => $purchase->paid_amount,
+                'discount_percentage' => $purchase->discount_percentage,
+                'discount_amount' => $purchase->discount_amount,
+                'tax' => $purchase->tax,
                 'status' => $purchase->status,
                 'items' => $purchase->items->map(function ($item) {
                     return [
@@ -217,10 +224,8 @@ class PurchaseController extends Controller
                             'product_name' => $item->product->product_name,
                         ],
                         'quantity' => $item->quantity,
+                        'free_items' => $item->free_items,
                         'buying_cost' => $item->buying_cost,
-                        'discount_percentage' => $item->discount_percentage,
-                        'discount_amount' => $item->discount_amount,
-                        'tax' => $item->tax,
                         'created_at' => $item->created_at,
                         'updated_at' => $item->updated_at,
                     ];
@@ -252,14 +257,15 @@ class PurchaseController extends Controller
             'store_id' => 'required|exists:store_locations,id',
             'total' => 'required|numeric|min:0',
             'paid_amount' => 'required|numeric|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'tax' => 'nullable|numeric|min:0',
             'status' => 'required|in:pending,paid,cancelled',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,product_id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.free_items' => 'nullable|integer|min:0',
             'items.*.buying_cost' => 'required|numeric|min:0',
-            'items.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
-            'items.*.discount_amount' => 'nullable|numeric|min:0',
-            'items.*.tax' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -283,6 +289,9 @@ class PurchaseController extends Controller
                 'store_id' => $request->store_id,
                 'total' => $request->total,
                 'paid_amount' => $request->paid_amount,
+                'discount_percentage' => $request->discount_percentage ?? 0,
+                'discount_amount' => $request->discount_amount ?? 0,
+                'tax' => $request->tax ?? 0,
                 'status' => $request->status,
             ]);
 
@@ -293,10 +302,8 @@ class PurchaseController extends Controller
                     'purchase_id' => $purchase->id,
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
+                    'free_items' => $item['free_items'] ?? 0,
                     'buying_cost' => $item['buying_cost'],
-                    'discount_percentage' => $item['discount_percentage'] ?? 0,
-                    'discount_amount' => $item['discount_amount'] ?? 0,
-                    'tax' => $item['tax'] ?? 0,
                 ]);
             }
 
@@ -321,6 +328,9 @@ class PurchaseController extends Controller
                 ],
                 'total' => $purchase->total,
                 'paid_amount' => $purchase->paid_amount,
+                'discount_percentage' => $purchase->discount_percentage,
+                'discount_amount' => $purchase->discount_amount,
+                'tax' => $purchase->tax,
                 'status' => $purchase->status,
                 'items' => $purchase->items->map(function ($item) {
                     return [
@@ -332,10 +342,8 @@ class PurchaseController extends Controller
                             'product_name' => $item->product->product_name,
                         ],
                         'quantity' => $item->quantity,
+                        'free_items' => $item->free_items,
                         'buying_cost' => $item->buying_cost,
-                        'discount_percentage' => $item->discount_percentage,
-                        'discount_amount' => $item->discount_amount,
-                        'tax' => $item->tax,
                         'created_at' => $item->created_at,
                         'updated_at' => $item->updated_at,
                     ];
