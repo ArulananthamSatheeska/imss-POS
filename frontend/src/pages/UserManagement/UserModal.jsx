@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight, FiPlus, FiSearch } from 'react-icons/fi';
-import { BsFilter } from 'react-icons/bs';
 
-const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
+const UserModal = ({ isOpen, onClose, onSubmit, userData, formErrors, setFormErrors, showPassword, setShowPassword, roles, isCreating }) => {
     const [formData, setFormData] = useState({
         name: '',
+        username: '',
         email: '',
         role: 'user',
         password: '',
@@ -19,19 +17,25 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
     useEffect(() => {
         if (userData) {
             setFormData({
-                ...userData,
+                name: userData.name || '',
+                username: userData.username || '',
+                email: userData.email || '',
+                role: userData.role || 'user',
                 password: '',
                 password_confirmation: '',
-                id: userData.id
+                is_active: userData.is_active !== undefined ? userData.is_active : true,
+                id: userData.id || null
             });
         } else {
             setFormData({
                 name: '',
+                username: '',
                 email: '',
                 role: 'user',
                 password: '',
                 password_confirmation: '',
-                is_active: true
+                is_active: true,
+                id: null
             });
         }
         setErrors({});
@@ -57,14 +61,23 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
         e.preventDefault();
         setIsSubmitting(true);
         setErrors({});
+        setFormErrors({});
+
+        if (formData.password !== formData.password_confirmation) {
+            setErrors({ password_confirmation: ['Passwords do not match'] });
+            setIsSubmitting(false);
+            return;
+        }
 
         try {
             await onSubmit(formData);
         } catch (error) {
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
+                setFormErrors(error.response.data.errors);
             } else {
                 setErrors({ general: ['An unexpected error occurred. Please try again.'] });
+                setFormErrors({ general: ['An unexpected error occurred. Please try again.'] });
             }
         } finally {
             setIsSubmitting(false);
@@ -90,52 +103,6 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
         },
         exit: { opacity: 0, y: 50, scale: 0.95 }
     };
-
-    const renderActionButtons = (user) => (
-        <div className="flex items-center space-x-2">
-            {/* Edit Button */}
-            {/* {checkPermission(PERMISSIONS.USER_EDIT) && ( */}
-            <button
-                onClick={() => handleEditUser(user)}
-                className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-full transition-colors duration-200"
-                title="Edit user"
-            >
-                <FiEdit2 className="w-4 h-4" />
-            </button>
-            {/* )} */}
-
-            {/* Deactivate/Activate Button */}
-            {/* {checkPermission(PERMISSIONS.USER_CHANGE_STATUS) && ( */}
-            <button
-                onClick={() => handleStatusChange(user.id, user.is_active)}
-                className={`p-2 rounded-full transition-colors duration-200 ${user.is_active
-                    ? 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50'
-                    : 'text-green-600 hover:text-green-800 hover:bg-green-50'
-                    }`}
-                title={user.is_active ? 'Deactivate user' : 'Activate user'}
-                disabled={user.id === currentUser.id}
-            >
-                {user.is_active ? (
-                    <FiToggleRight className="w-4 h-4" />
-                ) : (
-                    <FiToggleLeft className="w-4 h-4" />
-                )}
-            </button>
-            {/* )} */}
-
-            {/* Delete Button */}
-            {/* {checkPermission(PERMISSIONS.USER_DELETE) && ( */}
-            <button
-                onClick={() => handleDelete(user.id)}
-                className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-full transition-colors duration-200"
-                title="Delete user"
-                disabled={user.id === currentUser.id}
-            >
-                <FiTrash2 className="w-4 h-4" />
-            </button>
-            {/* )} */}
-        </div>
-    );
 
     return (
         <AnimatePresence>
@@ -185,7 +152,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                         type="text"
                                         id="name"
                                         name="name"
-                                        value={formData.name}
+                                        value={formData.name || ''}
                                         onChange={handleChange}
                                         className={`w-full px-3 py-2 border ${errors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'
                                             } rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200`}
@@ -199,6 +166,27 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                 </div>
 
                                 <div>
+                                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                                        Username <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="username"
+                                        name="username"
+                                        value={formData.username || ''}
+                                        onChange={handleChange}
+                                        className={`w-full px-3 py-2 border ${errors.username ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                            } rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200`}
+                                        required
+                                    />
+                                    {errors.username && (
+                                        <p className="mt-1 text-sm text-red-600">
+                                            {errors.username[0]}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
                                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                                         Email <span className="text-red-500">*</span>
                                     </label>
@@ -206,7 +194,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                         type="email"
                                         id="email"
                                         name="email"
-                                        value={formData.email}
+                                        value={formData.email || ''}
                                         onChange={handleChange}
                                         className={`w-full px-3 py-2 border ${errors.email ? 'border-red-500 bg-red-50' : 'border-gray-300'
                                             } rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200`}
@@ -226,19 +214,23 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                     <select
                                         id="role"
                                         name="role"
-                                        value={formData.role}
+                                        value={formData.role || ''}
                                         onChange={handleChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none bg-white bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLWNoZXZyb24tZG93biI+PHBhdGggZD0ibTYgOSA2IDYgNi02Ii8+PC9zdmc+')] bg-no-repeat bg-[center_right_0.5rem] bg-[length:1.5rem]"
-                                        disabled={!canEditRoles}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none bg-white"
                                     >
-                                        <option value="user">User</option>
-                                        <option value="editor">Editor</option>
-                                        <option value="admin">Admin</option>
-                                        {canEditRoles && <option value="superadmin">Super Admin</option>}
+                                        {roles && roles.length > 0 ? (
+                                            roles.map((role) => (
+                                                <option key={role.id} value={role.name}>
+                                                    {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                                                </option>
+                                            ))
+                                        ) : (
+                                            <option value="user">User</option>
+                                        )}
                                     </select>
                                 </div>
 
-                                {!userData && (
+                                {isCreating && (
                                     <>
                                         <div>
                                             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
@@ -248,11 +240,11 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                                 type="password"
                                                 id="password"
                                                 name="password"
-                                                value={formData.password}
+                                                value={formData.password || ''}
                                                 onChange={handleChange}
                                                 className={`w-full px-3 py-2 border ${errors.password ? 'border-red-500 bg-red-50' : 'border-gray-300'
                                                     } rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200`}
-                                                required={!userData}
+                                                required={isCreating}
                                                 minLength="8"
                                             />
                                             <p className="mt-1 text-xs text-gray-500">Minimum 8 characters</p>
@@ -271,11 +263,11 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                                 type="password"
                                                 id="password_confirmation"
                                                 name="password_confirmation"
-                                                value={formData.password_confirmation}
+                                                value={formData.password_confirmation || ''}
                                                 onChange={handleChange}
                                                 className={`w-full px-3 py-2 border ${errors.password_confirmation ? 'border-red-500 bg-red-50' : 'border-gray-300'
                                                     } rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200`}
-                                                required={!userData}
+                                                required={isCreating}
                                             />
                                             {errors.password_confirmation && (
                                                 <p className="mt-1 text-sm text-red-600">
@@ -293,7 +285,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                         name="is_active"
                                         checked={formData.is_active}
                                         onChange={handleChange}
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-colors duration-200"
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                     />
                                     <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
                                         Active
@@ -305,27 +297,17 @@ const UserModal = ({ isOpen, onClose, onSubmit, userData, canEditRoles }) => {
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                                    className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                     disabled={isSubmitting}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed"
                                     disabled={isSubmitting}
                                 >
-                                    {isSubmitting ? (
-                                        <span className="flex items-center justify-center">
-                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            {userData ? 'Updating...' : 'Creating...'}
-                                        </span>
-                                    ) : (
-                                        userData ? 'Update User' : 'Create User'
-                                    )}
+                                    {isSubmitting ? 'Saving...' : isCreating ? 'Create User' : 'Update User'}
                                 </button>
                             </div>
                         </form>

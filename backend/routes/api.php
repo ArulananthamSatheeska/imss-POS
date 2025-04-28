@@ -59,6 +59,19 @@ Route::middleware(['api'])->group(function () {
     Route::put('/roles/{role}', [RoleController::class, 'update']);
     Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
     Route::post('/roles/{role}/permissions', [RoleController::class, 'assignPermissions']);
+
+    // User routes
+    Route::apiResource('users', UserController::class)->except(['create', 'edit']);
+    Route::get('users/deleted', [UserController::class, 'getDeletedUsers']);
+    Route::post('users/{id}/restore', [UserController::class, 'restoreUser']);
+    Route::delete('users/{id}/force', [UserController::class, 'forceDeleteUser']);
+    Route::post('users/{user}/permissions', [UserController::class, 'assignPermissions']);
+    Route::post('users/change-password', [UserController::class, 'changePassword']);
+    Route::put('users/update-profile', [UserController::class, 'updateProfile']);
+    Route::get('users/{user}/activity-log', [UserController::class, 'activityLog']);
+    Route::post('users/{user}/enable-2fa', [UserController::class, 'enable2FA']);
+    Route::post('users/{user}/activate', [UserController::class, 'activateUser']);
+    Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
     // Permission routes
     Route::apiResource('permissions', PermissionController::class)->except(['update']);
     // Other resource routes
@@ -88,18 +101,7 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::get('/verify-token', [AuthController::class, 'verifyToken']);
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
 
-    // User routes
-    Route::apiResource('users', UserController::class)->except(['create', 'edit']);
-    Route::get('users/deleted', [UserController::class, 'getDeletedUsers']);
-    Route::post('users/{id}/restore', [UserController::class, 'restoreUser']);
-    Route::delete('users/{id}/force', [UserController::class, 'forceDeleteUser']);
-    Route::post('users/{user}/permissions', [UserController::class, 'assignPermissions']);
-    Route::post('users/change-password', [UserController::class, 'changePassword']);
-    Route::put('users/update-profile', [UserController::class, 'updateProfile']);
-    Route::get('users/{user}/activity-log', [UserController::class, 'activityLog']);
-    Route::post('users/{user}/enable-2fa', [UserController::class, 'enable2FA']);
-    Route::post('users/{user}/activate', [UserController::class, 'activateUser']);
-    Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
+    
 });
 
 Route::prefix('discount-schemes')->group(function () {

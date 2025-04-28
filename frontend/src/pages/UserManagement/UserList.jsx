@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import UserModal from './UserModal';
 import { PERMISSIONS } from '../../constants/permissions';
-import { FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight, FiPlus, FiSearch, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight, FiPlus, FiSearch } from 'react-icons/fi';
 import { BsFilter } from 'react-icons/bs';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -41,11 +41,6 @@ const UserList = () => {
     }, [searchTerm]);
 
     const fetchUsers = useCallback(async () => {
-        // if (!checkPermission(PERMISSIONS.USER_VIEW)) {
-        //     navigate('/unauthorized');
-        //     return;
-        // }
-
         try {
             setLoading(true);
             setError(null);
@@ -60,7 +55,7 @@ const UserList = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentUser?.token, checkPermission, navigate]);
+    }, [currentUser?.token]);
 
     useEffect(() => {
         fetchUsers();
@@ -87,6 +82,7 @@ const UserList = () => {
         const errors = {};
 
         if (!userData.name) errors.name = 'Name is required';
+        if (!userData.username) errors.username = 'Username is required';
         if (!userData.email) errors.email = 'Email is required';
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) errors.email = 'Invalid email format';
 
@@ -102,11 +98,69 @@ const UserList = () => {
         return Object.keys(errors).length === 0;
     };
 
-    const handleDelete = async (userId) => {
-        if (!checkPermission(PERMISSIONS.USER_DELETE)) {
-            // toast.error("You don't have permission to delete users");
-            // return;
+    const handleSubmit = async (userData) => {
+        if (!validateForm(userData)) return;
+
+        try {
+            if (userData.id) {
+                // Update existing user - construct updateData with only expected fields
+                const updateData = {
+                    name: userData.name,
+                    username: userData.username,
+                    email: userData.email,
+                    phone: userData.phone || '',
+                    role: userData.role,
+                    permissions: userData.permissions || [],
+                    // Remove is_active to match backend expectations
+                    // is_active: userData.is_active,
+                };
+                if (userData.password) {
+                    updateData.password = userData.password;
+                }
+
+                await axios.put(`${API_BASE_URL}/users/${userData.id}`, updateData, {
+                    headers: { Authorization: `Bearer ${currentUser.token}` }
+                });
+                toast.success("User updated successfully");
+            } else {
+                // Create new user - construct createData with only expected fields
+                const createData = {
+                    name: userData.name,
+                    username: userData.username,
+                    email: userData.email,
+                    password: userData.password,
+                    role: userData.role,
+                    // Remove is_active to match backend expectations
+                    // is_active: userData.is_active,
+                    status: 'active', // Set status to active on create as backend expects
+                };
+
+                await axios.post(`${API_BASE_URL}/users`, createData, {
+                    headers: { Authorization: `Bearer ${currentUser.token}` }
+                });
+                toast.success("User created successfully");
+            }
+            await fetchUsers();
+            handleModalClose();
+        } catch (error) {
+            const errorMessage = error.response?.data?.message ||
+                (userData.id ? 'Failed to update user' : 'Failed to create user');
+
+            // Handle specific backend validation errors
+            if (error.response?.data?.errors) {
+                setFormErrors(error.response.data.errors);
+            }
+
+            console.error('API error:', error.response);
+            toast.error(errorMessage);
         }
+    };
+
+    const handleDelete = async (userId) => {
+        // if (!checkPermission(PERMISSIONS.USER_DELETE)) {
+        //     toast.error("You don't have permission to delete users");
+        //     return;
+        // }
 
         if (userId === currentUser.id) {
             toast.warning("You cannot delete your own account");
@@ -127,10 +181,10 @@ const UserList = () => {
     };
 
     const handleStatusChange = async (userId, isActive) => {
-        if (!checkPermission(PERMISSIONS.USER_CHANGE_STATUS)) {
-            // toast.error("You don't have permission to change user status");
-            // return;
-        }
+        // if (!checkPermission(PERMISSIONS.USER_CHANGE_STATUS)) {
+        //     toast.error("You don't have permission to change user status");
+        //     return;
+        // }
 
         if (userId === currentUser.id) {
             toast.warning("You cannot change your own status");
@@ -157,9 +211,10 @@ const UserList = () => {
         // }
         setCurrentUserData({
             name: '',
+            username: '',
             email: '',
             password: '',
-            role: '',
+            role: 'user',
             is_active: true
         });
         setFormErrors({});
@@ -167,10 +222,10 @@ const UserList = () => {
     };
 
     const handleEditUser = (user) => {
-        if (!checkPermission(PERMISSIONS.USER_EDIT)) {
-            // toast.error("You don't have permission to edit users");
-            // return;
-        }
+        // if (!checkPermission(PERMISSIONS.USER_EDIT)) {
+        //     toast.error("You don't have permission to edit users");
+        //     return;
+        // }
         setCurrentUserData({
             ...user,
             password: '' // Don't pre-fill password field for security
@@ -183,41 +238,6 @@ const UserList = () => {
         setIsModalOpen(false);
         setCurrentUserData(null);
         setFormErrors({});
-    };
-
-    const handleSubmit = async (userData) => {
-        if (!validateForm(userData)) return;
-
-        try {
-            if (userData.id) {
-                // Update existing user - don't send password if not changed
-                const updateData = { ...userData };
-                if (!updateData.password) delete updateData.password;
-
-                await axios.put(`${API_BASE_URL}/users/${userData.id}`, updateData, {
-                    headers: { Authorization: `Bearer ${currentUser.token}` }
-                });
-                toast.success("User updated successfully");
-            } else {
-                // Create new user
-                await axios.post(`${API_BASE_URL}/users`, userData, {
-                    headers: { Authorization: `Bearer ${currentUser.token}` }
-                });
-                toast.success("User created successfully");
-            }
-            await fetchUsers();
-            handleModalClose();
-        } catch (error) {
-            const errorMessage = error.response?.data?.message ||
-                (userData.id ? 'Failed to update user' : 'Failed to create user');
-
-            // Handle specific backend validation errors
-            if (error.response?.data?.errors) {
-                setFormErrors(error.response.data.errors);
-            }
-
-            toast.error(errorMessage);
-        }
     };
 
     const filteredUsers = useMemo(() => {
@@ -275,7 +295,6 @@ const UserList = () => {
 
     const renderActionButtons = (user) => (
         <div className="flex items-center space-x-2">
-            {/* {checkPermission(PERMISSIONS.USER_EDIT) && ( */}
             <button
                 onClick={() => handleEditUser(user)}
                 className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-full transition-colors duration-200"
@@ -283,8 +302,6 @@ const UserList = () => {
             >
                 <FiEdit2 className="w-4 h-4" />
             </button>
-            {/* // )} */}
-            {/* {checkPermission(PERMISSIONS.USER_CHANGE_STATUS) && ( */}
             <button
                 onClick={() => handleStatusChange(user.id, user.is_active)}
                 className={`p-2 rounded-full transition-colors duration-200 ${user.is_active
@@ -300,8 +317,6 @@ const UserList = () => {
                     <FiToggleLeft className="w-4 h-4" />
                 )}
             </button>
-            {/* )} */}
-            {/* {checkPermission(PERMISSIONS.USER_DELETE) && ( */}
             <button
                 onClick={() => handleDelete(user.id)}
                 className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-full transition-colors duration-200"
@@ -310,7 +325,6 @@ const UserList = () => {
             >
                 <FiTrash2 className="w-4 h-4" />
             </button>
-            {/* )} */}
         </div>
     );
 
@@ -399,10 +413,8 @@ const UserList = () => {
                 showPassword={showPassword}
                 setShowPassword={setShowPassword}
                 roles={roles}
-
                 isCreating={!currentUserData?.id}
             />
-
 
             <div className="sm:flex sm:items-center sm:justify-between mb-8">
                 <div>
@@ -592,7 +604,6 @@ const UserList = () => {
                                             <p className="mt-1 text-sm text-gray-500">
                                                 Try adjusting your search or filter to find what you're looking for.
                                             </p>
-                                            {/* {checkPermission(PERMISSIONS.USER_CREATE) && ( */}
                                             <div className="mt-6">
                                                 <button
                                                     onClick={() => {
@@ -606,7 +617,6 @@ const UserList = () => {
                                                     Add New User
                                                 </button>
                                             </div>
-                                            {/* )} */}
                                         </td>
                                     </tr>
                                 )}
