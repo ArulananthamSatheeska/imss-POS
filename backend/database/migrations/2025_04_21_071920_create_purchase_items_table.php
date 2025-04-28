@@ -13,10 +13,8 @@ class CreatePurchaseItemsTable extends Migration
             $table->foreignId('purchase_id')->constrained('purchases')->onDelete('cascade');
             $table->foreignId('product_id')->constrained('products', 'product_id')->onDelete('restrict');
             $table->integer('quantity');
+            $table->integer('free_items')->default(0);
             $table->decimal('buying_cost', 10, 2);
-            $table->decimal('discount_percentage', 5, 2)->default(0);
-            $table->decimal('discount_amount', 10, 2)->default(0);
-            $table->decimal('tax', 10, 2)->default(0);
             $table->timestamps();
         });
     }
