@@ -20,8 +20,10 @@ use App\Http\Controllers\{
     ProductionCategoryController,
     ProductionItemController,
     PurchaseController,
-    RawMaterialController
+    RawMaterialController,
+    SalesInvoiceController
 };
+
 
 // Authentication routes (no permission middleware)
 Route::middleware(['api'])->group(function() {
@@ -129,8 +131,8 @@ Route::prefix('discount-schemes')->group(function () {
 //     // Route::get('/products', [ProductController::class, 'index']);
 // });
 
-    Route::get('/purchases', [PurchaseController::class, 'index']);
-    Route::post('/purchases', [PurchaseController::class, 'store']);
+Route::get('/purchases', [PurchaseController::class, 'index']);
+Route::post('/purchases', [PurchaseController::class, 'store']);
   
     Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
     Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
@@ -144,6 +146,7 @@ Route::prefix('discount-schemes')->group(function () {
         Route::delete('/{company_name}', [CompanyController::class, 'destroy']); // Correct: DELETE api/companies/{company_name}
     });
     
+Route::apiResource('invoices', SalesInvoiceController::class);
 
 
 
