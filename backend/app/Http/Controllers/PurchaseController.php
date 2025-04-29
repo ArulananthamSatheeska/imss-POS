@@ -57,11 +57,8 @@ class PurchaseController extends Controller
                     'buying_cost' => $item['buying_cost'],
                 ]);
 
-                // Update product stock
-                $product = Product::findOrFail($item['product_id']);
-                $totalQuantity = ($item['quantity'] ?? 0) + ($item['free_items'] ?? 0);
-                $product->updateStock($totalQuantity, 'add');
-                Log::info("Updated stock for product ID {$item['product_id']}: +{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
+                // Removed stock update logic
+                // Stock will be calculated dynamically in the StockReportController
             }
 
             DB::commit();
@@ -93,13 +90,7 @@ class PurchaseController extends Controller
 
             $purchase = Purchase::findOrFail($id);
 
-            // Reverse stock for existing items
-            foreach ($purchase->items as $item) {
-                $product = Product::findOrFail($item->product_id);
-                $totalQuantity = ($item->quantity ?? 0) + ($item->free_items ?? 0);
-                $product->updateStock($totalQuantity, 'subtract');
-                Log::info("Reversed stock for product ID {$item->product_id}: -{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
-            }
+            // Removed reversing stock logic since we are not modifying opening_stock_quantity
 
             // Update purchase details
             $purchase->update([
@@ -120,7 +111,7 @@ class PurchaseController extends Controller
             // Delete existing items
             $purchase->items()->delete();
 
-            // Add new items and update stock
+            // Add new items
             foreach ($validatedData['items'] as $item) {
                 $purchase->items()->create([
                     'product_id' => $item['product_id'],
@@ -129,11 +120,8 @@ class PurchaseController extends Controller
                     'buying_cost' => $item['buying_cost'],
                 ]);
 
-                // Update product stock
-                $product = Product::findOrFail($item['product_id']);
-                $totalQuantity = ($item['quantity'] ?? 0) + ($item['free_items'] ?? 0);
-                $product->updateStock($totalQuantity, 'add');
-                Log::info("Updated stock for product ID {$item['product_id']}: +{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
+                // Removed stock update logic
+                // Stock will be calculated dynamically in the StockReportController
             }
 
             DB::commit();
@@ -172,13 +160,7 @@ class PurchaseController extends Controller
 
             DB::beginTransaction();
 
-            // Reverse stock for all items
-            foreach ($purchase->items as $item) {
-                $product = Product::findOrFail($item->product_id);
-                $totalQuantity = ($item->quantity ?? 0) + ($item->free_items ?? 0);
-                $product->updateStock($totalQuantity, 'subtract');
-                Log::info("Reversed stock for product ID {$item->product_id}: -{$totalQuantity}, New stock: {$product->opening_stock_quantity}");
-            }
+            // Removed reversing stock logic since we are not modifying opening_stock_quantity
 
             $purchase->items()->delete();
             $purchase->delete();

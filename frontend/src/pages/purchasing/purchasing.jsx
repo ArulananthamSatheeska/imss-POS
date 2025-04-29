@@ -573,7 +573,7 @@ const PurchasingEntryForm = () => {
                 Purchase Date
               </label>
               <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
-                {invoice.purchaseDate}
+                {invoice.purchaseDate}‬{" "}
               </p>
             </div>
             <div>
@@ -850,6 +850,7 @@ const PurchasingEntryForm = () => {
                   <th className="px-6 py-3 text-left font-semibold">Store</th>
                   <th className="px-6 py-3 text-left font-semibold">Items</th>
                   <th className="px-6 py-3 text-left font-semibold">Total</th>
+                  <th className="px-6 py-3 text-left font-semibold">Status</th>
                   <th className="px-6 py-3 text-right font-semibold">
                     Actions
                   </th>
@@ -859,7 +860,7 @@ const PurchasingEntryForm = () => {
                 {filteredPurchases.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-6 py-4 text-center text-gray-500 dark:text-gray-400"
                     >
                       No purchase entries found
@@ -899,6 +900,9 @@ const PurchasingEntryForm = () => {
                         </td>
                         <td className="px-6 py-4 font-bold text-gray-800 dark:text-white">
                           {formatCurrency(parseFloat(purchase.total) || 0)}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {purchase.status || "Pending"}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-3">
@@ -947,7 +951,7 @@ const PurchasingEntryForm = () => {
                       </tr>
                       {expandedRow === index && (
                         <tr className="bg-gray-50 dark:bg-slate-700">
-                          <td colSpan={9} className="px-6 py-4">
+                          <td colSpan={10} className="px-6 py-4">
                             <div className="space-y-4">
                               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Invoice Items
