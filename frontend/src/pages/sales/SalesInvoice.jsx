@@ -12,6 +12,21 @@ const SalesInvoice = ({
 }) => {
   const draftKey = 'salesInvoiceDraft';
 
+  // Utility function to format date to YYYY-MM-DD
+  const formatDate = (date) => {
+    if (!date) return new Date().toISOString().split('T')[0];
+    try {
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        return new Date().toISOString().split('T')[0];
+      }
+      return parsedDate.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('Error parsing date:', error);
+      return new Date().toISOString().split('T')[0];
+    }
+  };
+
   // --- State ---
   const [formData, setFormData] = useState(() => {
     const defaultState = {
@@ -33,12 +48,23 @@ const SalesInvoice = ({
       return {
         ...defaultState,
         ...initialData,
-        invoice: { ...defaultState.invoice, ...(initialData.invoice || {}) },
+        invoice: {
+          ...defaultState.invoice,
+          ...initialData.invoice,
+          date: initialData.invoice?.date ? formatDate(initialData.invoice.date) : defaultState.invoice.date,
+          time: initialData.invoice?.time || defaultState.invoice.time,
+        },
         customer: { ...defaultState.customer, ...(initialData.customer || {}) },
         items: (initialData.items || []).map((item) => ({
           ...item,
           id: item.id || Date.now() + Math.random(),
-          productId: item.productId || null,
+          productId: item.productId || item.product_id || null,
+          description: item.description || '',
+          qty: item.qty || item.quantity || 1,
+          unitPrice: item.unitPrice || item.unit_price || 0,
+          discountAmount: item.discountAmount || item.discount_amount || 0,
+          discountPercentage: item.discountPercentage || item.discount_percentage || 0,
+          total: item.total || 0,
         })),
         purchaseDetails: { ...defaultState.purchaseDetails, ...(initialData.purchaseDetails || {}) },
         id: initialData.id || null,
@@ -53,6 +79,7 @@ const SalesInvoice = ({
           ...item,
           id: item.id || Date.now() + Math.random(),
           productId: item.productId || null,
+          description: item.description || '',
         }));
         return { ...defaultState, ...savedDraft, items: itemsWithIds, id: null, status: 'pending' };
       }
@@ -195,8 +222,8 @@ const SalesInvoice = ({
       newItems[index] = {
         ...newItems[index],
         productId: product ? product.product_id : null,
-        description: product ? product.product_name : '',
-        unitPrice: product ? parseFloat(product.sales_price) || 0 : 0,
+        description: product ? product.product_name : newItems[index].description || '',
+        unitPrice: product ? parseFloat(product.sales_price) || 0 : newItems[index].unitPrice || 0,
         qty: newItems[index].qty || 1,
         discountAmount: newItems[index].discountAmount || 0,
         discountPercentage: newItems[index].discountPercentage || 0,
@@ -227,7 +254,7 @@ const SalesInvoice = ({
       items: [
         ...prev.items,
         {
-          id: Date.now(),
+          id: Date.now() + Math.random(),
           description: '',
           qty: 1,
           unitPrice: 0,
@@ -295,8 +322,9 @@ const SalesInvoice = ({
       newErrors.items = 'At least one item is required';
     } else {
       items.forEach((item, idx) => {
-        if (!item.productId) newErrors[`itemDescription${idx}`] = 'Please select a product';
-        if (!item.description?.trim()) newErrors[`itemDescription${idx}`] = 'Description is required';
+        if (!item.description?.trim()) {
+          newErrors[`itemDescription${idx}`] = 'Description is required';
+        }
         const qty = parseFloat(item.qty);
         if (isNaN(qty) || qty <= 0) newErrors[`itemQty${idx}`] = 'Qty must be > 0';
         const unitPrice = parseFloat(item.unitPrice);
@@ -366,24 +394,34 @@ const SalesInvoice = ({
       setLoading(true);
 
       const payload = {
-        ...formData,
+        invoice: {
+          no: formData.invoice.no,
+          date: formData.invoice.date,
+          time: formData.invoice.time,
+        },
+        customer: {
+          name: formData.customer.name,
+          address: formData.customer.address || null,
+          phone: formData.customer.phone || null,
+          email: formData.customer.email || null,
+        },
         items: formData.items.map((item) => ({
-          description: item.description,
+          id: isEditMode && item.id && typeof item.id === 'number' ? item.id : undefined, // Only send valid numeric IDs
+          product_id: item.productId || null,
+          description: item.description || (item.productId ? 'Product-based item' : 'Unnamed item'),
           qty: parseFloat(item.qty) || 0,
           unitPrice: parseFloat(item.unitPrice) || 0,
           discountAmount: parseFloat(item.discountAmount) || 0,
           discountPercentage: parseFloat(item.discountPercentage) || 0,
-          product_id: item.productId || null,
         })),
         purchaseDetails: {
-          ...formData.purchaseDetails,
+          method: formData.purchaseDetails.method,
           amount: parseFloat(formData.purchaseDetails.amount) || 0,
         },
-        id: isEditMode ? formData.id : undefined,
+        status: formData.status,
       };
-      if (!isEditMode) {
-        delete payload.id;
-      }
+  
+      console.log('Submitting payload:', JSON.stringify(payload, null, 2)); // Log payload for debugging
 
       try {
         if (isEditMode) {
@@ -402,7 +440,7 @@ const SalesInvoice = ({
             customer: { name: '', address: '', phone: '', email: '' },
             items: [
               {
-                id: Date.now(),
+                id: Date.now() + Math.random(),
                 description: '',
                 qty: 1,
                 unitPrice: 0,
@@ -417,6 +455,7 @@ const SalesInvoice = ({
             id: null,
           });
           setErrors({});
+          itemRefs.current = [{}];
           if (firstInputRef.current) firstInputRef.current.focus();
           setTimeout(() => {
             setSuccessMessage('');
@@ -676,7 +715,7 @@ const SalesInvoice = ({
                   value={formData.invoice.time}
                   onChange={(e) => handleInputChange(e, 'invoice', 'time')}
                   className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${
-                    errors.invoiceTime ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hoverPretty-printed code block: border-gray-500'
+                    errors.invoiceTime ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
                   }`}
                   aria-invalid={!!errors.invoiceTime}
                   aria-describedby="invoiceTimeError"
@@ -863,7 +902,7 @@ const SalesInvoice = ({
             {errors.items && <p className="mb-2 text-xs text-red-400">{errors.items}</p>}
 
             <div className="overflow-x-auto border rounded-lg shadow-inner border-gray-700/50">
-              <table className="w-full min-w-[900px]" role="grid" aria-label="Invoice items">
+              <table className="w-full min-w-[900px] min-h-20" role="grid" aria-label="Invoice items">
                 <thead className="sticky top-0 z-10">
                   <tr className="text-gray-300 bg-gray-700/90 backdrop-blur-sm">
                     <th className="p-3 text-sm font-semibold text-left" scope="col" style={{ width: '30%' }}>
@@ -891,24 +930,34 @@ const SalesInvoice = ({
                 </thead>
                 <tbody className="divide-y divide-gray-700/30">
                   {formData.items.map((item, index) => {
-                    const selectedProduct = item.productId
-                      ? productOptions.find((option) => option.value === item.productId)
-                      : null;
+                    // Determine the selected product for react-select
+                    let selectedProduct = null;
+                    if (item.productId) {
+                      selectedProduct = productOptions.find((option) => option.value === item.productId) || null;
+                    }
+                    // If no productId but description exists, show it as a custom option
+                    if (!selectedProduct && item.description) {
+                      selectedProduct = {
+                        value: `custom-${item.id}`,
+                        label: item.description,
+                      };
+                    }
 
                     return (
                       <tr
-                        key={item.id}
+                        key={`item-${item.id}-${index}`}
                         className={`${
                           index % 2 === 0 ? 'bg-gray-700/30' : 'bg-gray-700/20'
                         } hover:bg-gray-700/40 transition-colors`}
                       >
                         <td className="p-2 align-top">
                           <Select
+                            key={`select-${item.id}`}
                             ref={(el) => setItemRef(el, index, 'description')}
                             options={productOptions}
                             value={selectedProduct}
                             onChange={(option) => handleProductSelect(option, index)}
-                            placeholder={productsLoading ? 'Loading products...' : 'Select a product'}
+                            placeholder={productsLoading ? 'Loading products...' : 'Select a product or enter description'}
                             isClearable
                             isDisabled={productsLoading}
                             styles={getSelectStyles(index)}
@@ -1247,7 +1296,7 @@ const SalesInvoice = ({
                       <path
                         className="opacity-75"
                         fill="currentColor"
-                        d="M4 12a8 8 0 018-8V8H4z"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
                     Processing...
@@ -1256,14 +1305,14 @@ const SalesInvoice = ({
                   <>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="w-5 h-5 mr-1"
+                      className="w-4 h-4 mr-1"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       aria-hidden="true"
                     >
                       <path
                         fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                         clipRule="evenodd"
                       />
                     </svg>

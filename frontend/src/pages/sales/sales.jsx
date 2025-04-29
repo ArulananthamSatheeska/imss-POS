@@ -110,7 +110,7 @@ const SalesReport = () => {
         return; // Or throw error
     }
     const url = `${API_BASE_URL}/invoices/${invoiceId}`;
-    console.log(`PUT to: ${url}`, updatedInvoiceData);
+    console.log(`PUT to: ${url}`, JSON.stringify(updatedInvoiceData, null, 2)); // Pretty-print JSON
     try {
         // Use putData service or axios directly
         const response = await axios.put(url, updatedInvoiceData, {
@@ -123,9 +123,11 @@ const SalesReport = () => {
         alert('Invoice updated successfully!');
         return response.data;
     } catch (error) {
-        console.error(`API Error during PUT ${url}:`, error.response || error);
-        // Let SalesInvoice handle displaying the error message by re-throwing
-        throw error; // Re-throw to be caught in SalesInvoice
+      console.error(`API Error during PUT ${url}:`, error.response || error);
+      const errorMessage = error.response?.data?.message || 'Failed to update invoice.';
+      const errorDetails = error.response?.data?.error || error.message;
+      alert(`Error: ${errorMessage}\nDetails: ${errorDetails}`);
+      throw error;
     }
   };
 
@@ -280,6 +282,7 @@ const SalesReport = () => {
         items: (row.items || []).map(item => ({
             // Map backend fields to frontend field names used in SalesInvoice's state
             id: item.id, // Keep track of original item ID if needed for complex updates (not used in delete-recreate)
+            productId: item.product_id || null,
             description: item.description,
             qty: item.quantity, // Map backend 'quantity' to 'qty' if needed
             unitPrice: item.unit_price, // Map backend 'unit_price' to 'unitPrice' if needed

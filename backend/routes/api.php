@@ -150,7 +150,7 @@ Route::post('/purchases', [PurchaseController::class, 'store']);
     });
     
 Route::apiResource('invoices', SalesInvoiceController::class);
-
+Route::get('/invoices/check-invoice-no', [SalesInvoiceController::class, 'checkInvoiceNo']);
 
 
 //     Route::get('/suppliers', [SupplierController::class, 'index']);

@@ -18,7 +18,7 @@ return new class extends Migration
             // Use constrained foreignId for better relationship handling
             $table->foreignIdFor(Invoice::class)->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->constrained('products', 'product_id')->onDelete('cascade');
-            $table->string('description');
+            $table->string('description')->nullable();
             $table->decimal('quantity', 15, 2); // Use decimal for potential fractional quantities
             $table->decimal('unit_price', 15, 2);
             $table->decimal('discount_amount', 15, 2)->default(0);
