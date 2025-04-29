@@ -43,4 +43,14 @@ class Product extends Model
         $generator = new BarcodeGeneratorPNG();
         return $generator->getBarcode($this->barcode, $generator::TYPE_CODE_128);
     }
+
+    protected static function boot()
+{
+    parent::boot();
+    static::creating(function ($model) {
+        if (isset($model->product_id)) {
+            unset($model->product_id); // Ignore product_id on create
+        }
+    });
+}
 }

@@ -18,6 +18,9 @@ class Purchase extends Model
         'store_id',
         'total',
         'paid_amount',
+        'discount_percentage',
+        'discount_amount',
+        'tax',
         'status',
     ];
 

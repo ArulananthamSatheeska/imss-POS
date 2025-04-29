@@ -13,15 +13,14 @@ class PurchaseItem extends Model
         'purchase_id',
         'product_id',
         'quantity',
+        'free_items',
         'buying_cost',
-        'discount_percentage',
-        'discount_amount',
-        'tax',
     ];
 
     public function purchase()
     {
-        return $this->belongsTo(Purchase::class);
+        // return $this->belongsTo(Purchase::class);
+        return $this->belongsTo(Purchase::class, 'purchase_id');
     }
 
     public function product()

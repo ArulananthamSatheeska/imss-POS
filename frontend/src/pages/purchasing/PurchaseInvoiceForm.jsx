@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/NewAuthContext";
 import { getApi } from "../../services/api";
+import { FiSearch } from "react-icons/fi";
 
 const PurchaseInvoiceForm = ({
   onGenerateInvoice,
@@ -19,32 +20,42 @@ const PurchaseInvoiceForm = ({
       storeId: "",
       paidAmount: 0,
       status: "pending",
+      discountPercentage: 0,
+      discountAmount: 0,
+      taxPercentage: 0, // New field for tax percentage
+      tax: 0,
     }
   );
 
   const [items, setItems] = useState(existingInvoice?.items || []);
   const [itemForm, setItemForm] = useState({
     itemId: "",
+    searchQuery: "",
     quantity: 1,
     freeItems: 0,
     buyingCost: 0,
-    discountPercentage: 0,
-    discountAmount: 0,
-    tax: 0,
   });
 
   const [suppliers, setSuppliers] = useState([]);
   const [stores, setStores] = useState([]);
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const api = getApi();
+  // Refs for input fields
+  const searchRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const quantityInputRef = useRef(null);
+  const freeItemsInputRef = useRef(null);
+  const buyingCostInputRef = useRef(null);
+  const discountPercentageInputRef = useRef(null);
+  const taxPercentageInputRef = useRef(null);
+  const taxInputRef = useRef(null);
 
-  console.log("PurchaseInvoiceForm rendering", {
-    user,
-    existingInvoice,
-  });
+  const api = getApi();
 
   // Fetch data on mount
   useEffect(() => {
@@ -60,36 +71,11 @@ const PurchaseInvoiceForm = ({
     setLoading(true);
     try {
       const timestamp = new Date().getTime();
-      console.log("Fetching data with token:", user.token);
       const [suppliersRes, storesRes, productsRes] = await Promise.all([
-        api.get(`/suppliers?_t=${timestamp}`).catch((err) => {
-          console.error(
-            "Suppliers fetch error:",
-            err.response?.data || err.message
-          );
-          throw err;
-        }),
-        api.get(`/store-locations?_t=${timestamp}`).catch((err) => {
-          console.error(
-            "Stores fetch error:",
-            err.response?.data || err.message
-          );
-          throw err;
-        }),
-        api.get(`/products?_t=${timestamp}`).catch((err) => {
-          console.error(
-            "Products fetch error:",
-            err.response?.data || err.message
-          );
-          throw err;
-        }),
+        api.get(`/suppliers?_t=${timestamp}`),
+        api.get(`/store-locations?_t=${timestamp}`),
+        api.get(`/products?_t=${timestamp}`),
       ]);
-
-      console.log("API responses:", {
-        suppliers: suppliersRes.data,
-        stores: storesRes.data,
-        products: productsRes.data,
-      });
 
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
@@ -137,11 +123,6 @@ const PurchaseInvoiceForm = ({
       const errorMsg = error.response?.data?.message || "Error fetching data";
       setErrors({ fetch: errorMsg });
       toast.error(errorMsg);
-      console.error("Fetch data error:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
       if (error.response?.status === 401) {
         toast.error("Session expired. Please login again.");
       }
@@ -149,6 +130,38 @@ const PurchaseInvoiceForm = ({
       setLoading(false);
     }
   };
+
+  // Handle clicks outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+        setHighlightedIndex(-1);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filter products based on search query
+  useEffect(() => {
+    if (itemForm.searchQuery.trim()) {
+      const query = itemForm.searchQuery.toLowerCase();
+      const filtered = products.filter(
+        (p) =>
+          p.product_name.toLowerCase().includes(query) ||
+          p.item_code?.toLowerCase().includes(query) ||
+          p.barcode?.toLowerCase().includes(query)
+      );
+      setFilteredProducts(filtered);
+      setShowSuggestions(true);
+      setHighlightedIndex(-1);
+    } else {
+      setFilteredProducts([]);
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+    }
+  }, [itemForm.searchQuery, products]);
 
   // Prefill buyingCost when selecting a product
   useEffect(() => {
@@ -160,25 +173,143 @@ const PurchaseInvoiceForm = ({
         setItemForm((prev) => ({
           ...prev,
           buyingCost: parseFloat(selectedProduct.buying_cost) || 0,
+          searchQuery: selectedProduct.product_name,
         }));
       }
     }
   }, [itemForm.itemId, products]);
 
+  // Update discount amount based on percentage
+  useEffect(() => {
+    if (invoice.discountPercentage > 0) {
+      const subtotal = calculateSubtotal();
+      setInvoice((prev) => ({
+        ...prev,
+        discountAmount: (subtotal * invoice.discountPercentage) / 100,
+      }));
+    } else {
+      setInvoice((prev) => ({
+        ...prev,
+        discountAmount: 0,
+      }));
+    }
+  }, [invoice.discountPercentage, items]);
+
+  // Update tax amount based on tax percentage
+  useEffect(() => {
+    if (invoice.taxPercentage > 0) {
+      const subtotal = calculateSubtotal();
+      const taxableAmount = subtotal - invoice.discountAmount;
+      setInvoice((prev) => ({
+        ...prev,
+        tax: (taxableAmount * invoice.taxPercentage) / 100,
+      }));
+    } else {
+      setInvoice((prev) => ({
+        ...prev,
+        tax: 0,
+      }));
+    }
+  }, [invoice.taxPercentage, invoice.discountAmount, items]);
+
   const handleItemFormChange = (e) => {
     const { name, value } = e.target;
     setItemForm({
       ...itemForm,
-      [name]: name === "itemId" ? value : parseFloat(value) || 0,
+      [name]:
+        name === "searchQuery"
+          ? value
+          : name === "itemId"
+          ? value
+          : parseFloat(value) || 0,
     });
+  };
+
+  const handleSelectProduct = (product) => {
+    setItemForm({
+      ...itemForm,
+      itemId: product.product_id.toString(),
+      searchQuery: product.product_name,
+      buyingCost: parseFloat(product.buying_cost) || 0,
+    });
+    setShowSuggestions(false);
+    setHighlightedIndex(-1);
+    quantityInputRef.current?.focus();
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) =>
+        prev < filteredProducts.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === "Enter" && highlightedIndex >= 0) {
+      e.preventDefault();
+      handleSelectProduct(filteredProducts[highlightedIndex]);
+    } else if (e.key === "Enter" && !showSuggestions && itemForm.itemId) {
+      e.preventDefault();
+      quantityInputRef.current?.focus();
+    }
+  };
+
+  const handleQuantityKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      freeItemsInputRef.current?.focus();
+    }
+  };
+
+  const handleFreeItemsKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      buyingCostInputRef.current?.focus();
+    }
+  };
+
+  const handleBuyingCostKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addItem();
+      searchInputRef.current?.focus();
+    }
+  };
+
+  const handleDiscountPercentageKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      taxPercentageInputRef.current?.focus();
+    }
+  };
+
+  const handleTaxPercentageKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      taxInputRef.current?.focus();
+    }
   };
 
   const handleInvoiceChange = (e) => {
     const { name, value } = e.target;
-    setInvoice({
-      ...invoice,
-      [name]: name === "paidAmount" ? parseFloat(value) || 0 : value,
-    });
+    setInvoice((prev) => ({
+      ...prev,
+      [name]:
+        name === "paidAmount" ||
+        name === "discountPercentage" ||
+        name === "discountAmount" ||
+        name === "taxPercentage" ||
+        name === "tax"
+          ? parseFloat(value) || 0
+          : value,
+      // Reset taxPercentage if tax is manually edited
+      ...(name === "tax" && value !== prev.tax ? { taxPercentage: 0 } : {}),
+      // Reset discountPercentage if discountAmount is manually edited
+      ...(name === "discountAmount" && value !== prev.discountAmount
+        ? { discountPercentage: 0 }
+        : {}),
+    }));
   };
 
   const addItem = () => {
@@ -192,11 +323,7 @@ const PurchaseInvoiceForm = ({
     }
 
     const totalQuantity = itemForm.quantity + itemForm.freeItems;
-    const totalBeforeDiscount = totalQuantity * itemForm.buyingCost;
-    const discountAmount =
-      itemForm.discountAmount ||
-      (totalBeforeDiscount * itemForm.discountPercentage) / 100;
-    const total = totalBeforeDiscount - discountAmount + itemForm.tax;
+    const total = totalQuantity * itemForm.buyingCost;
 
     const newItem = {
       id: items.length + 1,
@@ -205,26 +332,24 @@ const PurchaseInvoiceForm = ({
       quantity: itemForm.quantity,
       freeItems: itemForm.freeItems,
       buyingCost: itemForm.buyingCost,
-      discountPercentage: itemForm.discountPercentage,
-      discountAmount,
-      tax: itemForm.tax,
       total,
     };
 
     setItems([...items, newItem]);
     resetItemForm();
+    searchInputRef.current?.focus();
   };
 
   const resetItemForm = () => {
     setItemForm({
       itemId: "",
+      searchQuery: "",
       quantity: 1,
       freeItems: 0,
       buyingCost: 0,
-      discountPercentage: 0,
-      discountAmount: 0,
-      tax: 0,
     });
+    setShowSuggestions(false);
+    setHighlightedIndex(-1);
     setErrors((prev) => ({ ...prev, item: undefined }));
   };
 
@@ -234,19 +359,14 @@ const PurchaseInvoiceForm = ({
 
   const calculateSubtotal = () => {
     return items.reduce(
-      (sum, item) => sum + item.quantity * item.buyingCost,
+      (sum, item) => sum + (item.quantity + item.freeItems) * item.buyingCost,
       0
     );
   };
 
   const calculateFinalTotal = () => {
     const subtotal = calculateSubtotal();
-    const totalDiscount = items.reduce(
-      (sum, item) => sum + item.discountAmount,
-      0
-    );
-    const totalTax = items.reduce((sum, item) => sum + item.tax, 0);
-    return subtotal - totalDiscount + totalTax;
+    return subtotal - invoice.discountAmount + invoice.tax;
   };
 
   const calculateBalance = () => {
@@ -267,13 +387,19 @@ const PurchaseInvoiceForm = ({
       newErrors.paidAmount = "Paid amount cannot be negative";
     if (invoice.paidAmount > calculateFinalTotal())
       newErrors.paidAmount = "Paid amount cannot exceed total";
+    if (invoice.discountPercentage < 0)
+      newErrors.discountPercentage = "Discount percentage cannot be negative";
+    if (invoice.discountAmount < 0)
+      newErrors.discountAmount = "Discount amount cannot be negative";
+    if (invoice.taxPercentage < 0)
+      newErrors.taxPercentage = "Tax percentage cannot be negative";
+    if (invoice.tax < 0) newErrors.tax = "Tax cannot be negative";
     setErrors((prev) => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Form submitted:", { invoice, items });
     if (!validateForm()) {
       toast.error("Please fix the errors in the form");
       return;
@@ -289,94 +415,116 @@ const PurchaseInvoiceForm = ({
       storeId: invoice.storeId,
       paidAmount: invoice.paidAmount,
       status: invoice.status,
-      items,
+      discountPercentage: invoice.discountPercentage,
+      discountAmount: invoice.discountAmount,
+      taxPercentage: invoice.taxPercentage,
+      tax: invoice.tax,
+      items: items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity + item.freeItems,
+        freeItems: item.freeItems,
+        buyingCost: item.buyingCost,
+      })),
       total: calculateFinalTotal(),
     };
     onGenerateInvoice(newInvoice);
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-200 dark:bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50">
-      <div className="dark:bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-screen-xl max-h-[100vh] overflow-y-auto">
-        <h3 className="text-2xl font-bold mb-6 text-blue-400">
+    <div className="fixed inset-0 w-full flex items-center justify-center bg-slate-400 bg-opacity-50 z-50 overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-6xl relative my-8">
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-6 h-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+        <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
           {existingInvoice
             ? "Edit Purchase Invoice"
-            : "Fill Purchase Invoice Details"}
-        </h3>
-
-        {Object.keys(errors).length > 0 && (
-          <div className="p-2 mb-4 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded">
-            {Object.values(errors).filter(Boolean).join(", ")}
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex justify-center items-center p-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        )}
-
-        {!loading && (
-          <form onSubmit={handleSubmit}>
-            {/* Purchase Details */}
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold text-blue-400 mb-4 border-b border-gray-700 pb-2">
-                Purchase Details
-              </h4>
+            : "Create Purchase Invoice"}
+        </h2>
+        <div className="space-y-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg max-w-full mx-auto">
+          {Object.keys(errors).length > 0 && (
+            <div className="p-2 mb-4 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded">
+              {Object.values(errors).filter(Boolean).join(", ")}
+            </div>
+          )}
+          {loading && (
+            <div className="flex justify-center items-center p-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          )}
+          {!loading && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Purchase Details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Purchase Date:
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Purchase Date
                   </label>
                   <input
                     type="date"
                     name="purchaseDate"
                     value={invoice.purchaseDate}
                     onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     required
                     disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Bill Number:
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Bill Number
                   </label>
                   <input
                     type="text"
                     name="billNumber"
                     value={invoice.billNumber}
                     onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     placeholder="GRN-00001"
                     required
                     disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Invoice Number:
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Invoice Number
                   </label>
                   <input
                     type="text"
                     name="invoiceNumber"
                     value={invoice.invoiceNumber}
                     onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     placeholder="PINV-001"
                     required
                     disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Payment Method:
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Payment Method
                   </label>
                   <select
                     name="paymentMethod"
                     value={invoice.paymentMethod}
                     onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     disabled={loading}
                   >
                     <option value="Cash">Cash</option>
@@ -385,14 +533,14 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Supplier:
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Supplier
                   </label>
                   <select
                     name="supplierId"
                     value={invoice.supplierId}
                     onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     required
                     disabled={loading}
                   >
@@ -405,14 +553,14 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Store:
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Store
                   </label>
                   <select
                     name="storeId"
                     value={invoice.storeId}
                     onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     required
                     disabled={loading}
                   >
@@ -425,15 +573,15 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Paid Amount:
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Paid Amount
                   </label>
                   <input
                     type="number"
                     name="paidAmount"
                     value={invoice.paidAmount}
                     onChange={handleInvoiceChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     min="0"
                     step="0.01"
                     placeholder="0.00"
@@ -442,14 +590,14 @@ const PurchaseInvoiceForm = ({
                 </div>
                 {existingInvoice && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
-                      Status:
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Status
                     </label>
                     <select
                       name="status"
                       value={invoice.status}
                       onChange={handleInvoiceChange}
-                      className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                       disabled={loading}
                     >
                       <option value="pending">Pending</option>
@@ -459,325 +607,299 @@ const PurchaseInvoiceForm = ({
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Item Selection */}
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold text-blue-400 mb-4 border-b border-gray-700 pb-2">
-                Item Selection
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Select Item:
-                  </label>
-                  <select
-                    name="itemId"
-                    value={itemForm.itemId}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    disabled={loading}
-                  >
-                    <option value="">Select Item</option>
-                    {products.length === 0 ? (
-                      <option disabled>No products available</option>
-                    ) : (
-                      products.map((p) => (
-                        <option key={p.product_id} value={p.product_id}>
-                          {p.product_name}
-                        </option>
-                      ))
+              {/* Item Selection */}
+              <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+                  Add Item
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div ref={searchRef} className="relative">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Search Item
+                    </label>
+                    <div className="relative">
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        name="searchQuery"
+                        value={itemForm.searchQuery}
+                        onChange={handleItemFormChange}
+                        onFocus={() =>
+                          itemForm.searchQuery && setShowSuggestions(true)
+                        }
+                        onKeyDown={handleSearchKeyDown}
+                        placeholder="Type to search products..."
+                        className="w-full p-2 pl-8 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        disabled={loading}
+                      />
+                      <FiSearch className="absolute left-2 top-3 text-gray-400" />
+                    </div>
+                    {showSuggestions && filteredProducts.length > 0 && (
+                      <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {filteredProducts.map((p, index) => (
+                          <li
+                            key={p.product_id}
+                            onClick={() => handleSelectProduct(p)}
+                            className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white flex justify-between items-center ${
+                              highlightedIndex === index
+                                ? "bg-gray-100 dark:bg-gray-600"
+                                : ""
+                            }`}
+                          >
+                            <span>{p.product_name}</span>
+                            <span className="text-sm text-gray-500 dark:text-gray-300">
+                              Stock: {p.opening_stock_quantity || 0}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Quantity:
-                  </label>
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={itemForm.quantity}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    min="1"
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Free Items:
-                  </label>
-                  <input
-                    type="number"
-                    name="freeItems"
-                    value={itemForm.freeItems}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    min="0"
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Buying Cost:
-                  </label>
-                  <input
-                    type="number"
-                    name="buyingCost"
-                    value={itemForm.buyingCost}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    min="0"
-                    step="0.01"
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Discount %:
-                  </label>
-                  <input
-                    type="number"
-                    name="discountPercentage"
-                    value={itemForm.discountPercentage}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Discount Amount:
-                  </label>
-                  <input
-                    type="number"
-                    name="discountAmount"
-                    value={itemForm.discountAmount}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    min="0"
-                    step="0.01"
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Tax:
-                  </label>
-                  <input
-                    type="number"
-                    name="tax"
-                    value={itemForm.tax}
-                    onChange={handleItemFormChange}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                    min="0"
-                    step="0.01"
-                    disabled={loading}
-                  />
-                </div>
-                <div className="flex items-end gap-2">
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="w-full p-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    disabled={loading}
-                  >
-                    Add Item
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetItemForm}
-                    className="w-full p-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                    disabled={loading}
-                  >
-                    Reset
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Item Table */}
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold text-blue-400 mb-4 border-b border-gray-700 pb-2">
-                Selected Items
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full mb-4">
-                  <thead>
-                    <tr className="bg-gray-700 text-gray-300">
-                      <th className="p-3 text-left">Description</th>
-                      <th className="p-3 text-center">Qty</th>
-                      <th className="p-3 text-center">Free Items</th>
-                      <th className="p-3 text-right">Cost</th>
-                      <th className="p-3 text-right">Discount (%)</th>
-                      <th className="p-3 text-right">Discount (LKR)</th>
-                      <th className="p-3 text-right">Tax</th>
-                      <th className="p-3 text-right">Total</th>
-                      <th className="p-3 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={9}
-                          className="p-3 text-center text-gray-400"
-                        >
-                          No items added
-                        </td>
-                      </tr>
-                    ) : (
-                      items.map((item, index) => (
-                        <tr
-                          key={item.id}
-                          className="border-b border-gray-700 hover:bg-gray-700/50"
-                        >
-                          <td className="p-3">{item.description}</td>
-                          <td className="p-3 text-center">{item.quantity}</td>
-                          <td className="p-3 text-center">{item.freeItems}</td>
-                          <td className="p-3 text-right">
-                            {item.buyingCost.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-right">
-                            {item.discountPercentage.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-right">
-                            {item.discountAmount.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-right">
-                            {item.tax.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-right">
-                            {item.total.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="p-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                              disabled={loading}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end mt-4">
-                <div className="bg-gray-700 p-4 rounded-lg w-64">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Subtotal:</span>
-                    <span className="text-white">
-                      {calculateSubtotal().toFixed(2)}
-                    </span>
+                    {showSuggestions &&
+                      itemForm.searchQuery &&
+                      filteredProducts.length === 0 && (
+                        <div className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg p-4 text-gray-500 dark:text-gray-300">
+                          No products found
+                        </div>
+                      )}
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Total Discount:</span>
-                    <span className="text-white">
-                      {items
-                        .reduce((sum, item) => sum + item.discountAmount, 0)
-                        .toFixed(2)}
-                    </span>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Quantity
+                    </label>
+                    <input
+                      ref={quantityInputRef}
+                      type="number"
+                      name="quantity"
+                      value={itemForm.quantity}
+                      onChange={handleItemFormChange}
+                      onKeyDown={handleQuantityKeyDown}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                      min="1"
+                      step="1"
+                      disabled={loading}
+                    />
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Total Tax:</span>
-                    <span className="text-white">
-                      {items
-                        .reduce((sum, item) => sum + item.tax, 0)
-                        .toFixed(2)}
-                    </span>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Free Items
+                    </label>
+                    <input
+                      ref={freeItemsInputRef}
+                      type="number"
+                      name="freeItems"
+                      value={itemForm.freeItems}
+                      onChange={handleItemFormChange}
+                      onKeyDown={handleFreeItemsKeyDown}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                      min="0"
+                      step="1"
+                      disabled={loading}
+                    />
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Total:</span>
-                    <span className="text-blue-400">
-                      {calculateFinalTotal().toFixed(2)}
-                    </span>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Buying Cost
+                    </label>
+                    <input
+                      ref={buyingCostInputRef}
+                      type="number"
+                      name="buyingCost"
+                      value={itemForm.buyingCost.toFixed(2)}
+                      onChange={handleItemFormChange}
+                      onKeyDown={handleBuyingCostKeyDown}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                      min="0"
+                      step="0.01"
+                      disabled={loading}
+                    />
                   </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-300">Paid Amount:</span>
-                    <span className="text-green-400">
-                      {invoice.paidAmount.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-lg font-semibold border-t border-gray-600 pt-2">
-                    <span className="text-gray-300">Balance:</span>
-                    <span
-                      className={
-                        calculateBalance() < 0
-                          ? "text-red-400"
-                          : "text-yellow-400"
+                  <div className="flex items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md w-full"
+                      disabled={
+                        loading || !itemForm.itemId || itemForm.quantity <= 0
                       }
                     >
-                      {calculateBalance().toFixed(2)}
-                    </span>
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetItemForm}
+                      className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md w-full"
+                      disabled={loading}
+                    >
+                      Reset
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-4 mt-6 border-t border-gray-700 pt-4">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-all duration-300 flex items-center"
-                disabled={loading}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+              {/* Selected Items */}
+              {items.length > 0 && (
+                <div className="space-y-4">
+                  <div className="overflow-auto max-h-64">
+                    <table className="w-full border-collapse border rounded-lg overflow-hidden">
+                      <thead>
+                        <tr className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white">
+                          <th className="p-2 border">#</th>
+                          <th className="p-2 border">Description</th>
+                          <th className="p-2 border">Quantity</th>
+                          <th className="p-2 border">Free Items</th>
+                          <th className="p-2 border">Buying Cost</th>
+                          <th className="p-2 border">Total</th>
+                          <th className="p-2 border">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="border text-center dark:text-white"
+                          >
+                            <td className="p-2 border">{index + 1}</td>
+                            <td className="p-2 border">{item.description}</td>
+                            <td className="p-2 border">{item.quantity}</td>
+                            <td className="p-2 border">{item.freeItems}</td>
+                            <td className="p-2 border">
+                              {item.buyingCost.toFixed(2)}
+                            </td>
+                            <td className="p-2 border">
+                              {item.total.toFixed(2)}
+                            </td>
+                            <td className="p-2 border">
+                              <button
+                                type="button"
+                                onClick={() => removeItem(index)}
+                                className="text-red-500 hover:text-red-700"
+                                disabled={loading}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-right pr-4">
+                      <span className="text-lg font-semibold text-yellow-600 dark:text-gray-200">
+                        Subtotal: ${calculateSubtotal().toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Discount
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          ref={discountPercentageInputRef}
+                          type="number"
+                          name="discountPercentage"
+                          value={invoice.discountPercentage}
+                          onChange={handleInvoiceChange}
+                          onKeyDown={handleDiscountPercentageKeyDown}
+                          className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="%"
+                          min="0"
+                          step="0.1"
+                          disabled={calculateSubtotal() === 0}
+                        />
+                        <input
+                          type="number"
+                          name="discountAmount"
+                          value={invoice.discountAmount.toFixed(2)}
+                          onChange={handleInvoiceChange}
+                          className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                          step="0.01"
+                          disabled={calculateSubtotal() === 0}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Tax
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          ref={taxPercentageInputRef}
+                          type="number"
+                          name="taxPercentage"
+                          value={invoice.taxPercentage}
+                          onChange={handleInvoiceChange}
+                          onKeyDown={handleTaxPercentageKeyDown}
+                          className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="%"
+                          min="0"
+                          step="0.1"
+                        />
+                        <input
+                          ref={taxInputRef}
+                          type="number"
+                          name="tax"
+                          value={invoice.tax.toFixed(2)}
+                          onChange={handleInvoiceChange}
+                          className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right pr-4 space-y-2">
+                    <div>
+                      <span className="text-lg font-semibold text-blue-800 dark:text-gray-200">
+                        Total: ${calculateFinalTotal().toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-lg font-semibold text-green-800 dark:text-gray-200">
+                        Paid Amount: ${invoice.paidAmount.toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-lg font-semibold text-green-800 dark:text-gray-200">
+                        Balance: $
+                        <span
+                          className={
+                            calculateBalance() < 0
+                              ? "text-red-500"
+                              : "text-yellow-500"
+                          }
+                        >
+                          {calculateBalance().toFixed(2)}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition"
+                  disabled={loading}
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center"
-                disabled={loading}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                  disabled={loading || items.length === 0}
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {existingInvoice ? "Update Invoice" : "Generate Invoice"}
-              </button>
-            </div>
-          </form>
-        )}
+                  {existingInvoice ? "Update Invoice" : "Generate Invoice"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

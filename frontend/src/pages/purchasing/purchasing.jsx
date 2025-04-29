@@ -1,10 +1,12 @@
-// src/pages/purchasing/PurchasingEntryForm.jsx
 import React, { useState, useEffect } from "react";
 import {
   FiSearch,
   FiRefreshCw,
   FiChevronDown,
   FiChevronUp,
+  FiEye,
+  FiX,
+  FiPrinter,
 } from "react-icons/fi";
 import { FaFilter, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx";
@@ -20,16 +22,16 @@ const PurchasingEntryForm = () => {
   oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
   const lastMonth = oneMonthAgo.toISOString().split("T")[0];
 
-  const [purchasedItems, setPurchasedItems] = useState([]);
+  const [purchases, setPurchases] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [stores, setStores] = useState([]);
-  const [items, setItems] = useState([]);
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [notification, setNotification] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
-  const [editingItem, setEditingItem] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [fromDate, setFromDate] = useState(lastMonth);
@@ -49,71 +51,16 @@ const PurchasingEntryForm = () => {
     setLoading(true);
     try {
       const timestamp = new Date().getTime();
-      const [suppliersRes, storesRes, itemsRes, purchasesRes] =
+      const [suppliersRes, storesRes, productsRes, purchasesRes] =
         await Promise.all([
-          getApi()
-            .get(`/suppliers?_t=${timestamp}`)
-            .catch((err) => {
-              console.error(
-                "Suppliers fetch error:",
-                err.response?.data || err.message
-              );
-              toast.error(
-                "Failed to fetch suppliers: " +
-                  (err.response?.data?.message || err.message)
-              );
-              return { data: [] };
-            }),
-          getApi()
-            .get(`/store-locations?_t=${timestamp}`)
-            .catch((err) => {
-              console.error(
-                "Stores fetch error:",
-                err.response?.data || err.message
-              );
-              toast.error(
-                "Failed to fetch stores: " +
-                  (err.response?.data?.message || err.message)
-              );
-              return { data: [] };
-            }),
-          getApi()
-            .get(`/products?_t=${timestamp}`)
-            .catch((err) => {
-              console.error(
-                "Products fetch error:",
-                err.response?.data || err.message
-              );
-              toast.error(
-                "Failed to fetch products: " +
-                  (err.response?.data?.message || err.message)
-              );
-              return { data: [] };
-            }),
-          getApi()
-            .get(`/purchases?_t=${timestamp}`, { params: { fromDate, toDate } })
-            .catch((err) => {
-              console.error(
-                "Purchases fetch error:",
-                err.response?.data || err.message
-              );
-              toast.error(
-                "Failed to fetch purchases: " +
-                  (err.response?.data?.message || err.message)
-              );
-              return { data: { data: [] } };
-            }),
+          getApi().get(`/suppliers?_t=${timestamp}`),
+          getApi().get(`/store-locations?_t=${timestamp}`),
+          getApi().get(`/products?_t=${timestamp}`),
+          getApi().get(`/purchases?_t=${timestamp}`, {
+            params: { fromDate, toDate },
+          }),
         ]);
 
-      // Log responses for debugging
-      console.log("API Responses:", {
-        suppliers: suppliersRes.data,
-        stores: storesRes.data,
-        items: itemsRes.data,
-        purchases: purchasesRes.data,
-      });
-
-      // Handle flexible response structures
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
         : Array.isArray(suppliersRes.data)
@@ -124,10 +71,10 @@ const PurchasingEntryForm = () => {
         : Array.isArray(storesRes.data)
         ? storesRes.data
         : [];
-      const itemsData = Array.isArray(itemsRes.data.data)
-        ? itemsRes.data.data
-        : Array.isArray(itemsRes.data)
-        ? itemsRes.data
+      const productsData = Array.isArray(productsRes.data.data)
+        ? productsRes.data.data
+        : Array.isArray(productsRes.data)
+        ? productsRes.data
         : [];
       const purchasesData = Array.isArray(purchasesRes.data.data)
         ? purchasesRes.data.data
@@ -137,63 +84,19 @@ const PurchasingEntryForm = () => {
 
       setSuppliers(suppliersData);
       setStores(storesData);
-      setItems(itemsData);
+      setProducts(productsData);
+      setPurchases(purchasesData);
 
       if (suppliersData.length === 0) toast.warn("No suppliers available");
       if (storesData.length === 0) toast.warn("No stores available");
-      if (itemsData.length === 0) toast.warn("No products available");
-
-      // Map purchases to table format
-      const purchaseItems = purchasesData.flatMap((purchase, purchaseIndex) =>
-        (purchase.items || []).map((item, index) => {
-          const product =
-            itemsData.find((i) => i.product_id === item.product_id) || {};
-          // Use supplier/store from purchase response if available, else fallback to suppliersData/storesData
-          const supplier =
-            purchase.supplier?.supplier_name ||
-            suppliersData.find((s) => s.id === purchase.supplier_id)
-              ?.supplier_name ||
-            "Unknown";
-          const store =
-            purchase.store?.store_name ||
-            storesData.find((s) => s.id === purchase.store_id)?.store_name ||
-            "Unknown";
-
-          return {
-            id: `${purchase.id}-${index}`,
-            product_name: product.product_name || "Unknown",
-            quantity: item.quantity || 0,
-            buyingCost: item.buying_cost || 0,
-            sellingPrice: item.selling_price || 0,
-            mrp: item.mrp || 0,
-            minimumPrice: item.minimum_price || 0,
-            discountPercentage: item.discount_percentage || 0,
-            discountAmount: item.discount_amount || 0,
-            tax: item.tax || 0,
-            expiryDate: item.expiry_date || "",
-            totalPrice:
-              (item.quantity || 0) * (item.buying_cost || 0) -
-              (item.discount_amount || 0) +
-              (item.tax || 0),
-            purchaseId: purchase.id,
-            billNumber: purchase.bill_number || "",
-            invoiceNumber: purchase.invoice_number || "",
-            date: purchase.date_of_purchase || "",
-            supplier,
-            supplierId: purchase.supplier_id || null,
-            store,
-            storeId: purchase.store_id || null,
-            paymentMethod: purchase.payment_method || "",
-            status: purchase.status || "pending",
-          };
-        })
-      );
-
-      console.log("Mapped purchaseItems:", purchaseItems);
-      setPurchasedItems(purchaseItems);
+      if (productsData.length === 0) toast.warn("No products available");
+      if (purchasesData.length === 0)
+        toast.warn("No purchases found for the selected date range");
     } catch (error) {
-      setNotification("Error fetching data: " + error.message);
-      console.error("Error fetching data:", error);
+      console.error("Fetch Data Error:", error);
+      const errorMsg = error.response?.data?.message || "Error fetching data";
+      setNotification(errorMsg);
+      toast.error(errorMsg);
       if (error.response?.status === 401) {
         toast.error("Session expired. Please login again.");
       }
@@ -202,142 +105,181 @@ const PurchasingEntryForm = () => {
     }
   };
 
-  // Handle search term changes
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
   };
 
-  // Filter items based on search term
-  const filteredItems = purchasedItems.filter(
-    (item) =>
-      item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.billNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.supplier?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPurchases = purchases.filter(
+    (purchase) =>
+      purchase.bill_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      purchase.invoice_number
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      purchase.supplier?.supplier_name
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      purchase.store?.store_name
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      purchase.items?.some((item) =>
+        products
+          .find((p) => p.product_id === item.product_id)
+          ?.product_name?.toLowerCase()
+          .includes(searchTerm.toLowerCase())
+      )
   );
 
-  // Calculate totals
   const calculateTotals = () => {
-    const subtotal = purchasedItems.reduce(
-      (acc, item) => acc + (item.quantity * item.buyingCost || 0),
+    const subtotal = purchases.reduce(
+      (acc, purchase) =>
+        acc +
+        (purchase.items?.reduce(
+          (sum, item) =>
+            sum +
+            (parseFloat(item.quantity) || 0) *
+              (parseFloat(item.buying_cost) || 0),
+          0
+        ) || 0),
       0
     );
-    const totalDiscount = purchasedItems.reduce(
-      (acc, item) => acc + (item.discountAmount || 0),
+    const totalDiscount = purchases.reduce(
+      (acc, purchase) => acc + (parseFloat(purchase.discount_amount) || 0),
       0
     );
-    const totalTax = purchasedItems.reduce(
-      (acc, item) => acc + (item.tax || 0),
+    const totalTax = purchases.reduce(
+      (acc, purchase) => acc + (parseFloat(purchase.tax) || 0),
       0
     );
-    const grandTotal = subtotal - totalDiscount + totalTax;
+    const grandTotal = purchases.reduce(
+      (acc, purchase) => acc + (parseFloat(purchase.total) || 0),
+      0
+    );
     return { subtotal, totalDiscount, totalTax, grandTotal };
   };
 
-  // Export to Excel
+  const calculateTaxPercentage = (purchase) => {
+    const subtotal =
+      purchase.items?.reduce(
+        (sum, item) =>
+          sum +
+          (parseFloat(item.quantity) || 0) *
+            (parseFloat(item.buying_cost) || 0),
+        0
+      ) || 0;
+    const discountAmount = parseFloat(purchase.discount_amount) || 0;
+    const tax = parseFloat(purchase.tax) || 0;
+    const taxableAmount = subtotal - discountAmount;
+    return taxableAmount > 0 ? (tax / taxableAmount) * 100 : 0;
+  };
+
   const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(
-      filteredItems.map((item, index) => ({
-        "S.No": index + 1,
-        "Bill Number": item.billNumber,
-        "Invoice Number": item.invoiceNumber,
-        Supplier: item.supplier,
-        Store: item.store,
-        Item: item.product_name,
-        Quantity: item.quantity,
-        "Buying Cost": item.buyingCost,
-        Discount: item.discountAmount,
-        Tax: item.tax,
-        Total: item.totalPrice,
-        Date: item.date,
-        Status: item.status,
-      }))
-    );
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "PurchaseEntries");
-    XLSX.writeFile(
-      workbook,
-      `Purchase_Entries_${new Date().toISOString().split("T")[0]}.xlsx`
-    );
+    try {
+      const worksheet = XLSX.utils.json_to_sheet(
+        filteredPurchases.flatMap((purchase, purchaseIndex) =>
+          purchase.items.map((item, itemIndex) => ({
+            "S.No": purchaseIndex + 1,
+            "Bill Number": purchase.bill_number,
+            "Invoice Number": purchase.invoice_number,
+            Supplier: purchase.supplier?.supplier_name || "Unknown",
+            Store: purchase.store?.store_name || "Unknown",
+            Item:
+              products.find((p) => p.product_id === item.product_id)
+                ?.product_name || "Unknown",
+            Quantity: item.quantity,
+            "Free Items": item.free_items || 0,
+            "Buying Cost": item.buying_cost,
+            "Discount Percentage": purchase.discount_percentage || 0,
+            Discount: purchase.discount_amount,
+            "Tax Percentage": calculateTaxPercentage(purchase).toFixed(2),
+            Tax: purchase.tax,
+            Total: purchase.total / purchase.items.length,
+            Date: purchase.date_of_purchase,
+            Status: purchase.status,
+          }))
+        )
+      );
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "PurchaseEntries");
+      XLSX.writeFile(
+        workbook,
+        `Purchase_Entries_${new Date().toISOString().split("T")[0]}.xlsx`
+      );
+    } catch (error) {
+      console.error("Export to Excel Error:", error);
+      toast.error("Error exporting to Excel");
+    }
   };
 
-  // Open modal for editing an item
-  const openEditModal = (item) => {
-    setEditingItem(item);
-    setIsModalOpen(true);
-  };
-
-  // Open PurchaseInvoiceForm for editing an invoice
-  const openEditInvoice = (item) => {
-    const invoiceItems = purchasedItems
-      .filter((i) => i.purchaseId === item.purchaseId)
-      .map((i) => ({
-        id: i.id.split("-")[1],
-        productId: items.find((prod) => prod.product_name === i.product_name)
-          ?.product_id,
-        description: i.product_name,
-        quantity: i.quantity,
-        freeItems: 0,
-        buyingCost: i.buyingCost,
-        discountPercentage: i.discountPercentage,
-        discountAmount: i.discountAmount,
-        tax: i.tax,
-        total: i.totalPrice,
-      }));
+  const openEditInvoice = (purchase) => {
     setEditingInvoice({
-      billNumber: item.billNumber,
-      invoiceNumber: item.invoiceNumber,
-      purchaseDate: item.date,
-      paymentMethod: item.paymentMethod,
-      supplierId: item.supplierId,
-      storeId: item.storeId,
-      items: invoiceItems,
-      total: invoiceItems.reduce((sum, i) => sum + i.total, 0),
-      status: item.status,
-      id: item.purchaseId,
+      id: purchase.id,
+      billNumber: purchase.bill_number || "",
+      invoiceNumber: purchase.invoice_number || "",
+      purchaseDate: purchase.date_of_purchase || "",
+      paymentMethod: purchase.payment_method || "Cash",
+      supplierId: purchase.supplier_id || "",
+      storeId: purchase.store_id || "",
+      paidAmount: parseFloat(purchase.paid_amount) || 0,
+      status: purchase.status || "pending",
+      discountPercentage: parseFloat(purchase.discount_percentage) || 0,
+      discountAmount: parseFloat(purchase.discount_amount) || 0,
+      taxPercentage: calculateTaxPercentage(purchase),
+      tax: parseFloat(purchase.tax) || 0,
+      items:
+        purchase.items?.map((item, index) => ({
+          id: index + 1,
+          productId: item.product_id || "",
+          description:
+            products.find((p) => p.product_id === item.product_id)
+              ?.product_name || "Unknown",
+          quantity: parseInt(item.quantity - (item.free_items || 0)) || 1,
+          freeItems: parseInt(item.free_items) || 0,
+          buyingCost: parseFloat(item.buying_cost) || 0,
+          total:
+            (parseFloat(item.quantity) || 0) *
+            (parseFloat(item.buying_cost) || 0),
+        })) || [],
+      total: parseFloat(purchase.total) || 0,
     });
     setIsInvoiceFormOpen(true);
   };
 
-  // Close modal
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingItem(null);
+  const openViewInvoice = (purchase) => {
+    const invoice = {
+      id: purchase.id,
+      billNumber: purchase.bill_number || "",
+      invoiceNumber: purchase.invoice_number || "",
+      purchaseDate: purchase.date_of_purchase || "",
+      paymentMethod: purchase.payment_method || "Cash",
+      supplierName: purchase.supplier?.supplier_name || "Unknown",
+      storeName: purchase.store?.store_name || "Unknown",
+      paidAmount: parseFloat(purchase.paid_amount) || 0,
+      status: purchase.status || "pending",
+      discountPercentage: parseFloat(purchase.discount_percentage) || 0,
+      discountAmount: parseFloat(purchase.discount_amount) || 0,
+      taxPercentage: calculateTaxPercentage(purchase),
+      tax: parseFloat(purchase.tax) || 0,
+      items:
+        purchase.items?.map((item, index) => ({
+          id: index + 1,
+          productId: item.product_id || "",
+          description:
+            products.find((p) => p.product_id === item.product_id)
+              ?.product_name || "Unknown",
+          quantity: parseInt(item.quantity - (item.free_items || 0)) || 1,
+          freeItems: parseInt(item.free_items) || 0,
+          buyingCost: parseFloat(item.buying_cost) || 0,
+          total:
+            (parseFloat(item.quantity) || 0) *
+            (parseFloat(item.buying_cost) || 0),
+        })) || [],
+      total: parseFloat(purchase.total) || 0,
+    };
+    console.log("Opening View Invoice:", invoice);
+    setViewingInvoice(invoice);
+    setIsViewModalOpen(true);
   };
 
-  // Update item in the purchased items table
-  const updateItem = async (e) => {
-    e.preventDefault();
-    const totalPrice =
-      (editingItem.quantity || 0) * (parseFloat(editingItem.buyingCost) || 0) -
-      (parseFloat(editingItem.discountAmount) || 0) +
-      (parseFloat(editingItem.tax) || 0);
-    const updatedItem = { ...editingItem, totalPrice };
-
-    try {
-      setLoading(true);
-      await putData(
-        `/purchases/${updatedItem.purchaseId}/items/${updatedItem.id}`,
-        updatedItem
-      );
-      setPurchasedItems(
-        purchasedItems.map((item) =>
-          item.id === updatedItem.id ? updatedItem : item
-        )
-      );
-      setNotification("Item updated successfully!");
-      toast.success("Item updated successfully!");
-    } catch (error) {
-      setNotification("Error updating item: " + error.message);
-      toast.error("Error updating item: " + error.message);
-      console.error("Error updating item:", error);
-    } finally {
-      setLoading(false);
-      closeModal();
-    }
-  };
-
-  // Handle invoice submission (create or update)
   const handleGenerateInvoice = async (newInvoice) => {
     try {
       setLoading(true);
@@ -348,17 +290,18 @@ const PurchasingEntryForm = () => {
         payment_method: newInvoice.paymentMethod,
         supplier_id: parseInt(newInvoice.supplierId),
         store_id: parseInt(newInvoice.storeId),
+        paid_amount: newInvoice.paidAmount || 0,
+        discount_percentage: newInvoice.discountPercentage || 0,
+        discount_amount: newInvoice.discountAmount || 0,
+        tax: newInvoice.tax || 0,
+        status: newInvoice.status || "pending",
         items: newInvoice.items.map((item) => ({
           product_id: item.productId,
           quantity: item.quantity,
+          free_items: item.freeItems || 0,
           buying_cost: item.buyingCost,
-          discount_percentage: item.discountPercentage,
-          discount_amount: item.discountAmount,
-          tax: item.tax,
         })),
         total: newInvoice.total,
-        paid_amount: newInvoice.paidAmount || 0,
-        status: newInvoice.status || "pending",
       };
 
       if (newInvoice.id) {
@@ -374,48 +317,377 @@ const PurchasingEntryForm = () => {
       setIsInvoiceFormOpen(false);
       setEditingInvoice(null);
     } catch (error) {
+      console.error("Generate Invoice Error:", error);
       setNotification("Error recording purchase invoice: " + error.message);
       toast.error("Error recording purchase invoice: " + error.message);
-      console.error("Error recording purchase:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Delete an invoice
   const deleteInvoice = async (purchaseId) => {
     try {
       setLoading(true);
       await deleteData(`/purchases/${purchaseId}`);
-      setPurchasedItems(
-        purchasedItems.filter((item) => item.purchaseId !== purchaseId)
-      );
+      setPurchases(purchases.filter((purchase) => purchase.id !== purchaseId));
       setNotification("Purchase invoice deleted successfully!");
       toast.success("Purchase invoice deleted successfully!");
     } catch (error) {
+      console.error("Delete Invoice Error:", error);
       setNotification("Error deleting purchase invoice: " + error.message);
       toast.error("Error deleting purchase invoice: " + error.message);
-      console.error("Error deleting purchase:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Toggle row expansion
   const toggleRow = (index) => {
     setExpandedRow(expandedRow === index ? null : index);
   };
 
-  // Format currency
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "LKR",
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return isNaN(amount)
+      ? "LKR 0.00"
+      : new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "LKR",
+          minimumFractionDigits: 2,
+        }).format(amount);
   };
 
-  // JSX remains unchanged
+  const handlePrint = (invoice) => {
+    const printWindow = window.open("", "_blank");
+    const currentTime = new Date().toLocaleTimeString();
+
+    // Map invoice data to PrintableInvoice props
+    const printableData = {
+      supplier: {
+        name: invoice.supplierName || "Unknown",
+        address: "Not Provided", // Placeholder, as address not available in invoice
+        phone: "Not Provided", // Placeholder
+      },
+      items: invoice.items.map((item, index) => ({
+        description: item.description,
+        qty: item.quantity,
+        unitPrice: item.buyingCost,
+        freeQty: item.freeItems || 0,
+        discountAmount: index === 0 ? invoice.discountAmount : 0, // Apply discount to first item
+        discountPercentage: index === 0 ? invoice.discountPercentage : 0,
+        total: item.total,
+      })),
+      invoice: {
+        no: invoice.invoiceNumber,
+        date: invoice.purchaseDate,
+        time: currentTime,
+      },
+      total: invoice.total,
+      footerDetails: {
+        dateTime: new Date().toLocaleString(), // Current date and time
+      },
+    };
+
+    // HTML content for the print window
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Print Purchase Invoice</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="p-8 bg-white text-gray-900">
+          <!-- Header -->
+          <div class="flex justify-between mb-4">
+            <div>
+              <h2 class="text-3xl font-bold text-blue-900">SK JEELAN</h2>
+              <p class="text-gray-600">PVT(Ltd)</p>
+            </div>
+            <h1 class="text-4xl font-bold text-blue-900 uppercase text-right">Purchase Invoice</h1>
+          </div>
+
+          <!-- Supplier & Invoice Details -->
+          <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-8 ml-12">
+            <div>
+              <h4 class="font-semibold text-blue-900 mb-2">Supplier Details</h4>
+              <p class="text-gray-900"><strong class="uppercase">Name:</strong> ${
+                printableData.supplier.name
+              }</p>
+              <p class="text-gray-900"><strong class="uppercase">Address:</strong> ${
+                printableData.supplier.address
+              }</p>
+              <p class="text-gray-900"><strong class="uppercase">Phone:</strong> ${
+                printableData.supplier.phone
+              }</p>
+              <p class="text-gray-900"><strong class="uppercase">Status:</strong> ${
+                invoice.status
+              }</p>
+            </div>
+            <div>
+              <h4 class="font-semibold text-blue-900 mb-2">Invoice Details</h4>
+              <p class="text-gray-900"><strong>Invoice No:</strong> ${
+                printableData.invoice.no
+              }</p>
+              <p class="text-gray-900"><strong>Date:</strong> ${
+                printableData.invoice.date
+              }</p>
+              <p class="text-gray-900"><strong>Time:</strong> ${
+                printableData.invoice.time
+              }</p>
+              <p class="text-gray-900"><strong>Tax Percentage:</strong> ${invoice.taxPercentage.toFixed(
+                2
+              )}%</p>
+            </div>
+          </div>
+
+          <!-- Items Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full mb-4 border border-gray-300 border-collapse">
+              <thead>
+                <tr class="bg-blue-900 text-white border border-gray-300 uppercase">
+                  <th class="p-2 text-center border border-gray-300">No</th>
+                  <th class="p-2 text-center border border-gray-300">Item Description</th>
+                  <th class="p-2 text-center border border-gray-300">Qty</th>
+                  <th class="p-2 text-center border border-gray-300">Unit Price (LKR)</th>
+                  <th class="p-2 text-center border border-gray-300">Free (Qty)</th>
+                  <th class="p-2 text-center border border-gray-300">Dis (LKR)</th>
+                  <th class="p-2 text-center border border-gray-300">Dis (%)</th>
+                  <th class="p-2 text-center border border-gray-300">Total (LKR)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${printableData.items
+                  .map(
+                    (item, index) => `
+                  <tr class="border border-gray-300">
+                    <td class="p-2 text-center border border-gray-300 text-gray-900">${
+                      index + 1
+                    }</td>
+                    <td class="p-3 text-left border border-gray-300 text-gray-900">${
+                      item.description
+                    }</td>
+                    <td class="p-3 text-center border border-gray-300 text-gray-900">${
+                      item.qty
+                    }</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">LKR ${(
+                      Number(item.unitPrice) || 0
+                    ).toFixed(2)}</td>
+                    <td class="p-3 text-center border border-gray-300 text-gray-900">${
+                      item.freeQty
+                    }</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">LKR ${(
+                      Number(item.discountAmount) || 0
+                    ).toFixed(2)}</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">${(
+                      Number(item.discountPercentage) || 0
+                    ).toFixed(2)}%</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">LKR ${(
+                      Number(item.total) || 0
+                    ).toFixed(2)}</td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Total Amount -->
+          <div class="text-right mb-4">
+            <h3 class="font-semibold text-xl text-blue-900 uppercase">Total: LKR ${(
+              Number(printableData.total) || 0
+            ).toFixed(2)}</h3>
+          </div>
+
+          <!-- Footer Details -->
+          <div class="grid pt-4 grid-cols-1 md:grid-cols-3 gap-6 text-center">
+            <div>
+              <h4 class="font-semibold text-blue-900">Approved By</h4>
+              <p class="text-gray-900">....................</p>
+            </div>
+            <div>
+              <h4 class="font-semibold text-blue-900">Next Approval To</h4>
+              <p class="text-gray-900">....................</p>
+            </div>
+            <div>
+              <h4 class="font-semibold text-blue-900">Date & Time</h4>
+              <p class="text-gray-900">${
+                printableData.footerDetails.dateTime
+              }</p>
+            </div>
+          </div>
+        </div>
+        <script>
+          window.onload = () => {
+            window.print();
+            window.onafterprint = () => window.close();
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const ViewInvoiceModal = ({ invoice, onClose }) => {
+    if (!invoice) return null;
+
+    return (
+      <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex justify-center items-center z-50">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[80vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              Purchase Invoice Details
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
+            >
+              <FiX size={24} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Bill Number
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {invoice.billNumber}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Invoice Number
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {invoice.invoiceNumber}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Purchase Date
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {invoice.purchaseDate}‬{" "}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Payment Method
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {invoice.paymentMethod}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Supplier
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {invoice.supplierName}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Store
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {invoice.storeName}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Paid Amount
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {formatCurrency(invoice.paidAmount)}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Status
+              </label>
+              <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                {invoice.status}
+              </p>
+            </div>
+          </div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Items
+            </h3>
+            <table className="w-full border-collapse border rounded-lg">
+              <thead>
+                <tr className="bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-300">
+                  <th className="p-2 border">Item</th>
+                  <th className="p-2 border">Quantity</th>
+                  <th className="p-2 border">Free Items</th>
+                  <th className="p-2 border">Buying Cost</th>
+                  <th className="p-2 border">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.items.map((item) => (
+                  <tr key={item.id} className="text-center dark:text-gray-300">
+                    <td className="p-2 border">{item.description}</td>
+                    <td className="p-2 border">{item.quantity}</td>
+                    <td className="p-2 border">{item.freeItems}</td>
+                    <td className="p-2 border">
+                      {formatCurrency(item.buyingCost)}
+                    </td>
+                    <td className="p-2 border">{formatCurrency(item.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-right space-y-1">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Subtotal:{" "}
+              {formatCurrency(
+                invoice.items.reduce((sum, item) => sum + item.total, 0)
+              )}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Discount Percentage: {invoice.discountPercentage.toFixed(2)}%
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Discount Amount: {formatCurrency(invoice.discountAmount)}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Tax Percentage: {invoice.taxPercentage.toFixed(2)}%
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Tax Amount: {formatCurrency(invoice.tax)}
+            </p>
+            <p className="text-sm font-bold text-gray-900 dark:text-white">
+              Total: {formatCurrency(invoice.total)}
+            </p>
+          </div>
+          <div className="flex justify-end mt-4 gap-2">
+            <button
+              onClick={() => handlePrint(invoice)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2"
+            >
+              <FiPrinter /> Print
+            </button>
+            <button
+              onClick={onClose}
+              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-4 min-h-screen flex flex-col bg-transparent">
       <div className="bg-gradient-to-r from-blue-500 to-blue-800 dark:bg-gradient-to-r dark:from-blue-900 dark:to-slate-800 text-white text-center py-3 rounded-lg shadow-md mb-6">
@@ -438,7 +710,7 @@ const PurchasingEntryForm = () => {
           </div>
           <input
             type="text"
-            placeholder="Search items, bill number, supplier..."
+            placeholder="Search bill number, invoice number, supplier, store, or item..."
             value={searchTerm}
             onChange={handleSearchChange}
             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -446,7 +718,10 @@ const PurchasingEntryForm = () => {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setIsInvoiceFormOpen(true)}
+            onClick={() => {
+              setEditingInvoice(null);
+              setIsInvoiceFormOpen(true);
+            }}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             Create Purchase Entry
@@ -558,7 +833,7 @@ const PurchasingEntryForm = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600 text-sm">
+            <table className="min-w-full table-auto divide-y divide-gray-200 dark:divide-slate-600 text-sm">
               <thead className="bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 uppercase text-xs tracking-wider">
                 <tr>
                   <th className="px-6 py-3 text-left font-semibold">S.No</th>
@@ -573,13 +848,7 @@ const PurchasingEntryForm = () => {
                     Supplier
                   </th>
                   <th className="px-6 py-3 text-left font-semibold">Store</th>
-                  <th className="px-6 py-3 text-left font-semibold">Item</th>
-                  <th className="px-6 py-3 text-left font-semibold">Qty</th>
-                  <th className="px-6 py-3 text-left font-semibold">Cost</th>
-                  <th className="px-6 py-3 text-left font-semibold">
-                    Discount
-                  </th>
-                  <th className="px-6 py-3 text-left font-semibold">Tax</th>
+                  <th className="px-6 py-3 text-left font-semibold">Items</th>
                   <th className="px-6 py-3 text-left font-semibold">Total</th>
                   <th className="px-6 py-3 text-left font-semibold">Status</th>
                   <th className="px-6 py-3 text-right font-semibold">
@@ -588,18 +857,18 @@ const PurchasingEntryForm = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
-                {filteredItems.length === 0 ? (
+                {filteredPurchases.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={14}
+                      colSpan={10}
                       className="px-6 py-4 text-center text-gray-500 dark:text-gray-400"
                     >
                       No purchase entries found
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item, index) => (
-                    <React.Fragment key={item.id}>
+                  filteredPurchases.map((purchase, index) => (
+                    <React.Fragment key={purchase.id}>
                       <tr
                         className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors cursor-pointer ${
                           expandedRow === index
@@ -612,66 +881,44 @@ const PurchasingEntryForm = () => {
                           {index + 1}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {item.billNumber}
+                          {purchase.bill_number}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {item.invoiceNumber}
+                          {purchase.invoice_number}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {item.date}
+                          {purchase.date_of_purchase}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {item.supplier}
+                          {purchase.supplier?.supplier_name || "Unknown"}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {item.store}
-                        </td>
-                        <td className="px-6 py-4 font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                          {item.product_name}
+                          {purchase.store?.store_name || "Unknown"}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {item.quantity}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {formatCurrency(item.buyingCost)}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {formatCurrency(item.discountAmount)}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {formatCurrency(item.tax)}
+                          {purchase.items?.length || 0} items
                         </td>
                         <td className="px-6 py-4 font-bold text-gray-800 dark:text-white">
-                          {formatCurrency(item.totalPrice)}
+                          {formatCurrency(parseFloat(purchase.total) || 0)}
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              item.status === "paid"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                                : item.status === "pending"
-                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-                            }`}
-                          >
-                            {item.status}
-                          </span>
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {purchase.status || "Pending"}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-3">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openEditModal(item);
+                                openViewInvoice(purchase);
                               }}
-                              className="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
+                              className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
                             >
-                              Edit Item
+                              <FiEye size={18} title="View" />
                             </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openEditInvoice(item);
+                                openEditInvoice(purchase);
                               }}
                               className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                             >
@@ -680,7 +927,7 @@ const PurchasingEntryForm = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deleteInvoice(item.purchaseId);
+                                deleteInvoice(purchase.id);
                               }}
                               className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                             >
@@ -704,38 +951,99 @@ const PurchasingEntryForm = () => {
                       </tr>
                       {expandedRow === index && (
                         <tr className="bg-gray-50 dark:bg-slate-700">
-                          <td colSpan={14} className="px-6 py-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div>
-                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                  Item Details
-                                </h4>
-                                <div className="grid grid-cols-2 gap-y-1 text-sm">
-                                  <div className="text-gray-500 dark:text-gray-400">
-                                    Selling Price:
-                                  </div>
-                                  <div className="text-gray-900 dark:text-white font-medium">
-                                    {formatCurrency(item.sellingPrice)}
-                                  </div>
-                                  <div className="text-gray-500 dark:text-gray-400">
-                                    MRP:
-                                  </div>
-                                  <div className="text-gray-900 dark:text-white font-medium">
-                                    {formatCurrency(item.mrp)}
-                                  </div>
-                                  <div className="text-gray-500 dark:text-gray-400">
-                                    Minimum Price:
-                                  </div>
-                                  <div className="text-gray-900 dark:text-white font-medium">
-                                    {formatCurrency(item.minimumPrice)}
-                                  </div>
-                                  <div className="text-gray-500 dark:text-gray-400">
-                                    Expiry Date:
-                                  </div>
-                                  <div className="text-gray-900 dark:text-white font-medium">
-                                    {item.expiryDate || "N/A"}
-                                  </div>
-                                </div>
+                          <td colSpan={10} className="px-6 py-4">
+                            <div className="space-y-4">
+                              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                Invoice Items
+                              </h4>
+                              <table className="w-full border-collapse border rounded-lg">
+                                <thead>
+                                  <tr className="bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-300">
+                                    <th className="p-2 border">Item</th>
+                                    <th className="p-2 border">Quantity</th>
+                                    <th className="p-2 border">Free Items</th>
+                                    <th className="p-2 border">Buying Cost</th>
+                                    <th className="p-2 border">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {purchase.items?.map((item, itemIndex) => (
+                                    <tr
+                                      key={itemIndex}
+                                      className="border text-center dark:text-gray-300"
+                                    >
+                                      <td className="p-2 border">
+                                        {products.find(
+                                          (p) =>
+                                            p.product_id === item.product_id
+                                        )?.product_name || "Unknown"}
+                                      </td>
+                                      <td className="p-2 border">
+                                        {parseInt(
+                                          item.quantity - (item.free_items || 0)
+                                        ) || 0}
+                                      </td>
+                                      <td className="p-2 border">
+                                        {parseInt(item.free_items) || 0}
+                                      </td>
+                                      <td className="p-2 border">
+                                        {formatCurrency(
+                                          parseFloat(item.buying_cost) || 0
+                                        )}
+                                      </td>
+                                      <td className="p-2 border">
+                                        {formatCurrency(
+                                          (parseFloat(item.quantity) || 0) *
+                                            (parseFloat(item.buying_cost) || 0)
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              <div className="text-right space-y-1">
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  Subtotal:{" "}
+                                  {formatCurrency(
+                                    purchase.items?.reduce(
+                                      (sum, item) =>
+                                        sum +
+                                        (parseFloat(item.quantity) || 0) *
+                                          (parseFloat(item.buying_cost) || 0),
+                                      0
+                                    ) || 0
+                                  )}
+                                </p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  Discount Percentage:{" "}
+                                  {(
+                                    parseFloat(purchase.discount_percentage) ||
+                                    0
+                                  ).toFixed(2)}
+                                  %
+                                </p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  Discount Amount:{" "}
+                                  {formatCurrency(
+                                    parseFloat(purchase.discount_amount) || 0
+                                  )}
+                                </p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  Tax Percentage:{" "}
+                                  {calculateTaxPercentage(purchase).toFixed(2)}%
+                                </p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  Tax Amount:{" "}
+                                  {formatCurrency(
+                                    parseFloat(purchase.tax) || 0
+                                  )}
+                                </p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                  Total:{" "}
+                                  {formatCurrency(
+                                    parseFloat(purchase.total) || 0
+                                  )}
+                                </p>
                               </div>
                             </div>
                           </td>
@@ -761,126 +1069,14 @@ const PurchasingEntryForm = () => {
         />
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Edit Item
-              </h3>
-              <button
-                onClick={closeModal}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <form onSubmit={updateItem}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    value={editingItem.quantity}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        quantity: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-gray-600 dark:text-gray-100"
-                    placeholder="Quantity"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Buying Cost
-                  </label>
-                  <input
-                    type="number"
-                    value={editingItem.buyingCost}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        buyingCost: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-gray-600 dark:text-gray-100"
-                    placeholder="Buying Cost"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Discount Amount
-                  </label>
-                  <input
-                    type="number"
-                    value={editingItem.discountAmount}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        discountAmount: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-gray-600 dark:text-gray-100"
-                    placeholder="Discount Amount"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Tax
-                  </label>
-                  <input
-                    type="number"
-                    value={editingItem.tax}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        tax: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-gray-600 dark:text-gray-100"
-                    placeholder="Tax"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                    Expiry Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editingItem.expiryDate}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        expiryDate: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-gray-600 dark:text-gray-100"
-                    placeholder="Expiry Date"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end mt-4 gap-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {isViewModalOpen && (
+        <ViewInvoiceModal
+          invoice={viewingInvoice}
+          onClose={() => {
+            setIsViewModalOpen(false);
+            setViewingInvoice(null);
+          }}
+        />
       )}
     </div>
   );
