@@ -26,9 +26,10 @@ class SalesInvoiceController extends Controller
             'customer.address' => 'nullable|string|max:255',
             'customer.phone' => 'nullable|string|max:20',
             'customer.email' => 'nullable|email|max:255',
-            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer', // Adjust payment methods as needed
+            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer,cheque,online', // Adjust payment methods as needed
             'purchaseDetails.amount' => 'required|numeric|min:0',
             'items' => 'required|array|min:1',
+            'items.*.product_id' => 'nullable|exists:products,product_id',
             'items.*.description' => 'required|string|max:255',
             'items.*.qty' => 'required|numeric|min:1',
             'items.*.unitPrice' => 'required|numeric|min:0',
@@ -55,6 +56,7 @@ class SalesInvoiceController extends Controller
             $calculatedSubtotal += $itemTotal;
 
             $itemsData[] = [
+                'product_id' => $itemInput['product_id'] ?? null,
                 'description' => $itemInput['description'],
                 'quantity' => $itemInput['qty'],
                 'unit_price' => $itemInput['unitPrice'],
@@ -126,9 +128,10 @@ class SalesInvoiceController extends Controller
             'customer.address' => 'nullable|string|max:255',
             'customer.phone' => 'nullable|string|max:20',
             'customer.email' => 'nullable|email|max:255',
-            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer', // Adjust payment methods as needed
+            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer,cheque,online', // Adjust payment methods as needed
             'purchaseDetails.amount' => 'required|numeric|min:0',
             'items' => 'required|array|min:1',
+            'items.*.product_id' => 'nullable|exists:products,product_id',
             'items.*.description' => 'required|string|max:255',
             'items.*.qty' => 'required|numeric|min:1',
             'items.*.unitPrice' => 'required|numeric|min:0',
@@ -159,6 +162,7 @@ class SalesInvoiceController extends Controller
             $calculatedSubtotal += $itemTotal;
 
             $itemsData[] = [
+                'product_id' => $itemInput['product_id'] ?? null,
                 'description' => $itemInput['description'],
                 'quantity' => $qty,
                 'unit_price' => $unitPrice,
