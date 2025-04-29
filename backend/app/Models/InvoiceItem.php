@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InvoiceItem extends Model
 {
+    protected $table = 'invoice_items';
     use HasFactory;
 
     /**
@@ -22,7 +23,18 @@ class InvoiceItem extends Model
     //     'discount_percentage',
     //     'total',
     // ];
-    protected $guarded = []; // Allow mass assignment for all fields
+
+    
+    protected $fillable = [
+        'invoice_id',
+        'product_id',
+        'description',
+        'quantity',
+        'unit_price',
+        'discount_amount',
+        'discount_percentage',
+        'total',
+    ];
 
 
     /**
@@ -44,5 +56,10 @@ class InvoiceItem extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
     }
 }

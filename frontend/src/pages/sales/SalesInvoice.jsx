@@ -3,26 +3,6 @@ import Select from 'react-select';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-// Helper function to check if a date is in the past (considers the whole day)
-const isDateInPast = (dateString) => {
-  if (!dateString) return false; // No end date means it never expires based on date
-  try {
-    // Set time to the end of the day for comparison
-    const endDate = new Date(dateString);
-    endDate.setHours(23, 59, 59, 999);
-    return endDate < new Date(); // Is the end of the specified day before now?
-  } catch (e) {
-    console.error('Error parsing date for past check:', dateString, e);
-    return false; // Treat parse errors as not in the past
-  }
-};
-
-// Helper function to calculate the effective active status
-const calculateEffectiveActiveStatus = (scheme) => {
-  // Must have active flag set AND (no end date OR end date is not in the past)
-  return scheme.active && !isDateInPast(scheme.endDate);
-};
-
 const SalesInvoice = ({
   initialData,
   isEditMode,
@@ -88,41 +68,26 @@ const SalesInvoice = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
-  const [discountSchemes, setDiscountSchemes] = useState([]);
-  const [discountSchemesLoading, setDiscountSchemesLoading] = useState(false);
 
   const firstInputRef = useRef(null);
   const itemRefs = useRef([]);
   const purchaseAmountRef = useRef(null);
 
-  // --- Fetch Products and Discount Schemes ---
+  // --- Fetch Products ---
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProducts = async () => {
       setProductsLoading(true);
-      setDiscountSchemesLoading(true);
       try {
-        // Fetch products
-        const productResponse = await axios.get('http://127.0.0.1:8000/api/products');
-        setProducts(productResponse.data.data || []);
-
-        // Fetch discount schemes
-        const schemeResponse = await axios.get('http://127.0.0.1:8000/api/discount-schemes');
-        const fetchedSchemes = (Array.isArray(schemeResponse.data.data) ? schemeResponse.data.data : []).map(s => ({
-          ...s,
-          appliesTo: s.applies_to,
-          startDate: s.start_date,
-          endDate: s.end_date,
-        }));
-        setDiscountSchemes(fetchedSchemes);
+        const response = await axios.get('http://127.0.0.1:8000/api/products');
+        setProducts(response.data.data || []);
       } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Failed to load products or discount schemes.');
+        console.error('Error fetching products:', error);
+        toast.error('Failed to load products.');
       } finally {
         setProductsLoading(false);
-        setDiscountSchemesLoading(false);
       }
     };
-    fetchData();
+    fetchProducts();
   }, []);
 
   // --- Effects ---
@@ -227,54 +192,22 @@ const SalesInvoice = ({
       if (!newItems[index]) return prevFormData;
 
       const product = selectedOption ? products.find((p) => p.product_id === selectedOption.value) : null;
-      let discountAmount = 0;
-      let discountPercentage = 0;
-
-      // Check for active discount scheme
-      if (product) {
-        const productSchemes = discountSchemes.filter(
-          (scheme) =>
-            scheme.appliesTo === 'product' &&
-            scheme.target === product.product_name &&
-            calculateEffectiveActiveStatus(scheme)
-        );
-        const categorySchemes = discountSchemes.filter(
-          (scheme) =>
-            scheme.appliesTo === 'category' &&
-            scheme.target === product.category_name && // Assuming product has a category_name field
-            calculateEffectiveActiveStatus(scheme)
-        );
-
-        // Prioritize product-specific schemes over category schemes
-        const applicableScheme = productSchemes[0] || categorySchemes[0];
-
-        if (applicableScheme) {
-          if (applicableScheme.type === 'percentage') {
-            discountPercentage = parseFloat(applicableScheme.value) || 0;
-            discountAmount = ((product.sales_price * discountPercentage) / 100).toFixed(2);
-          } else if (applicableScheme.type === 'amount') {
-            discountAmount = parseFloat(applicableScheme.value) || 0;
-            discountPercentage = product.sales_price > 0 ? ((discountAmount / product.sales_price) * 100).toFixed(2) : 0;
-          }
-        }
-      }
-
       newItems[index] = {
         ...newItems[index],
         productId: product ? product.product_id : null,
         description: product ? product.product_name : '',
         unitPrice: product ? parseFloat(product.sales_price) || 0 : 0,
         qty: newItems[index].qty || 1,
-        discountAmount,
-        discountPercentage,
+        discountAmount: newItems[index].discountAmount || 0,
+        discountPercentage: newItems[index].discountPercentage || 0,
       };
 
       // Recalculate total
       const qty = parseFloat(newItems[index].qty) || 0;
       const unitPrice = parseFloat(newItems[index].unitPrice) || 0;
       const totalBeforeDiscount = qty * unitPrice;
-      const currentDiscountAmount = Math.max(0, parseFloat(newItems[index].discountAmount) || 0);
-      newItems[index].total = totalBeforeDiscount - Math.min(totalBeforeDiscount, currentDiscountAmount);
+      const discountAmount = Math.max(0, parseFloat(newItems[index].discountAmount) || 0);
+      newItems[index].total = totalBeforeDiscount - Math.min(totalBeforeDiscount, discountAmount);
 
       return { ...prevFormData, items: newItems };
     });
@@ -284,8 +217,6 @@ const SalesInvoice = ({
       ...prev,
       [`itemDescription${index}`]: undefined,
       [`itemUnitPrice${index}`]: undefined,
-      [`itemDiscountAmount${index}`]: undefined,
-      [`itemDiscountPercentage${index}`]: undefined,
     }));
   };
 
@@ -364,6 +295,7 @@ const SalesInvoice = ({
       newErrors.items = 'At least one item is required';
     } else {
       items.forEach((item, idx) => {
+        if (!item.productId) newErrors[`itemDescription${idx}`] = 'Please select a product';
         if (!item.description?.trim()) newErrors[`itemDescription${idx}`] = 'Description is required';
         const qty = parseFloat(item.qty);
         if (isNaN(qty) || qty <= 0) newErrors[`itemQty${idx}`] = 'Qty must be > 0';
@@ -409,7 +341,7 @@ const SalesInvoice = ({
           if (firstErrorKey.startsWith('item')) {
             const match = firstErrorKey.match(/item([A-Za-z]+)(\d+)/);
             if (match) {
-              const field = match[ aga1].toLowerCase();
+              const field = match[1].toLowerCase();
               const index = parseInt(match[2], 10);
               errorElement = itemRefs.current?.[index]?.[field];
             }
@@ -441,7 +373,7 @@ const SalesInvoice = ({
           unitPrice: parseFloat(item.unitPrice) || 0,
           discountAmount: parseFloat(item.discountAmount) || 0,
           discountPercentage: parseFloat(item.discountPercentage) || 0,
-          productId: item.productId || undefined,
+          product_id: item.productId || null,
         })),
         purchaseDetails: {
           ...formData.purchaseDetails,
@@ -491,7 +423,7 @@ const SalesInvoice = ({
           }, 2500);
         }
       } catch (error) {
-        console.errormano('Submit error:', error);
+        console.error('Submit error:', error);
         let displayError = isEditMode ? 'Failed to update invoice.' : 'Failed to save invoice.';
         let backendErrors = {};
 
@@ -516,6 +448,8 @@ const SalesInvoice = ({
                     ? 'DiscountAmount'
                     : field === 'discountPercentage'
                     ? 'DiscountPercentage'
+                    : field === 'product_id'
+                    ? 'Description'
                     : field.charAt(0).toUpperCase() + field.slice(1);
                 mappedErrors[`item${frontendField}${index}`] = message;
               }
@@ -637,28 +571,6 @@ const SalesInvoice = ({
     }),
   });
 
-  // --- Check if Item has Active Discount Scheme ---
-  const hasActiveDiscountScheme = (item) => {
-    if (!item.productId) return false;
-    const product = products.find((p) => p.product_id === item.productId);
-    if (!product) return false;
-
-    const productSchemes = discountSchemes.filter(
-      (scheme) =>
-        scheme.appliesTo === 'product' &&
-        scheme.target === product.product_name &&
-        calculateEffectiveActiveStatus(scheme)
-    );
-    const categorySchemes = discountSchemes.filter(
-      (scheme) =>
-        scheme.appliesTo === 'category' &&
-        scheme.target === product.category_name &&
-        calculateEffectiveActiveStatus(scheme)
-    );
-
-    return productSchemes.length > 0 || categorySchemes.length > 0;
-  };
-
   // --- JSX ---
   return (
     <div
@@ -764,7 +676,7 @@ const SalesInvoice = ({
                   value={formData.invoice.time}
                   onChange={(e) => handleInputChange(e, 'invoice', 'time')}
                   className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${
-                    errors.invoiceTime ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
+                    errors.invoiceTime ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hoverPretty-printed code block: border-gray-500'
                   }`}
                   aria-invalid={!!errors.invoiceTime}
                   aria-describedby="invoiceTimeError"
@@ -982,7 +894,6 @@ const SalesInvoice = ({
                     const selectedProduct = item.productId
                       ? productOptions.find((option) => option.value === item.productId)
                       : null;
-                    const hasDiscount = hasActiveDiscountScheme(item);
 
                     return (
                       <tr
@@ -1060,32 +971,22 @@ const SalesInvoice = ({
                           )}
                         </td>
                         <td className="p-2 align-top">
-                          <div className="relative">
-                            <input
-                              ref={(el) => setItemRef(el, index, 'discountAmount')}
-                              type="number"
-                              name="discountAmount"
-                              value={item.discountAmount}
-                              onChange={(e) => handleInputChange(e, 'items', 'discountAmount', index)}
-                              onKeyDown={(e) => handleItemKeyDown(index, 'discountAmount', e)}
-                              className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${
-                                errors[`itemDiscountAmount${index}`]
-                                  ? 'border-red-500'
-                                  : hasDiscount
-                                  ? 'border-green-500'
-                                  : 'border-gray-600/30 hover:border-gray-500'
-                              }`}
-                              min="0"
-                              step="0.01"
-                              placeholder={hasDiscount ? 'From Scheme' : '0.00'}
-                              title={hasDiscount ? 'Discount applied from active scheme' : ''}
-                              aria-invalid={!!errors[`itemDiscountAmount${index}`]}
-                              aria-describedby={`itemDiscountAmountError${index}`}
-                            />
-                            {hasDiscount && (
-                              <span className="absolute text-xs text-green-400 top-1 right-2">🔔</span>
-                            )}
-                          </div>
+                          <input
+                            ref={(el) => setItemRef(el, index, 'discountAmount')}
+                            type="number"
+                            name="discountAmount"
+                            value={item.discountAmount}
+                            onChange={(e) => handleInputChange(e, 'items', 'discountAmount', index)}
+                            onKeyDown={(e) => handleItemKeyDown(index, 'discountAmount', e)}
+                            className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${
+                              errors[`itemDiscountAmount${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'
+                            }`}
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            aria-invalid={!!errors[`itemDiscountAmount${index}`]}
+                            aria-describedby={`itemDiscountAmountError${index}`}
+                          />
                           {errors[`itemDiscountAmount${index}`] && (
                             <p id={`itemDiscountAmountError${index}`} className="mt-1 text-xs text-red-400">
                               {errors[`itemDiscountAmount${index}`]}
@@ -1104,24 +1005,18 @@ const SalesInvoice = ({
                               className={`w-full p-2 pr-6 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${
                                 errors[`itemDiscountPercentage${index}`]
                                   ? 'border-red-500'
-                                  : hasDiscount
-                                  ? 'border-green-500'
                                   : 'border-gray-600/30 hover:border-gray-500'
                               }`}
                               min="0"
                               max="100"
                               step="1"
-                              placeholder={hasDiscount ? 'From Scheme' : '0'}
-                              title={hasDiscount ? 'Discount applied from active scheme' : ''}
+                              placeholder="0"
                               aria-invalid={!!errors[`itemDiscountPercentage${index}`]}
                               aria-describedby={`itemDiscountPercentageError${index}`}
                             />
                             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                               <span className="text-xs text-gray-400">%</span>
                             </div>
-                            {hasDiscount && (
-                              <span className="absolute text-xs text-green-400 top-1 right-8">🔔</span>
-                            )}
                           </div>
                           {errors[`itemDiscountPercentage${index}`] && (
                             <p id={`itemDiscountPercentageError${index}`} className="mt-1 text-xs text-red-400">
@@ -1190,7 +1085,7 @@ const SalesInvoice = ({
                   >
                     <option value="cash">Cash</option>
                     <option value="card">Credit/Debit Card</option>
-                    <option value="bank">Bank Transfer</option>
+                    <option value="bank_transfer">Bank Transfer</option>
                     <option value="cheque">Cheque</option>
                     <option value="online">Online Payment</option>
                   </select>
