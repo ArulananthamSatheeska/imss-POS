@@ -1,57 +1,61 @@
-import React, { useState } from 'react';
-import { DollarSign, Package, TrendingDown, TrendingUp, CreditCard, AlertCircle, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { DollarSign, Package, TrendingDown, TrendingUp, CreditCard, Clock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import axios from 'axios';
 
 const Dashboard = () => {
   const [hoveredCategory, setHoveredCategory] = useState(null);
   const [hoveredProducts, setHoveredProducts] = useState(null);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [dailyProfitSummary, setDailyProfitSummary] = useState(null);
+  const [billWiseProfitSummary, setBillWiseProfitSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const salesData = [
-    { date: '2024-03-01', amount: 1200 },
-    { date: '2024-03-02', amount: 1800 },
-    { date: '2024-03-03', amount: 1400 },
-    { date: '2024-03-04', amount: 2200 },
-    { date: '2024-03-05', amount: 1600 },
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await axios.get('/api/dashboard');
+        setDashboardData(response.data);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        setError('Failed to load dashboard data.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const categoryData = [
-    {
-      category: 'Electronics',
-      count: 45,
-      products: [
-        { name: 'Laptop', price: '$1000' },
-        { name: 'Smartphone', price: '$800' },
-        { name: 'Headphones', price: '$150' },
-      ],
-    },
-    {
-      category: 'Clothing',
-      count: 30,
-      products: [
-        { name: 'T-shirt', price: '$20' },
-        { name: 'Jeans', price: '$50' },
-        { name: 'Jacket', price: '$100' },
-      ],
-    },
-    {
-      category: 'Food',
-      count: 25,
-      products: [
-        { name: 'Apples', price: '$5/kg' },
-        { name: 'Milk', price: '$2/liter' },
-        { name: 'Bread', price: '$3/loaf' },
-      ],
-    },
-    {
-      category: 'Books',
-      count: 20,
-      products: [
-        { name: 'Fiction Book', price: '$15' },
-        { name: 'Science Book', price: '$25' },
-        { name: 'Biography', price: '$30' },
-      ],
-    },
-  ];
+    fetchDashboardData();
+
+    // Fetch daily profit summary for current date
+    const fetchDailyProfitSummary = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const response = await axios.get('http://127.0.0.1:8000/api/sales/daily-profit-report', {
+          params: { date: today }
+        });
+        setDailyProfitSummary(response.data.summary || {});
+      } catch (error) {
+        console.error('Error fetching daily profit summary:', error);
+      }
+    };
+
+    fetchDailyProfitSummary();
+
+    // Fetch bill wise profit summary (total profit)
+    const fetchBillWiseProfitSummary = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/api/sales/bill-wise-profit-report');
+        setBillWiseProfitSummary(response.data.summary || {});
+      } catch (error) {
+        console.error('Error fetching bill wise profit summary:', error);
+      }
+    };
+
+    fetchBillWiseProfitSummary();
+  }, []);
+
+
 
   const COLORS = ['#FF6361', '#003F5C', '#BC5090', '#FFA600'];
 
@@ -66,79 +70,100 @@ const Dashboard = () => {
     setHoveredProducts(null);
   };
 
+  if (loading) {
+    return <div>Loading dashboard data...</div>;
+  }
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  if (!dashboardData) {
+    return <div>No dashboard data available.</div>;
+  }
+
+  // Map backend data to frontend UI data structures
   const stats = [
     {
       title: "Today's Sales",
-      value: 'LKR 1,234',
+      value: `LKR ${Number(dashboardData.summaryCards.totalTodaysSales).toLocaleString()}`,
       icon: DollarSign,
       trend: 'up',
-      percentage: '12%',
+      percentage: "Today's Sales",
     },
     {
       title: 'Total Items',
-      value: '156',
+      value: dashboardData.summaryCards.totalItems,
       icon: Package,
       trend: 'up',
-      percentage: '8%',
+      percentage: 'Total Items',
     },
+
     {
-      title: 'Low Stock Items',
-      value: '5',
-      icon: TrendingDown,
-      trend: 'down',
-      percentage: '2%',
-    },
-    {
-      title: 'Top Selling',
-      value: '23',
+      title: 'Today\'s Profit',
+      value: dailyProfitSummary ? `LKR ${Number(dailyProfitSummary.totalProfitAll).toLocaleString()}` : `LKR ${Number(dashboardData.summaryCards.todaysProfit).toLocaleString()}`,
       icon: TrendingUp,
-      trend: 'up',
-      percentage: '15%',
+      trend: dailyProfitSummary && Number(dailyProfitSummary.totalProfitAll) >= 0 ? 'up' : 'down',
+      percentage: "Today's Profit",
+    },
+    {
+      title: 'Total Profit',
+      value: billWiseProfitSummary ? `LKR ${Number(billWiseProfitSummary.totalProfitAll).toLocaleString()}` : 'LKR 0',
+      icon: TrendingUp,
+      trend: billWiseProfitSummary && Number(billWiseProfitSummary.totalProfitAll) >= 0 ? 'up' : 'down',
+      percentage: 'Total Profit',
     },
   ];
+
 
   const paymentDue = [
     {
       title: 'Sales Payment Due',
-      value: 'LKR 500',
+      value: `LKR ${Number(dashboardData.financialStatus.salesPaymentDue).toLocaleString()}`,
       icon: CreditCard,
       trend: 'down',
-      percentage: '5%',
+      percentage: 'N/A',
       color: 'bg-fuchsia-900',
     },
     {
       title: 'Purchase Payment Due',
-      value: 'LKR 800',
+      value: `LKR ${Number(dashboardData.financialStatus.purchasePaymentDue).toLocaleString()}`,
       icon: CreditCard,
       trend: 'up',
-      percentage: '10%',
+      percentage: 'N/A',
       color: 'bg-cyan-900',
     },
   ];
 
   const alerts = [
     {
-      title: 'Product Stock Alert',
-      value: '3',
-      icon: AlertCircle,
-      description: 'Items running low in stock.',
-      color: 'bg-Cyan-900',
-    },
-    {
       title: 'Going to Expiry',
-      value: '5',
+      value: dashboardData.expiryTracking.itemsGoingToExpire,
       icon: Clock,
       description: 'Items nearing expiration.',
       color: 'bg-yellow-500',
     },
     {
       title: 'Already Expired',
-      value: '3',
+      value: dashboardData.expiryTracking.alreadyExpiredItems,
       icon: Clock,
       description: 'Items have already expired.',
       color: 'bg-gray-500',
     },
   ];
+
+  // Prepare salesData for LineChart
+  const salesData = dashboardData.chartsAndReports.monthlySales.map(item => ({
+    date: item.month,
+    amount: parseFloat(item.total_sales),
+  }));
+
+  // Prepare categoryData for PieChart (top selling products)
+  const categoryData = dashboardData.chartsAndReports.topSellingProducts.map(product => ({
+    category: product.product_name,
+    count: Number(product.total_quantity_sold),
+    products: [], // No detailed products info from backend, keep empty
+  }));
 
   return (
     <div className="bg-transparent space-y-8 p-6 min-h-screen">
@@ -166,7 +191,6 @@ const Dashboard = () => {
                 >
                   {stat.percentage}
                 </span>
-                <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">vs last month</span>
               </div>
             </div>
           );
@@ -188,9 +212,7 @@ const Dashboard = () => {
                   className={`text-sm font-bold ${payment.trend === 'up' ? 'text-green-500' : 'text-red-500'
                     }`}
                 >
-                  {payment.percentage}
                 </span>
-                <span className="ml-2 text-sm text-white">vs last month</span>
               </div>
             </div>
             <div className="bg-white p-4 rounded-full">
@@ -201,10 +223,10 @@ const Dashboard = () => {
         ))}
 
         {/* Going to Expiry Section */}
-        <div className="p-6 bg-red-700 dark:bg-gray-700 rounded-xl shadow-lg backdrop-blur-md hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-          <h3 className="text-lg font-semibold text-white">Going to Expiry</h3>
-          {alerts.filter((alert) => alert.title === 'Going to Expiry').map((alert, index) => (
-            <div key={index} className="mt-4 flex items-center justify-between">
+        {alerts.map((alert, index) => (
+          <div key={index} className={`p-6 ${alert.color} dark:bg-gray-700 rounded-xl shadow-lg backdrop-blur-md hover:shadow-xl transform hover:scale-105 transition-all duration-300`}>
+            <h3 className="text-lg font-semibold text-white">{alert.title}</h3>
+            <div className="mt-4 flex items-center justify-between">
               <div>
                 <p className="text-sm text-white">{alert.title}</p>
                 <p className="text-3xl font-semibold text-white">{alert.value}</p>
@@ -214,25 +236,8 @@ const Dashboard = () => {
                 <alert.icon className="text-gray-700 w-6 h-6" />
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Already Expired Section */}
-        <div className="p-6 bg-teal-900 dark:bg-gray-700 backdrop-blur-md rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-          <h3 className="text-lg font-semibold text-white">Already Expired</h3>
-          {alerts.filter((alert) => alert.title === 'Already Expired').map((alert, index) => (
-            <div key={index} className="mt-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm text-white">{alert.title}</p>
-                <p className="text-3xl font-semibold text-white">{alert.value}</p>
-                <p className="text-sm text-white">{alert.description}</p>
-              </div>
-              <div className="bg-white p-4 rounded-full">
-                <alert.icon className="text-gray-700 w-6 h-6" />
-              </div>
-            </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
       {/* Charts Section */}
@@ -262,7 +267,7 @@ const Dashboard = () => {
                 innerRadius={60}
                 paddingAngle={5}
                 fill="#8884d8"
-                label={({ category, count }) => `${category} (${count})`} // Destructuring the props
+                label={({ category, count }) => `${category} (${count})`}
                 isAnimationActive
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
@@ -276,7 +281,6 @@ const Dashboard = () => {
                   />
                 ))}
               </Pie>
-
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
