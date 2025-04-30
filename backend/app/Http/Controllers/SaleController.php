@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Product;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -50,10 +51,8 @@ class SaleController extends Controller
 
         DB::beginTransaction();
         try {
-            // Generate the next bill number
             $billNumber = BillNumberGenerator::generateNextBillNumber();
 
-            // Fetch active discount schemes
             $activeSchemes = \App\Models\DiscountScheme::where('active', true)
                 ->where(function ($query) {
                     $today = date('Y-m-d');
@@ -65,7 +64,6 @@ class SaleController extends Controller
                 })
                 ->get();
 
-            // Create the sale
             $sale = Sale::create([
                 'bill_number' => $billNumber,
                 'customer_id' => $request->customer_id,
@@ -79,54 +77,13 @@ class SaleController extends Controller
                 'balance_amount' => $request->balance_amount,
             ]);
 
-            // Helper function to calculate discount for a product
-            $calculateDiscount = function ($product, $schemes) {
-                $basePrice = $product->sales_price ?? 0;
-                $categoryName = $product->category_name ?? null;
-                $maxDiscountValue = 0;
-
-                foreach ($schemes as $scheme) {
-                    if (!$scheme->active) continue;
-
-                    $appliesTo = $scheme->applies_to;
-                    $target = $scheme->target;
-
-                    if ($appliesTo === 'product' && $target === $product->product_name) {
-                        $discountValue = 0;
-                        if ($scheme->type === 'percentage') {
-                            $discountValue = ($basePrice * $scheme->value) / 100;
-                        } elseif ($scheme->type === 'amount') {
-                            $discountValue = $scheme->value;
-                        }
-                        if ($discountValue > $maxDiscountValue) {
-                            $maxDiscountValue = $discountValue;
-                        }
-                    } elseif ($appliesTo === 'category' && $target === $categoryName) {
-                        $discountValue = 0;
-                        if ($scheme->type === 'percentage') {
-                            $discountValue = ($basePrice * $scheme->value) / 100;
-                        } elseif ($scheme->type === 'amount') {
-                            $discountValue = $scheme->value;
-                        }
-                        if ($discountValue > $maxDiscountValue) {
-                            $maxDiscountValue = $discountValue;
-                        }
-                    }
-                }
-                return min($maxDiscountValue, $basePrice);
-            };
-
-            // Create the sale items and update product stock
             foreach ($request->items as $item) {
                 $product = Product::where('product_name', $item['product_name'])->first();
                 if ($product) {
-                    // Calculate discount and adjust unit price and total
-                    $discountAmount = $calculateDiscount($product, $activeSchemes);
-                    $unitPrice = $product->sales_price - $discountAmount;
-                    $unitPrice = max(0, $unitPrice);
+                    $discountAmount = $this->calculateDiscount($product, $activeSchemes);
+                    $unitPrice = max(0, $product->sales_price - $discountAmount);
                     $totalPrice = $unitPrice * $item['quantity'];
 
-                    // Update the stock quantity
                     $product->updateStock($item['quantity'], 'subtract');
 
                     SaleItem::create([
@@ -138,9 +95,9 @@ class SaleController extends Controller
                         'unit_price' => $unitPrice,
                         'discount' => $discountAmount,
                         'total' => $totalPrice,
+                        'cost_price' => $product->buying_cost * $item['quantity'],
                     ]);
                 } else {
-                    // If product not found, save as is
                     SaleItem::create([
                         'sale_id' => $sale->id,
                         'product_id' => null,
@@ -188,7 +145,6 @@ class SaleController extends Controller
 
         DB::beginTransaction();
         try {
-            // Revert stock quantities for existing sale items
             foreach ($sale->items as $item) {
                 $product = Product::find($item->product_id);
                 if ($product) {
@@ -196,7 +152,6 @@ class SaleController extends Controller
                 }
             }
 
-            // Fetch active discount schemes
             $activeSchemes = \App\Models\DiscountScheme::where('active', true)
                 ->where(function ($query) {
                     $today = date('Y-m-d');
@@ -208,7 +163,6 @@ class SaleController extends Controller
                 })
                 ->get();
 
-            // Update the sale
             $sale->update([
                 'customer_name' => $request->customer_name,
                 'subtotal' => $request->subtotal,
@@ -220,59 +174,17 @@ class SaleController extends Controller
                 'balance_amount' => $request->balance_amount,
             ]);
 
-            // Delete existing sale items
             $sale->items()->delete();
 
-            // Helper function to calculate discount for a product
-            $calculateDiscount = function ($product, $schemes) {
-                $basePrice = $product->sales_price ?? 0;
-                $categoryName = $product->category_name ?? null;
-                $maxDiscountValue = 0;
-
-                foreach ($schemes as $scheme) {
-                    if (!$scheme->active) continue;
-
-                    $appliesTo = $scheme->applies_to;
-                    $target = $scheme->target;
-
-                    if ($appliesTo === 'product' && $target === $product->product_name) {
-                        $discountValue = 0;
-                        if ($scheme->type === 'percentage') {
-                            $discountValue = ($basePrice * $scheme->value) / 100;
-                        } elseif ($scheme->type === 'amount') {
-                            $discountValue = $scheme->value;
-                        }
-                        if ($discountValue > $maxDiscountValue) {
-                            $maxDiscountValue = $discountValue;
-                        }
-                    } elseif ($appliesTo === 'category' && $target === $categoryName) {
-                        $discountValue = 0;
-                        if ($scheme->type === 'percentage') {
-                            $discountValue = ($basePrice * $scheme->value) / 100;
-                        } elseif ($scheme->type === 'amount') {
-                            $discountValue = $scheme->value;
-                        }
-                        if ($discountValue > $maxDiscountValue) {
-                            $maxDiscountValue = $discountValue;
-                        }
-                    }
-                }
-                return min($maxDiscountValue, $basePrice);
-            };
-
-            // Create new sale items and update product stock
             foreach ($request->items as $item) {
                 $product = Product::where('product_name', $item['product_name'])->first();
                 if ($product) {
-                    // Calculate discount and adjust unit price and total
-                    $discountAmount = $calculateDiscount($product, $activeSchemes);
-                    $unitPrice = $product->sales_price - $discountAmount;
-                    $unitPrice = max(0, $unitPrice);
+                    $discountAmount = $this->calculateDiscount($product, $activeSchemes);
+                    $unitPrice = max(0, $product->sales_price - $discountAmount);
                     $totalPrice = $unitPrice * $item['quantity'];
 
                     if ($item['quantity'] <= 0) {
-                        Log::warning('Invalid quantity for product ' . $item['product_name'] . ': ' . $item['quantity']);
-                        continue; // Skip invalid quantity
+                        continue;
                     }
 
                     $product->updateStock($item['quantity'], 'subtract');
@@ -286,9 +198,9 @@ class SaleController extends Controller
                         'unit_price' => $unitPrice,
                         'discount' => $discountAmount,
                         'total' => $totalPrice,
+                        'cost_price' => $product->buying_cost * $item['quantity'],
                     ]);
                 } else {
-                    Log::warning('Product not found: ' . $item['product_name']);
                     SaleItem::create([
                         'sale_id' => $sale->id,
                         'product_id' => null,
@@ -316,14 +228,12 @@ class SaleController extends Controller
         Log::info('Deleting sale with ID: ' . $id);
         $sale = Sale::find($id);
         if ($sale) {
-            // Revert stock quantities for existing sale items
             foreach ($sale->items as $item) {
                 $product = Product::find($item->product_id);
                 if ($product) {
                     $product->updateStock($item->quantity, 'add');
                 }
             }
-
             $sale->delete();
             return response()->json(['message' => 'Sale deleted successfully!'], 200);
         } else {
@@ -337,123 +247,117 @@ class SaleController extends Controller
         return response()->json(['next_bill_number' => $nextBillNumber]);
     }
 
+    public function getBillWiseProfitReport(Request $request)
+    {
+        try {
+            // Get sales data
+            $salesQuery = Sale::with(['items.product'])
+                ->select('id', 'bill_number', 'created_at', 'customer_name', 'payment_type');
 
-   public function getBillWiseProfitReport(Request $request)
-{
-    try {
-        $query = Sale::with(['items.product'])
-            ->select('id', 'bill_number', 'created_at', 'customer_name', 'payment_type');
+            // Get invoices data
+            $invoicesQuery = Invoice::with(['items'])
+                ->select('id', 'invoice_no as bill_number', 'created_at', 'customer_name', 'payment_method as payment_type');
 
-        // Apply date filter
-        if ($request->has('fromDate') && $request->has('toDate')) {
-            $query->whereBetween('created_at', [
-                $request->input('fromDate') . ' 00:00:00',
-                $request->input('toDate') . ' 23:59:59'
-            ]);
-        }
-
-        // Apply payment method filter
-        if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '') {
-            $query->where('payment_type', $request->input('paymentMethod'));
-        }
-
-        $sales = $query->get(); // Fetch sales data for the report
-
-        // Prepare the report data
-        $reportData = [];
-        $totalCostPriceAll = 0;
-        $totalSellingPriceAll = 0;
-        $totalProfitAll = 0;
-
-        foreach ($sales as $sale) {
-            $totalCostPrice = 0;
-            $totalSellingPrice = 0;
-            $items = [];
-
-            foreach ($sale->items as $item) {
-                // Fetch the product details to get the buying cost
-                $product = $item->product; // Ensure this relationship exists
-                $buyingCost = $product ? $product->buying_cost : 0;
-
-                // Calculate cost price and selling price for each item
-                $itemCostPrice = $buyingCost * $item->quantity;
-                $itemSellingPrice = $item->unit_price * $item->quantity;
-                $itemProfit = $itemSellingPrice - $itemCostPrice;
-                $itemProfitPercentage = ($itemSellingPrice > 0) ? ($itemProfit / $itemSellingPrice) * 100 : 0;
-
-                // Add item details
-                $items[] = [
-                    'product_name' => $item->product_name,
-                    'quantity' => $item->quantity,
-                    'costPrice' => number_format($itemCostPrice, 2),
-                    'sellingPrice' => number_format($itemSellingPrice, 2),
-                    'profit' => number_format($itemProfit, 2),
-                    'profitPercentage' => number_format($itemProfitPercentage, 2) . '%',
-                ];
-
-                // Accumulate totals for the bill
-                $totalCostPrice += $itemCostPrice;
-                $totalSellingPrice += $itemSellingPrice;
+            // Apply filters
+            if ($request->has('fromDate') && $request->has('toDate')) {
+                $fromDate = $request->input('fromDate') . ' 00:00:00';
+                $toDate = $request->input('toDate') . ' 23:59:59';
+                
+                $salesQuery->whereBetween('created_at', [$fromDate, $toDate]);
+                $invoicesQuery->whereBetween('created_at', [$fromDate, $toDate]);
             }
 
-            $totalProfit = $totalSellingPrice - $totalCostPrice;
-            $profitPercentage = ($totalSellingPrice > 0) ? ($totalProfit / $totalSellingPrice) * 100 : 0;
+            if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '') {
+                $paymentMethod = $request->input('paymentMethod');
+                $salesQuery->where('payment_type', $paymentMethod);
+                $invoicesQuery->where('payment_method', $paymentMethod);
+            }
 
-            // Add bill details
-            $reportData[] = [
-                'bill_number' => $sale->bill_number,
-                'date' => $sale->created_at->format('d-m-Y'),
-                'customer_name' => $sale->customer_name ?: 'Walk-in Customer', // Fallback to 'Walk-in Customer'
-                'payment_type' => $sale->payment_type,
-                'items' => $items, // Include item-level details
-                'totalCostPrice' => number_format($totalCostPrice, 2),
-                'totalSellingPrice' => number_format($totalSellingPrice, 2),
-                'totalProfit' => number_format($totalProfit, 2),
-                'profitPercentage' => number_format($profitPercentage, 2) . '%',
-            ];
+            $sales = $salesQuery->get();
+            $invoices = $invoicesQuery->get();
 
-            // Accumulate totals for the entire report
-            $totalCostPriceAll += $totalCostPrice;
-            $totalSellingPriceAll += $totalSellingPrice;
-            $totalProfitAll += $totalProfit;
+            $reportData = [];
+            $totals = ['cost' => 0, 'sales' => 0, 'profit' => 0];
+
+            // Process sales
+            foreach ($sales as $sale) {
+                $saleData = $this->processSaleForReport($sale);
+                $reportData[] = $saleData;
+                $this->accumulateTotals($totals, $saleData);
+            }
+
+            // Process invoices
+            foreach ($invoices as $invoice) {
+                $invoiceData = $this->processInvoiceForReport($invoice);
+                $reportData[] = $invoiceData;
+                $this->accumulateTotals($totals, $invoiceData);
+            }
+
+            // Sort by date
+            usort($reportData, fn($a, $b) => strtotime($a['date']) - strtotime($b['date']));
+
+            return response()->json([
+                'reportData' => $reportData,
+                'summary' => $this->generateSummary($totals),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in getBillWiseProfitReport: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch report.'], 500);
         }
-
-        // Add summary totals for the entire report
-        $summary = [
-            'totalCostPriceAll' => number_format($totalCostPriceAll, 2),
-            'totalSellingPriceAll' => number_format($totalSellingPriceAll, 2),
-            'totalProfitAll' => number_format($totalProfitAll, 2),
-            'averageProfitPercentageAll' => ($totalSellingPriceAll > 0) ? number_format(($totalProfitAll / $totalSellingPriceAll) * 100, 2) . '%' : '0.00%',
-        ];
-
-        return response()->json([
-            'reportData' => $reportData,
-            'summary' => $summary,
-        ]);
-    } catch (\Exception $e) {
-        Log::error('Error in getBillWiseProfitReport: ' . $e->getMessage());
-        return response()->json(['error' => 'Failed to fetch report.'], 500);
     }
-}
+
     public function getDailyProfitReport(Request $request)
     {
         try {
             $date = $request->input('date', now()->format('Y-m-d'));
+            
             $sales = Sale::with('items.product')
                 ->whereDate('created_at', $date)
                 ->get();
 
-            $reportData = [];
-            $totalCost = 0;
-            $totalSales = 0;
-            $totalProfit = 0;
+            $invoices = Invoice::with('items')
+                ->whereDate('created_at', $date)
+                ->get();
 
+            $reportData = [];
+            $totals = ['cost' => 0, 'sales' => 0, 'profit' => 0];
+
+            // Process sales
             foreach ($sales as $sale) {
-                foreach ($sale->items as $item) {
-                    $product = $item->product;
-                    $productName = $product ? $product->product_name : 'Unknown Product';
-                    $costPrice = $product ? $product->buying_cost * $item->quantity : 0;
-                    $sellingPrice = $item->unit_price * $item->quantity;
+            foreach ($sale->items as $item) {
+                $product = $item->product;
+                $productName = $product ? $product->product_name : 'Unknown Product';
+                $costPrice = $item->cost_price ?? ($product ? $product->buying_cost * $item->quantity : 0);
+                $sellingPrice = $item->unit_price * $item->quantity;
+                $profit = $sellingPrice - $costPrice;
+
+                if (!isset($reportData[$productName])) {
+                    $reportData[$productName] = [
+                        'product_name' => $productName,
+                        'total_quantity_sold' => 0,
+                        'total_sales_amount' => 0,
+                        'total_cost' => 0,
+                        'total_profit' => 0,
+                    ];
+                }
+
+                $reportData[$productName]['total_quantity_sold'] += $item->quantity;
+                $reportData[$productName]['total_sales_amount'] += $sellingPrice;
+                $reportData[$productName]['total_cost'] += $costPrice;
+                $reportData[$productName]['total_profit'] += $profit;
+
+                $totals['cost'] += $costPrice;
+                $totals['sales'] += $sellingPrice;
+                $totals['profit'] += $profit;
+            }
+            }
+
+            // Process invoices
+            foreach ($invoices as $invoice) {
+                foreach ($invoice->items as $item) {
+                    $productName = $item->description;
+                    $costPrice = $item->cost_price ?? 0; // Use cost_price from invoice items
+                    $sellingPrice = $item->total;
                     $profit = $sellingPrice - $costPrice;
 
                     if (!isset($reportData[$productName])) {
@@ -471,15 +375,14 @@ class SaleController extends Controller
                     $reportData[$productName]['total_cost'] += $costPrice;
                     $reportData[$productName]['total_profit'] += $profit;
 
-                    // Update totals
-                    $totalCost += $costPrice;
-                    $totalSales += $sellingPrice;
-                    $totalProfit += $profit;
+                    $totals['cost'] += $costPrice;
+                    $totals['sales'] += $sellingPrice;
+                    $totals['profit'] += $profit;
                 }
             }
 
-            // Format numbers
-            $reportData = array_map(function ($item) {
+            // Format report data
+            $formattedReport = array_map(function($item) {
                 return [
                     'product_name' => $item['product_name'],
                     'total_quantity_sold' => number_format($item['total_quantity_sold'], 2),
@@ -490,11 +393,11 @@ class SaleController extends Controller
             }, array_values($reportData));
 
             return response()->json([
-                'reportData' => $reportData,
+                'reportData' => $formattedReport,
                 'summary' => [
-                    'totalCostPriceAll' => number_format($totalCost, 2),
-                    'totalSellingPriceAll' => number_format($totalSales, 2),
-                    'totalProfitAll' => number_format($totalProfit, 2),
+                    'totalCostPriceAll' => number_format($totals['cost'], 2),
+                    'totalSellingPriceAll' => number_format($totals['sales'], 2),
+                    'totalProfitAll' => number_format($totals['profit'], 2),
                 ],
             ]);
         } catch (\Exception $e) {
@@ -506,38 +409,71 @@ class SaleController extends Controller
     public function getCompanyWiseProfitReport(Request $request)
     {
         try {
-            $query = Sale::with(['items.product'])
+            // Get sales data
+            $salesQuery = Sale::with(['items.product'])
                 ->select('id', 'created_at', 'customer_name', 'payment_type');
 
-            // Apply date filter
+            // Get invoices data
+            $invoicesQuery = Invoice::with(['items'])
+                ->select('id', 'created_at', 'customer_name', 'payment_method as payment_type');
+
+            // Apply filters
             if ($request->has('fromDate') && $request->has('toDate')) {
-                $query->whereBetween('created_at', [
-                    $request->input('fromDate') . ' 00:00:00',
-                    $request->input('toDate') . ' 23:59:59'
-                ]);
+                $fromDate = $request->input('fromDate') . ' 00:00:00';
+                $toDate = $request->input('toDate') . ' 23:59:59';
+                
+                $salesQuery->whereBetween('created_at', [$fromDate, $toDate]);
+                $invoicesQuery->whereBetween('created_at', [$fromDate, $toDate]);
             }
 
-            // Apply payment method filter
             if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '') {
-                $query->where('payment_type', $request->input('paymentMethod'));
+                $paymentMethod = $request->input('paymentMethod');
+                $salesQuery->where('payment_type', $paymentMethod);
+                $invoicesQuery->where('payment_method', $paymentMethod);
             }
 
-            $sales = $query->get();
+            $sales = $salesQuery->get();
+            $invoices = $invoicesQuery->get();
 
             $reportData = [];
-            $totalCostPriceAll = 0;
-            $totalSellingPriceAll = 0;
-            $totalProfitAll = 0;
+            $totals = ['cost' => 0, 'sales' => 0, 'profit' => 0];
 
+            // Process sales
             foreach ($sales as $sale) {
-                foreach ($sale->items as $item) {
-                    $product = $item->product;
-                    $companyName = $product ? $product->company_name : 'Unknown Company';
+            foreach ($sale->items as $item) {
+                $product = $item->product;
+                $companyName = $product ? $product->company_name : 'Unknown Company';
 
-                    $buyingCost = $product ? $product->buying_cost : 0;
-                    $itemCostPrice = $buyingCost * $item->quantity;
-                    $itemSellingPrice = $item->unit_price * $item->quantity;
-                    $itemProfit = $itemSellingPrice - $itemCostPrice;
+                $costPrice = $item->cost_price ?? ($product ? $product->buying_cost * $item->quantity : 0);
+                $sellingPrice = $item->unit_price * $item->quantity;
+                $profit = $sellingPrice - $costPrice;
+
+                if (!isset($reportData[$companyName])) {
+                    $reportData[$companyName] = [
+                        'companyName' => $companyName,
+                        'totalCostPrice' => 0,
+                        'totalSellingPrice' => 0,
+                        'totalProfit' => 0,
+                    ];
+                }
+
+                $reportData[$companyName]['totalCostPrice'] += $costPrice;
+                $reportData[$companyName]['totalSellingPrice'] += $sellingPrice;
+                $reportData[$companyName]['totalProfit'] += $profit;
+
+                $totals['cost'] += $costPrice;
+                $totals['sales'] += $sellingPrice;
+                $totals['profit'] += $profit;
+            }
+            }
+
+            // Process invoices (assuming no company data for invoices)
+            foreach ($invoices as $invoice) {
+                foreach ($invoice->items as $item) {
+                    $companyName = 'Invoices'; // Group all invoices together
+                    $costPrice = $item->cost_price ?? 0; // Use cost_price from invoice items
+                    $sellingPrice = $item->total;
+                    $profit = $sellingPrice - $costPrice;
 
                     if (!isset($reportData[$companyName])) {
                         $reportData[$companyName] = [
@@ -548,19 +484,22 @@ class SaleController extends Controller
                         ];
                     }
 
-                    $reportData[$companyName]['totalCostPrice'] += $itemCostPrice;
-                    $reportData[$companyName]['totalSellingPrice'] += $itemSellingPrice;
-                    $reportData[$companyName]['totalProfit'] += $itemProfit;
+                    $reportData[$companyName]['totalCostPrice'] += $costPrice;
+                    $reportData[$companyName]['totalSellingPrice'] += $sellingPrice;
+                    $reportData[$companyName]['totalProfit'] += $profit;
 
-                    $totalCostPriceAll += $itemCostPrice;
-                    $totalSellingPriceAll += $itemSellingPrice;
-                    $totalProfitAll += $itemProfit;
+                    $totals['cost'] += $costPrice;
+                    $totals['sales'] += $sellingPrice;
+                    $totals['profit'] += $profit;
                 }
             }
 
-            // Calculate profit percentage and format numbers
-            $reportData = array_map(function ($item) {
-                $profitPercentage = ($item['totalSellingPrice'] > 0) ? ($item['totalProfit'] / $item['totalSellingPrice']) * 100 : 0;
+            // Format report data
+            $formattedReport = array_map(function($item) {
+                $profitPercentage = ($item['totalSellingPrice'] > 0) 
+                    ? ($item['totalProfit'] / $item['totalSellingPrice']) * 100 
+                    : 0;
+                
                 return [
                     'companyName' => $item['companyName'],
                     'totalCostPrice' => number_format($item['totalCostPrice'], 2),
@@ -570,16 +509,9 @@ class SaleController extends Controller
                 ];
             }, array_values($reportData));
 
-            $summary = [
-                'totalCostPriceAll' => number_format($totalCostPriceAll, 2),
-                'totalSellingPriceAll' => number_format($totalSellingPriceAll, 2),
-                'totalProfitAll' => number_format($totalProfitAll, 2),
-                'averageProfitPercentageAll' => ($totalSellingPriceAll > 0) ? number_format(($totalProfitAll / $totalSellingPriceAll) * 100, 2) . '%' : '0.00%',
-            ];
-
             return response()->json([
-                'reportData' => $reportData,
-                'summary' => $summary,
+                'reportData' => $formattedReport,
+                'summary' => $this->generateSummary($totals),
             ]);
         } catch (\Exception $e) {
             Log::error('Error in getCompanyWiseProfitReport: ' . $e->getMessage());
@@ -590,38 +522,73 @@ class SaleController extends Controller
     public function getSupplierWiseProfitReport(Request $request)
     {
         try {
-            $query = Sale::with(['items.product.supplier'])
+            // Get sales data
+            $salesQuery = Sale::with(['items.product.supplier'])
                 ->select('id', 'created_at', 'customer_name', 'payment_type');
 
-            // Apply date filter
+            // Get invoices data
+            $invoicesQuery = Invoice::with(['items'])
+                ->select('id', 'created_at', 'customer_name', 'payment_method as payment_type');
+
+            // Apply filters
             if ($request->has('fromDate') && $request->has('toDate')) {
-                $query->whereBetween('created_at', [
-                    $request->input('fromDate') . ' 00:00:00',
-                    $request->input('toDate') . ' 23:59:59'
-                ]);
+                $fromDate = $request->input('fromDate') . ' 00:00:00';
+                $toDate = $request->input('toDate') . ' 23:59:59';
+                
+                $salesQuery->whereBetween('created_at', [$fromDate, $toDate]);
+                $invoicesQuery->whereBetween('created_at', [$fromDate, $toDate]);
             }
 
-            // Apply payment method filter
             if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '') {
-                $query->where('payment_type', $request->input('paymentMethod'));
+                $paymentMethod = $request->input('paymentMethod');
+                $salesQuery->where('payment_type', $paymentMethod);
+                $invoicesQuery->where('payment_method', $paymentMethod);
             }
 
-            $sales = $query->get();
+            $sales = $salesQuery->get();
+            $invoices = $invoicesQuery->get();
 
             $reportData = [];
-            $totalCostPriceAll = 0;
-            $totalSellingPriceAll = 0;
-            $totalProfitAll = 0;
+            $totals = ['cost' => 0, 'sales' => 0, 'profit' => 0];
 
+            // Process sales
             foreach ($sales as $sale) {
-                foreach ($sale->items as $item) {
-                    $product = $item->product;
-                    $supplierName = ($product && $product->supplier) ? $product->supplier->supplier_name : 'Unknown Supplier';
+            foreach ($sale->items as $item) {
+                $product = $item->product;
+                $supplierName = ($product && $product->supplier) 
+                    ? $product->supplier->supplier_name 
+                    : 'Unknown Supplier';
 
-                    $buyingCost = $product ? $product->buying_cost : 0;
-                    $itemCostPrice = $buyingCost * $item->quantity;
-                    $itemSellingPrice = $item->unit_price * $item->quantity;
-                    $itemProfit = $itemSellingPrice - $itemCostPrice;
+                $costPrice = $item->cost_price ?? ($product ? $product->buying_cost * $item->quantity : 0);
+                $sellingPrice = $item->unit_price * $item->quantity;
+                $profit = $sellingPrice - $costPrice;
+
+                if (!isset($reportData[$supplierName])) {
+                    $reportData[$supplierName] = [
+                        'supplierName' => $supplierName,
+                        'totalCostPrice' => 0,
+                        'totalSellingPrice' => 0,
+                        'totalProfit' => 0,
+                    ];
+                }
+
+                $reportData[$supplierName]['totalCostPrice'] += $costPrice;
+                $reportData[$supplierName]['totalSellingPrice'] += $sellingPrice;
+                $reportData[$supplierName]['totalProfit'] += $profit;
+
+                $totals['cost'] += $costPrice;
+                $totals['sales'] += $sellingPrice;
+                $totals['profit'] += $profit;
+            }
+            }
+
+            // Process invoices (assuming no supplier data for invoices)
+            foreach ($invoices as $invoice) {
+                foreach ($invoice->items as $item) {
+                    $supplierName = 'Invoices'; // Group all invoices together
+                    $costPrice = $item->cost_price ?? 0; // Use cost_price from invoice items
+                    $sellingPrice = $item->total;
+                    $profit = $sellingPrice - $costPrice;
 
                     if (!isset($reportData[$supplierName])) {
                         $reportData[$supplierName] = [
@@ -632,19 +599,22 @@ class SaleController extends Controller
                         ];
                     }
 
-                    $reportData[$supplierName]['totalCostPrice'] += $itemCostPrice;
-                    $reportData[$supplierName]['totalSellingPrice'] += $itemSellingPrice;
-                    $reportData[$supplierName]['totalProfit'] += $itemProfit;
+                    $reportData[$supplierName]['totalCostPrice'] += $costPrice;
+                    $reportData[$supplierName]['totalSellingPrice'] += $sellingPrice;
+                    $reportData[$supplierName]['totalProfit'] += $profit;
 
-                    $totalCostPriceAll += $itemCostPrice;
-                    $totalSellingPriceAll += $itemSellingPrice;
-                    $totalProfitAll += $itemProfit;
+                    $totals['cost'] += $costPrice;
+                    $totals['sales'] += $sellingPrice;
+                    $totals['profit'] += $profit;
                 }
             }
 
-            // Calculate profit percentage and format numbers
-            $reportData = array_map(function ($item) {
-                $profitPercentage = ($item['totalSellingPrice'] > 0) ? ($item['totalProfit'] / $item['totalSellingPrice']) * 100 : 0;
+            // Format report data
+            $formattedReport = array_map(function($item) {
+                $profitPercentage = ($item['totalSellingPrice'] > 0) 
+                    ? ($item['totalProfit'] / $item['totalSellingPrice']) * 100 
+                    : 0;
+                
                 return [
                     'supplierName' => $item['supplierName'],
                     'totalCostPrice' => number_format($item['totalCostPrice'], 2),
@@ -654,20 +624,147 @@ class SaleController extends Controller
                 ];
             }, array_values($reportData));
 
-            $summary = [
-                'totalCostPriceAll' => number_format($totalCostPriceAll, 2),
-                'totalSellingPriceAll' => number_format($totalSellingPriceAll, 2),
-                'totalProfitAll' => number_format($totalProfitAll, 2),
-                'averageProfitPercentageAll' => ($totalSellingPriceAll > 0) ? number_format(($totalProfitAll / $totalSellingPriceAll) * 100, 2) . '%' : '0.00%',
-            ];
-
             return response()->json([
-                'reportData' => $reportData,
-                'summary' => $summary,
+                'reportData' => $formattedReport,
+                'summary' => $this->generateSummary($totals),
             ]);
         } catch (\Exception $e) {
             Log::error('Error in getSupplierWiseProfitReport: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to fetch report.'], 500);
         }
+    }
+
+    // Helper methods
+    private function calculateDiscount($product, $schemes)
+    {
+        $basePrice = $product->sales_price ?? 0;
+        $categoryName = $product->category_name ?? null;
+        $maxDiscountValue = 0;
+
+        foreach ($schemes as $scheme) {
+            if (!$scheme->active) continue;
+
+            $appliesTo = $scheme->applies_to;
+            $target = $scheme->target;
+
+            if ($appliesTo === 'product' && $target === $product->product_name) {
+                $discountValue = $scheme->type === 'percentage' 
+                    ? ($basePrice * $scheme->value) / 100 
+                    : $scheme->value;
+                $maxDiscountValue = max($maxDiscountValue, $discountValue);
+            } elseif ($appliesTo === 'category' && $target === $categoryName) {
+                $discountValue = $scheme->type === 'percentage' 
+                    ? ($basePrice * $scheme->value) / 100 
+                    : $scheme->value;
+                $maxDiscountValue = max($maxDiscountValue, $discountValue);
+            }
+        }
+        return min($maxDiscountValue, $basePrice);
+    }
+
+    private function processSaleForReport($sale)
+    {
+        $costPrice = 0;
+        $sellingPrice = 0;
+        $items = [];
+
+        foreach ($sale->items as $item) {
+            $product = $item->product;
+            $itemCost = $product ? $product->buying_cost * $item->quantity : 0;
+            $itemSales = $item->unit_price * $item->quantity;
+            $itemProfit = $itemSales - $itemCost;
+            $itemProfitPercentage = ($itemSales > 0) ? ($itemProfit / $itemSales) * 100 : 0;
+
+            $items[] = [
+                'product_name' => $item->product_name,
+                'quantity' => $item->quantity,
+                'costPrice' => number_format($itemCost, 2),
+                'sellingPrice' => number_format($itemSales, 2),
+                'profit' => number_format($itemProfit, 2),
+                'profitPercentage' => number_format($itemProfitPercentage, 2) . '%',
+            ];
+
+            $costPrice += $itemCost;
+            $sellingPrice += $itemSales;
+        }
+
+        $profit = $sellingPrice - $costPrice;
+        $profitPercentage = ($sellingPrice > 0) ? ($profit / $sellingPrice) * 100 : 0;
+
+        return [
+            'type' => 'sale',
+            'bill_number' => $sale->bill_number,
+            'date' => $sale->created_at->format('d-m-Y'),
+            'customer_name' => $sale->customer_name ?: 'Walk-in Customer',
+            'payment_type' => $sale->payment_type,
+            'items' => $items,
+            'totalCostPrice' => number_format($costPrice, 2),
+            'totalSellingPrice' => number_format($sellingPrice, 2),
+            'totalProfit' => number_format($profit, 2),
+            'profitPercentage' => number_format($profitPercentage, 2) . '%',
+        ];
+    }
+
+    private function processInvoiceForReport($invoice)
+    {
+        $costPrice = 0;
+        $sellingPrice = 0;
+        $items = [];
+
+        foreach ($invoice->items as $item) {
+            $itemCost = 0; // Assuming no cost data for invoices
+            $itemSales = $item->total;
+            $itemProfit = $itemSales - $itemCost;
+            $itemProfitPercentage = ($itemSales > 0) ? ($itemProfit / $itemSales) * 100 : 0;
+
+            $items[] = [
+                'product_name' => $item->description,
+                'quantity' => $item->quantity,
+                'costPrice' => number_format($itemCost, 2),
+                'sellingPrice' => number_format($itemSales, 2),
+                'profit' => number_format($itemProfit, 2),
+                'profitPercentage' => number_format($itemProfitPercentage, 2) . '%',
+            ];
+
+            $costPrice += $itemCost;
+            $sellingPrice += $itemSales;
+        }
+
+        $profit = $sellingPrice - $costPrice;
+        $profitPercentage = ($sellingPrice > 0) ? ($profit / $sellingPrice) * 100 : 0;
+
+        return [
+            'type' => 'invoice',
+            'bill_number' => $invoice->bill_number,
+            'date' => $invoice->created_at->format('d-m-Y'),
+            'customer_name' => $invoice->customer_name ?: 'Unknown Customer',
+            'payment_type' => $invoice->payment_type,
+            'items' => $items,
+            'totalCostPrice' => number_format($costPrice, 2),
+            'totalSellingPrice' => number_format($sellingPrice, 2),
+            'totalProfit' => number_format($profit, 2),
+            'profitPercentage' => number_format($profitPercentage, 2) . '%',
+        ];
+    }
+
+    private function accumulateTotals(&$totals, $data)
+    {
+        $totals['cost'] += (float) str_replace(',', '', $data['totalCostPrice']);
+        $totals['sales'] += (float) str_replace(',', '', $data['totalSellingPrice']);
+        $totals['profit'] += (float) str_replace(',', '', $data['totalProfit']);
+    }
+
+    private function generateSummary($totals)
+    {
+        $profitPercentage = ($totals['sales'] > 0) 
+            ? ($totals['profit'] / $totals['sales']) * 100 
+            : 0;
+
+        return [
+            'totalCostPriceAll' => number_format($totals['cost'], 2),
+            'totalSellingPriceAll' => number_format($totals['sales'], 2),
+            'totalProfitAll' => number_format($totals['profit'], 2),
+            'averageProfitPercentageAll' => number_format($profitPercentage, 2) . '%',
+        ];
     }
 }

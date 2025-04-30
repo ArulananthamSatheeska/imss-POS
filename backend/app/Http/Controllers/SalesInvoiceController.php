@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Invoice;
+use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -51,18 +52,47 @@ class SalesInvoiceController extends Controller
         $calculatedSubtotal = 0;
         $itemsData = [];
 
+        $activeSchemes = \App\Models\DiscountScheme::where('active', true)
+            ->where(function ($query) {
+                $today = date('Y-m-d');
+                $query->whereNull('start_date')->orWhere('start_date', '<=', $today);
+            })
+            ->where(function ($query) {
+                $today = date('Y-m-d');
+                $query->whereNull('end_date')->orWhere('end_date', '>=', $today);
+            })
+            ->get();
+
         foreach ($validatedData['items'] as $itemInput) {
-            $itemTotal = ($itemInput['qty'] * $itemInput['unitPrice']) - $itemInput['discountAmount'];
+            $discountAmount = 0;
+            $unitPrice = $itemInput['unitPrice'];
+            $qty = $itemInput['qty'];
+
+            if (!empty($itemInput['product_id'])) {
+                $product = \App\Models\Product::find($itemInput['product_id']);
+                if ($product) {
+                    $discountAmount = $this->calculateDiscount($product, $activeSchemes);
+                    $unitPrice = max(0, $product->sales_price - $discountAmount);
+                    $costPrice = $product->buying_cost * $qty;
+                } else {
+                    $costPrice = 0;
+                }
+            } else {
+                $costPrice = 0;
+            }
+
+            $itemTotal = ($qty * $unitPrice) - $discountAmount;
             $calculatedSubtotal += $itemTotal;
 
             $itemsData[] = [
                 'product_id' => $itemInput['product_id'] ?? null,
                 'description' => $itemInput['description'],
-                'quantity' => $itemInput['qty'],
-                'unit_price' => $itemInput['unitPrice'],
-                'discount_amount' => $itemInput['discountAmount'],
+                'quantity' => $qty,
+                'unit_price' => $unitPrice,
+                'discount_amount' => $discountAmount,
                 'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
                 'total' => $itemTotal,
+                'cost_price' => $costPrice,
             ];
         }
 
@@ -153,10 +183,34 @@ class SalesInvoiceController extends Controller
         $calculatedSubtotal = 0;
         $itemsData = [];
 
+        $activeSchemes = \App\Models\DiscountScheme::where('active', true)
+            ->where(function ($query) {
+                $today = date('Y-m-d');
+                $query->whereNull('start_date')->orWhere('start_date', '<=', $today);
+            })
+            ->where(function ($query) {
+                $today = date('Y-m-d');
+                $query->whereNull('end_date')->orWhere('end_date', '>=', $today);
+            })
+            ->get();
+
         foreach ($validatedData['items'] as $itemInput) {
-            $qty = $itemInput['qty'] ?? 0;
+            $discountAmount = 0;
             $unitPrice = $itemInput['unitPrice'] ?? 0;
-            $discountAmount = $itemInput['discountAmount'] ?? 0;
+            $qty = $itemInput['qty'] ?? 0;
+
+            if (!empty($itemInput['product_id'])) {
+                $product = \App\Models\Product::find($itemInput['product_id']);
+                if ($product) {
+                    $discountAmount = $this->calculateDiscount($product, $activeSchemes);
+                    $unitPrice = max(0, $product->sales_price - $discountAmount);
+                    $costPrice = $product->buying_cost * $qty;
+                } else {
+                    $costPrice = 0;
+                }
+            } else {
+                $costPrice = 0;
+            }
 
             $itemTotal = ($qty * $unitPrice) - $discountAmount;
             $calculatedSubtotal += $itemTotal;
@@ -169,6 +223,7 @@ class SalesInvoiceController extends Controller
                 'discount_amount' => $discountAmount,
                 'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
                 'total' => $itemTotal,
+                'cost_price' => $costPrice,
             ];
         }
 

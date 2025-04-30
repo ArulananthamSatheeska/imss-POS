@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable'; // For PDF table generation
+import 'jspdf-autotable';
 
-// Helper component for displaying bill details (items)
 const BillDetailsTable = ({ items }) => {
     return (
         <div className="overflow-x-auto mt-4">
             <table className="min-w-full bg-white dark:bg-slate-800 text-black dark:text-white">
-                <thead className=" bg-white dark:bg-slate-800 text-black dark:text-white">
+                <thead className="bg-white dark:bg-slate-800 text-black dark:text-white">
                     <tr>
                         <th className="px-4 py-2">Product Name</th>
                         <th className="px-4 py-2">Quantity</th>
@@ -27,7 +26,7 @@ const BillDetailsTable = ({ items }) => {
                             <td className="px-4 py-2 text-right">LKR {item.costPrice}</td>
                             <td className="px-4 py-2 text-right">LKR {item.sellingPrice}</td>
                             <td className="px-4 py-2 text-right">LKR {item.profit}</td>
-                            <td className="px-4 py-2 text-right">{item.profitPercentage}%</td>
+                            <td className="px-4 py-2 text-right">{item.profitPercentage}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -49,7 +48,7 @@ const BillWiseReportTable = ({ data, columns, renderCell }) => {
     return (
         <div className="overflow-x-auto">
             <table className="min-w-full bg-white dark:bg-slate-800 text-black dark:text-white">
-                <thead className=" bg-white dark:bg-slate-800 text-black dark:text-white">
+                <thead className="bg-white dark:bg-slate-800 text-black dark:text-white">
                     <tr>
                         {columns.map((column, index) => (
                             <th key={index} className="px-4 py-2">
@@ -84,39 +83,22 @@ const BillWiseReportTable = ({ data, columns, renderCell }) => {
 };
 
 const BillWiseProfitReport = () => {
-    // Helper functions for default dates
-    const getCurrentDate = () => {
-        const today = new Date();
-        return today.toISOString().split('T')[0]; // YYYY-MM-DD format
-    };
-    const getOneMonthBeforeDate = () => {
-        const today = new Date();
-        const oneMonthBefore = new Date(today.setMonth(today.getMonth() - 1));
-        return oneMonthBefore.toISOString().split('T')[0]; // YYYY-MM-DD format
-    };
-
     // State management
-    const [fromDate, setFromDate] = useState(getOneMonthBeforeDate());
-    const [toDate, setToDate] = useState(getCurrentDate());
-    const [paymentMethodFilter, setPaymentMethodFilter] = useState('cash'); // Default to 'cash'
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [reportData, setReportData] = useState([]);
     const [summary, setSummary] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-    const [selectedBill, setSelectedBill] = useState(null); // Track selected bill for details
 
-    // Fetch report data from the backend
+    // Fetch all report data initially without filters
     const fetchReportData = async () => {
-        console.log("Fetching report data with parameters:", { fromDate, toDate, paymentMethod: paymentMethodFilter });
-
         try {
             setIsLoading(true);
-            const response = await axios.get("http://127.0.0.1:8000/api/sales/bill-wise-profit-report", {
-                params: { fromDate, toDate, paymentMethod: paymentMethodFilter },
-            });
-            console.log("Fetched report data:", response.data); // Log the entire response data
-            console.log("Report data structure:", response.data.reportData); // Log the structure of reportData
+            const response = await axios.get("http://127.0.0.1:8000/api/sales/bill-wise-profit-report");
+            console.log("Fetched all report data:", response.data);
             setReportData(response.data.reportData || []);
             setSummary(response.data.summary || {});
             setError('');
@@ -128,40 +110,66 @@ const BillWiseProfitReport = () => {
         }
     };
 
-    // Fetch data when filters change
+    // Fetch filtered data when filters are applied
+    const fetchFilteredData = async () => {
+        try {
+            setIsLoading(true);
+            const params = {};
+            if (fromDate) params.fromDate = fromDate;
+            if (toDate) params.toDate = toDate;
+            if (paymentMethodFilter) params.paymentMethod = paymentMethodFilter;
+
+            const response = await axios.get("http://127.0.0.1:8000/api/sales/bill-wise-profit-report", { params });
+            console.log("Fetched filtered report data:", response.data);
+            setReportData(response.data.reportData || []);
+            setSummary(response.data.summary || {});
+            setError('');
+        } catch (error) {
+            console.error("Error fetching filtered report data:", error);
+            setError('Failed to fetch filtered report. Check the console for details.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Fetch all data on component mount
     useEffect(() => {
         fetchReportData();
+    }, []);
+
+    // Fetch filtered data when filters change
+    useEffect(() => {
+        if (fromDate || toDate || paymentMethodFilter) {
+            fetchFilteredData();
+        }
     }, [fromDate, toDate, paymentMethodFilter]);
 
     // Generate report data with calculated profits
     const generateReportData = () => {
-        console.log("Generating report data from fetched data:", reportData);
-
         return reportData.map((bill) => ({
             billNo: bill.bill_number,
-            date: new Date(bill.date).toLocaleDateString('en-GB'), // DD/MM/YYYY format
-            customerName: bill.customer_name || 'Walk-in Customer', // Fallback to 'Walk-in Customer'
-            paymentMethod: bill.payment_type || 'cash', // Fallback to 'Cash'
+            date: bill.date,
+            customerName: bill.customer_name || 'Walk-in Customer',
+            paymentMethod: bill.payment_type || 'cash',
             totalCostPrice: bill.totalCostPrice,
             totalSellingPrice: bill.totalSellingPrice,
             totalProfit: bill.totalProfit,
             profitPercentage: bill.profitPercentage,
-            isProfit: parseFloat(bill.totalProfit) >= 0,
-            items: bill.items || [], // Include nested items
+            isProfit: parseFloat(bill.totalProfit.replace(/,/g, '')) >= 0,
+            items: bill.items || [],
         }));
     };
 
-    // Filtered data based on filters
+    // Filtered data based on search query
     const filteredData = generateReportData().filter((row) => {
         return Object.values(row).some((value) =>
             value.toString().toLowerCase().includes(searchQuery.toLowerCase())
         );
     });
 
-    // Flatten data for export (bill headers + item details)
+    // Flatten data for export
     const flattenDataForExport = () => {
         return filteredData.flatMap((bill) => [
-            // Bill header
             {
                 'Bill No.': bill.billNo,
                 Date: bill.date,
@@ -172,7 +180,6 @@ const BillWiseProfitReport = () => {
                 'Total Profit': bill.totalProfit,
                 'Profit %': bill.profitPercentage,
             },
-            // Item rows
             ...bill.items.map((item) => ({
                 'Product Name': item.product_name,
                 Quantity: item.quantity,
@@ -198,11 +205,9 @@ const BillWiseProfitReport = () => {
         const flatData = flattenDataForExport();
         const doc = new jsPDF();
 
-        // Add title
         doc.setFontSize(18);
         doc.text("Bill Wise Profit Report", 10, 10);
 
-        // Define table columns and rows
         const columns = [
             'Bill No.',
             'Date',
@@ -224,20 +229,26 @@ const BillWiseProfitReport = () => {
             row['Profit %'],
         ]);
 
-        // Add table
         doc.autoTable({
             head: [columns],
             body: rows,
-            startY: 20, // Start below the title
+            startY: 20,
         });
 
-        // Save the PDF
         doc.save("Bill_Wise_Profit_Report.pdf");
     };
 
+    // Reset filters to show all data
+    const resetFilters = () => {
+        setFromDate('');
+        setToDate('');
+        setPaymentMethodFilter('');
+        setSearchQuery('');
+        fetchReportData();
+    };
+
     return (
-        <div className="p-4  bg-white dark:bg-slate-800 text-black dark:text-white min-h-screen flex flex-col">
-            {/* Header */}
+        <div className="p-4 bg-white dark:bg-slate-800 text-black dark:text-white min-h-screen flex flex-col">
             <div className="bg-blue-600 text-white text-center p-4 rounded-t-lg">
                 <h1 className="text-2xl font-bold">Bill Wise Profit Report</h1>
             </div>
@@ -279,6 +290,7 @@ const BillWiseProfitReport = () => {
                         onChange={(e) => setPaymentMethodFilter(e.target.value)}
                         className="border text-black border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                        <option value="">All Methods</option>
                         <option value="cash">Cash</option>
                         <option value="card">Card</option>
                         <option value="online">Online</option>
@@ -288,25 +300,33 @@ const BillWiseProfitReport = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-4 mb-4">
+            <div className="flex justify-between mb-4">
                 <button
-                    onClick={exportToExcel}
-                    className="bg-green-500 text-white dark:text-slate-600 px-4 py-2 rounded-lg hover:bg-green-600 transition duration-300"
+                    onClick={resetFilters}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition duration-300"
                 >
-                    Export to Excel
+                    Reset Filters
                 </button>
-                <button
-                    onClick={exportToPDF}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-300"
-                >
-                    Export to PDF
-                </button>
-                <button
-                    onClick={() => window.print()}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
-                >
-                    Print
-                </button>
+                <div className="flex gap-4">
+                    <button
+                        onClick={exportToExcel}
+                        className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-300"
+                    >
+                        Export to Excel
+                    </button>
+                    <button
+                        onClick={exportToPDF}
+                        className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-300"
+                    >
+                        Export to PDF
+                    </button>
+                    <button
+                        onClick={() => window.print()}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
+                    >
+                        Print
+                    </button>
+                </div>
             </div>
 
             {/* Loading State */}
@@ -314,6 +334,13 @@ const BillWiseProfitReport = () => {
                 <div className="text-center py-4">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
                     <p className="mt-2">Loading report data...</p>
+                </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
+                    <p>{error}</p>
                 </div>
             )}
 
@@ -335,68 +362,33 @@ const BillWiseProfitReport = () => {
                             "Items",
                         ]}
                         renderCell={(row, column, toggleExpand, isExpanded, rowIndex) => {
-                            if (column === "No.") {
-                                return rowIndex + 1; // Use rowIndex to display the row number
-                            }
-                            if (column === "Bill No.") {
-                                return row.billNo; // Display Bill Number
-                            }
-                            if (column === "Date") {
-                                return row.date; // Display Date
-                            }
-                            if (column === "Customer Name") {
-                                return row.customerName; // Display Customer Name
-                            }
-                            if (column === "Payment Method") {
-                                return row.paymentMethod; // Display Payment Method
-                            }
-                            if (column === "Total Cost Price") {
-                                return row.totalCostPrice; // Display Total Cost Price
-                            }
-                            if (column === "Total Selling Price") {
-                                return row.totalSellingPrice; // Display Total Selling Price
-                            }
-                            if (column === "Total Profit") {
-                                return (
-                                    <span
-                                        className={row.isProfit ? 'text-green-600' : 'text-red-600'}
-                                    >
-                                        {row.totalProfit}
-                                    </span>
-                                );
-                            }
-                            if (column === "Profit %") {
-                                return (
-                                    <span
-                                        className={row.isProfit ? 'text-green-600' : 'text-red-600'}
-                                    >
-                                        {row.profitPercentage}%
-                                    </span>
-                                );
-                            }
-                            if (column === "Items") {
-                                return (
-                                    <button
-                                        onClick={toggleExpand}
-                                        className="text-blue-500 hover:text-blue-700"
-                                    >
-                                        {isExpanded ? '▲ Hide' : '▼ Show'} Items
-                                    </button>
-                                );
-                            }
-
+                            if (column === "No.") return rowIndex + 1;
+                            if (column === "Bill No.") return row.billNo;
+                            if (column === "Date") return row.date;
+                            if (column === "Customer Name") return row.customerName;
+                            if (column === "Payment Method") return row.paymentMethod;
+                            if (column === "Total Cost Price") return `LKR ${row.totalCostPrice}`;
+                            if (column === "Total Selling Price") return `LKR ${row.totalSellingPrice}`;
+                            if (column === "Total Profit") return (
+                                <span className={row.isProfit ? 'text-green-600' : 'text-red-600'}>
+                                    LKR {row.totalProfit}
+                                </span>
+                            );
+                            if (column === "Profit %") return (
+                                <span className={row.isProfit ? 'text-green-600' : 'text-red-600'}>
+                                    {row.profitPercentage}
+                                </span>
+                            );
+                            if (column === "Items") return (
+                                <button
+                                    onClick={toggleExpand}
+                                    className="text-blue-500 hover:text-blue-700"
+                                >
+                                    {isExpanded ? '▲ Hide' : '▼ Show'} Items
+                                </button>
+                            );
                         }}
                     />
-
-                    {/* Bill Details Table */}
-                    {selectedBill && (
-                        <div className="mt-4">
-                            <h2 className="text-xl font-bold mb-2">Bill Details</h2>
-                            <BillDetailsTable
-                                items={filteredData.find((bill) => bill.billNo === selectedBill)?.items || []}
-                            />
-                        </div>
-                    )}
 
                     {/* Summary Section */}
                     <div className="bg-white dark:bg-slate-700 rounded-lg shadow-lg p-4 mt-4">
@@ -405,7 +397,7 @@ const BillWiseProfitReport = () => {
                             <div className="bg-cyan-700 p-4 text-center rounded-lg">
                                 <p className="text-blue-300">Total Profit</p>
                                 <p className="text-2xl font-bold text-cyan-400">
-                                    LKR {summary.totalProfitAll || 0}
+                                    LKR {summary.totalProfitAll || '0.00'}
                                 </p>
                             </div>
                             <div className="bg-emerald-700 p-4 text-center rounded-lg">
@@ -417,7 +409,7 @@ const BillWiseProfitReport = () => {
                             <div className="bg-fuchsia-700 p-4 text-center rounded-lg">
                                 <p className="text-fuchsia-300">Total Cost Price</p>
                                 <p className="text-2xl font-bold text-fuchsia-400">
-                                    LKR {summary.totalCostPriceAll || 0}
+                                    LKR {summary.totalCostPriceAll || '0.00'}
                                 </p>
                             </div>
                         </div>

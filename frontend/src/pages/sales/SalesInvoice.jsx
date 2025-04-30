@@ -22,7 +22,7 @@ const SalesInvoice = ({
       },
       customer: { name: '', address: '', phone: '', email: '' },
       items: [
-        { id: Date.now(), description: '', qty: 1, unitPrice: 0, discountAmount: 0, discountPercentage: 0, total: 0, productId: null },
+        { id: Date.now(), description: '', qty: 1, costPrice: 0, discountAmount: 0, discountPercentage: 0, total: 0, productId: null },
       ],
       purchaseDetails: { method: 'cash', amount: 0 },
       status: 'pending',
@@ -126,7 +126,7 @@ const SalesInvoice = ({
         const newItems = [...newData.items];
         if (!newItems[index]) return prevFormData;
 
-        if (type === 'number' || ['qty', 'unitPrice', 'discountAmount', 'discountPercentage'].includes(targetName)) {
+        if (type === 'number' || ['qty', 'costPrice', 'discountAmount', 'discountPercentage'].includes(targetName)) {
           processedValue = value === '' ? '' : parseFloat(value);
           if (isNaN(processedValue) && value !== '') {
             processedValue = 0;
@@ -137,8 +137,8 @@ const SalesInvoice = ({
         // Recalculate item total and sync discounts
         const item = newItems[index];
         const qty = parseFloat(item.qty) || 0;
-        const unitPrice = parseFloat(item.unitPrice) || 0;
-        const totalBeforeDiscount = qty * unitPrice;
+        const costPrice = parseFloat(item.costPrice) || 0;
+        const totalBeforeDiscount = qty * costPrice;
 
         if (targetName === 'discountAmount') {
           const discountAmount = Math.max(0, parseFloat(item.discountAmount) || 0);
@@ -196,7 +196,7 @@ const SalesInvoice = ({
         ...newItems[index],
         productId: product ? product.product_id : null,
         description: product ? product.product_name : '',
-        unitPrice: product ? parseFloat(product.sales_price) || 0 : 0,
+        costPrice: product ? parseFloat(product.sales_price) || 0 : 0,
         qty: newItems[index].qty || 1,
         discountAmount: newItems[index].discountAmount || 0,
         discountPercentage: newItems[index].discountPercentage || 0,
@@ -204,8 +204,8 @@ const SalesInvoice = ({
 
       // Recalculate total
       const qty = parseFloat(newItems[index].qty) || 0;
-      const unitPrice = parseFloat(newItems[index].unitPrice) || 0;
-      const totalBeforeDiscount = qty * unitPrice;
+      const costPrice = parseFloat(newItems[index].costPrice) || 0;
+      const totalBeforeDiscount = qty * costPrice;
       const discountAmount = Math.max(0, parseFloat(newItems[index].discountAmount) || 0);
       newItems[index].total = totalBeforeDiscount - Math.min(totalBeforeDiscount, discountAmount);
 
@@ -216,7 +216,7 @@ const SalesInvoice = ({
     setErrors((prev) => ({
       ...prev,
       [`itemDescription${index}`]: undefined,
-      [`itemUnitPrice${index}`]: undefined,
+      [`itemcostPrice${index}`]: undefined,
     }));
   };
 
@@ -230,7 +230,7 @@ const SalesInvoice = ({
           id: Date.now(),
           description: '',
           qty: 1,
-          unitPrice: 0,
+          costPrice: 0,
           discountAmount: 0,
           discountPercentage: 0,
           total: 0,
@@ -261,7 +261,7 @@ const SalesInvoice = ({
   }, [formData.items]);
 
   const calculateTax = useCallback((subtotal) => {
-    return subtotal * 0.10;
+    return subtotal * 0;
   }, []);
 
   const calculateTotal = useCallback(() => {
@@ -299,8 +299,8 @@ const SalesInvoice = ({
         if (!item.description?.trim()) newErrors[`itemDescription${idx}`] = 'Description is required';
         const qty = parseFloat(item.qty);
         if (isNaN(qty) || qty <= 0) newErrors[`itemQty${idx}`] = 'Qty must be > 0';
-        const unitPrice = parseFloat(item.unitPrice);
-        if (isNaN(unitPrice) || unitPrice < 0) newErrors[`itemUnitPrice${idx}`] = 'Price >= 0';
+        const costPrice = parseFloat(item.costPrice);
+        if (isNaN(costPrice) || costPrice < 0) newErrors[`itemcostPrice${idx}`] = 'Price >= 0';
         const discountAmount = parseFloat(item.discountAmount);
         if (!isNaN(discountAmount) && discountAmount < 0)
           newErrors[`itemDiscountAmount${idx}`] = 'Disc. Amt >= 0';
@@ -370,7 +370,7 @@ const SalesInvoice = ({
         items: formData.items.map((item) => ({
           description: item.description,
           qty: parseFloat(item.qty) || 0,
-          unitPrice: parseFloat(item.unitPrice) || 0,
+          costPrice: parseFloat(item.costPrice) || 0,
           discountAmount: parseFloat(item.discountAmount) || 0,
           discountPercentage: parseFloat(item.discountPercentage) || 0,
           product_id: item.productId || null,
@@ -405,7 +405,7 @@ const SalesInvoice = ({
                 id: Date.now(),
                 description: '',
                 qty: 1,
-                unitPrice: 0,
+                costPrice: 0,
                 discountAmount: 0,
                 discountPercentage: 0,
                 total: 0,
@@ -442,15 +442,15 @@ const SalesInvoice = ({
                 const frontendField =
                   field === 'qty'
                     ? 'Qty'
-                    : field === 'unitPrice'
-                    ? 'UnitPrice'
-                    : field === 'discountAmount'
-                    ? 'DiscountAmount'
-                    : field === 'discountPercentage'
-                    ? 'DiscountPercentage'
-                    : field === 'product_id'
-                    ? 'Description'
-                    : field.charAt(0).toUpperCase() + field.slice(1);
+                    : field === 'costPrice'
+                      ? 'costPrice'
+                      : field === 'discountAmount'
+                        ? 'DiscountAmount'
+                        : field === 'discountPercentage'
+                          ? 'DiscountPercentage'
+                          : field === 'product_id'
+                            ? 'Description'
+                            : field.charAt(0).toUpperCase() + field.slice(1);
                 mappedErrors[`item${frontendField}${index}`] = message;
               }
             } else if (key.startsWith('customer.')) {
@@ -498,7 +498,7 @@ const SalesInvoice = ({
   const handleItemKeyDown = (index, fieldName, e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const fieldsOrder = ['description', 'qty', 'unitPrice', 'discountAmount', 'discountPercentage'];
+      const fieldsOrder = ['description', 'qty', 'costPrice', 'discountAmount', 'discountPercentage'];
       const currentFieldIndex = fieldsOrder.indexOf(fieldName);
 
       if (currentFieldIndex === -1) return;
@@ -608,9 +608,8 @@ const SalesInvoice = ({
                   name="no"
                   value={formData.invoice.no}
                   onChange={(e) => handleInputChange(e, 'invoice', 'no')}
-                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${
-                    errors.invoiceNo ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
-                  }`}
+                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.invoiceNo ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
+                    }`}
                   placeholder="e.g., INV-2024-001"
                   aria-invalid={!!errors.invoiceNo}
                   aria-describedby="invoiceNoError"
@@ -634,9 +633,8 @@ const SalesInvoice = ({
                   name="date"
                   value={formData.invoice.date}
                   onChange={(e) => handleInputChange(e, 'invoice', 'date')}
-                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${
-                    errors.invoiceDate ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
-                  }`}
+                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.invoiceDate ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
+                    }`}
                   aria-invalid={!!errors.invoiceDate}
                   aria-describedby="invoiceDateError"
                   required
@@ -675,9 +673,8 @@ const SalesInvoice = ({
                   name="time"
                   value={formData.invoice.time}
                   onChange={(e) => handleInputChange(e, 'invoice', 'time')}
-                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${
-                    errors.invoiceTime ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hoverPretty-printed code block: border-gray-500'
-                  }`}
+                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.invoiceTime ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hoverPretty-printed code block: border-gray-500'
+                    }`}
                   aria-invalid={!!errors.invoiceTime}
                   aria-describedby="invoiceTimeError"
                   step="60"
@@ -725,9 +722,8 @@ const SalesInvoice = ({
                   name="name"
                   value={formData.customer.name}
                   onChange={(e) => handleInputChange(e, 'customer', 'name')}
-                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${
-                    errors.customerName ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
-                  }`}
+                  className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.customerName ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
+                    }`}
                   placeholder="John Doe"
                   aria-invalid={!!errors.customerName}
                   aria-describedby="customerNameError"
@@ -796,9 +792,8 @@ const SalesInvoice = ({
                     name="email"
                     value={formData.customer.email}
                     onChange={(e) => handleInputChange(e, 'customer', 'email')}
-                    className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${
-                      errors.customerEmail ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
-                    }`}
+                    className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all ${errors.customerEmail ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
+                      }`}
                     placeholder="customer@example.com"
                     aria-invalid={!!errors.customerEmail}
                     aria-describedby="customerEmailError"
@@ -898,9 +893,8 @@ const SalesInvoice = ({
                     return (
                       <tr
                         key={item.id}
-                        className={`${
-                          index % 2 === 0 ? 'bg-gray-700/30' : 'bg-gray-700/20'
-                        } hover:bg-gray-700/40 transition-colors`}
+                        className={`${index % 2 === 0 ? 'bg-gray-700/30' : 'bg-gray-700/20'
+                          } hover:bg-gray-700/40 transition-colors`}
                       >
                         <td className="p-2 align-top">
                           <Select
@@ -931,9 +925,8 @@ const SalesInvoice = ({
                             value={item.qty}
                             onChange={(e) => handleInputChange(e, 'items', 'qty', index)}
                             onKeyDown={(e) => handleItemKeyDown(index, 'qty', e)}
-                            className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-center transition-all ${
-                              errors[`itemQty${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'
-                            }`}
+                            className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-center transition-all ${errors[`itemQty${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'
+                              }`}
                             step="any"
                             placeholder=""
                             aria-invalid={!!errors[`itemQty${index}`]}
@@ -948,25 +941,24 @@ const SalesInvoice = ({
                         </td>
                         <td className="p-2 align-top">
                           <input
-                            ref={(el) => setItemRef(el, index, 'unitPrice')}
+                            ref={(el) => setItemRef(el, index, 'costPrice')}
                             type="number"
-                            name="unitPrice"
-                            value={item.unitPrice}
-                            onChange={(e) => handleInputChange(e, 'items', 'unitPrice', index)}
-                            onKeyDown={(e) => handleItemKeyDown(index, 'unitPrice', e)}
-                            className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${
-                              errors[`itemUnitPrice${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'
-                            }`}
+                            name="costPrice"
+                            value={item.costPrice}
+                            onChange={(e) => handleInputChange(e, 'items', 'costPrice', index)}
+                            onKeyDown={(e) => handleItemKeyDown(index, 'costPrice', e)}
+                            className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${errors[`itemcostPrice${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'
+                              }`}
                             min="0"
                             step="0.01"
                             placeholder="0.00"
-                            aria-invalid={!!errors[`itemUnitPrice${index}`]}
-                            aria-describedby={`itemUnitPriceError${index}`}
+                            aria-invalid={!!errors[`itemcostPrice${index}`]}
+                            aria-describedby={`itemcostPriceError${index}`}
                             required
                           />
-                          {errors[`itemUnitPrice${index}`] && (
-                            <p id={`itemUnitPriceError${index}`} className="mt-1 text-xs text-red-400">
-                              {errors[`itemUnitPrice${index}`]}
+                          {errors[`itemcostPrice${index}`] && (
+                            <p id={`itemcostPriceError${index}`} className="mt-1 text-xs text-red-400">
+                              {errors[`itemcostPrice${index}`]}
                             </p>
                           )}
                         </td>
@@ -978,9 +970,8 @@ const SalesInvoice = ({
                             value={item.discountAmount}
                             onChange={(e) => handleInputChange(e, 'items', 'discountAmount', index)}
                             onKeyDown={(e) => handleItemKeyDown(index, 'discountAmount', e)}
-                            className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${
-                              errors[`itemDiscountAmount${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'
-                            }`}
+                            className={`w-full p-2 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${errors[`itemDiscountAmount${index}`] ? 'border-red-500' : 'border-gray-600/30 hover:border-gray-500'
+                              }`}
                             min="0"
                             step="0.01"
                             placeholder="0.00"
@@ -1002,11 +993,10 @@ const SalesInvoice = ({
                               value={item.discountPercentage}
                               onChange={(e) => handleInputChange(e, 'items', 'discountPercentage', index)}
                               onKeyDown={(e) => handleItemKeyDown(index, 'discountPercentage', e)}
-                              className={`w-full p-2 pr-6 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${
-                                errors[`itemDiscountPercentage${index}`]
-                                  ? 'border-red-500'
-                                  : 'border-gray-600/30 hover:border-gray-500'
-                              }`}
+                              className={`w-full p-2 pr-6 bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-white text-right transition-all ${errors[`itemDiscountPercentage${index}`]
+                                ? 'border-red-500'
+                                : 'border-gray-600/30 hover:border-gray-500'
+                                }`}
                               min="0"
                               max="100"
                               step="1"
@@ -1032,11 +1022,10 @@ const SalesInvoice = ({
                             type="button"
                             onClick={() => removeItem(index)}
                             disabled={formData.items.length <= 1}
-                            className={`p-1.5 rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 ${
-                              formData.items.length <= 1
-                                ? 'text-gray-500 cursor-not-allowed'
-                                : 'text-red-500 hover:bg-red-500/20 hover:text-red-400'
-                            }`}
+                            className={`p-1.5 rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 ${formData.items.length <= 1
+                              ? 'text-gray-500 cursor-not-allowed'
+                              : 'text-red-500 hover:bg-red-500/20 hover:text-red-400'
+                              }`}
                             title={formData.items.length <= 1 ? 'Cannot remove the only item' : 'Remove this item'}
                             aria-label={`Remove item ${index + 1}`}
                           >
@@ -1102,9 +1091,8 @@ const SalesInvoice = ({
                       name="amount"
                       value={formData.purchaseDetails.amount}
                       onChange={(e) => handleInputChange(e, 'purchaseDetails', 'amount')}
-                      className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white text-right transition-all ${
-                        errors.purchaseAmount ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
-                      }`}
+                      className={`w-full p-3 bg-gray-700/80 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white text-right transition-all ${errors.purchaseAmount ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-600/50 hover:border-gray-500'
+                        }`}
                       min="0"
                       step="0.01"
                       placeholder="0.00"
@@ -1230,9 +1218,8 @@ const SalesInvoice = ({
               <button
                 type="submit"
                 disabled={loading}
-                className={`px-5 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-400 transition-all duration-300 flex items-center shadow-md hover:shadow-blue-500/30 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${
-                  loading ? 'opacity-70 cursor-wait' : ''
-                }`}
+                className={`px-5 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-400 transition-all duration-300 flex items-center shadow-md hover:shadow-blue-500/30 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${loading ? 'opacity-70 cursor-wait' : ''
+                  }`}
               >
                 {loading ? (
                   <>
