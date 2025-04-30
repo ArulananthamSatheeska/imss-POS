@@ -22,8 +22,10 @@ const PurchaseInvoiceForm = ({
       status: "pending",
       discountPercentage: 0,
       discountAmount: 0,
-      taxPercentage: 0, // New field for tax percentage
+      discountAmountEdited: false,
+      taxPercentage: 0,
       tax: 0,
+      taxEdited: false,
     }
   );
 
@@ -34,6 +36,9 @@ const PurchaseInvoiceForm = ({
     quantity: 1,
     freeItems: 0,
     buyingCost: 0,
+    discountPercentage: 0,
+    discountAmount: 0,
+    discountAmountEdited: false,
   });
 
   const [suppliers, setSuppliers] = useState([]);
@@ -52,6 +57,7 @@ const PurchaseInvoiceForm = ({
   const freeItemsInputRef = useRef(null);
   const buyingCostInputRef = useRef(null);
   const discountPercentageInputRef = useRef(null);
+  const discountAmountInputRef = useRef(null);
   const taxPercentageInputRef = useRef(null);
   const taxInputRef = useRef(null);
 
@@ -83,7 +89,7 @@ const PurchaseInvoiceForm = ({
         ? suppliersRes.data
         : [];
       const storesData = Array.isArray(storesRes.data.data)
-        ? storesRes.data.data
+        ? storesData.data.data
         : Array.isArray(storesRes.data)
         ? storesRes.data
         : [];
@@ -179,50 +185,104 @@ const PurchaseInvoiceForm = ({
     }
   }, [itemForm.itemId, products]);
 
-  // Update discount amount based on percentage
+  // Update item discount amount based on percentage
   useEffect(() => {
-    if (invoice.discountPercentage > 0) {
+    if (itemForm.discountPercentage > 0 && !itemForm.discountAmountEdited) {
+      const itemSubtotal =
+        (itemForm.quantity + itemForm.freeItems) * itemForm.buyingCost;
+      setItemForm((prev) => ({
+        ...prev,
+        discountAmount: (itemSubtotal * itemForm.discountPercentage) / 100,
+      }));
+    }
+  }, [
+    itemForm.discountPercentage,
+    itemForm.quantity,
+    itemForm.freeItems,
+    itemForm.buyingCost,
+  ]);
+
+  // Update item discount percentage based on amount
+  useEffect(() => {
+    if (itemForm.discountAmount > 0 && itemForm.discountAmountEdited) {
+      const itemSubtotal =
+        (itemForm.quantity + itemForm.freeItems) * itemForm.buyingCost;
+      const calculatedPercentage =
+        itemSubtotal > 0 ? (itemForm.discountAmount / itemSubtotal) * 100 : 0;
+      setItemForm((prev) => ({
+        ...prev,
+        discountPercentage: parseFloat(calculatedPercentage.toFixed(1)),
+      }));
+    }
+  }, [itemForm.discountAmount]);
+
+  // Update invoice discount amount based on percentage
+  useEffect(() => {
+    if (invoice.discountPercentage > 0 && !invoice.discountAmountEdited) {
       const subtotal = calculateSubtotal();
       setInvoice((prev) => ({
         ...prev,
         discountAmount: (subtotal * invoice.discountPercentage) / 100,
       }));
-    } else {
-      setInvoice((prev) => ({
-        ...prev,
-        discountAmount: 0,
-      }));
     }
   }, [invoice.discountPercentage, items]);
 
-  // Update tax amount based on tax percentage
+  // Update invoice discount percentage based on amount
   useEffect(() => {
-    if (invoice.taxPercentage > 0) {
+    if (invoice.discountAmount > 0 && invoice.discountAmountEdited) {
+      const subtotal = calculateSubtotal();
+      const calculatedPercentage =
+        subtotal > 0 ? (invoice.discountAmount / subtotal) * 100 : 0;
+      setInvoice((prev) => ({
+        ...prev,
+        discountPercentage: parseFloat(calculatedPercentage.toFixed(1)),
+      }));
+    }
+  }, [invoice.discountAmount, items]);
+
+  // Update tax amount based on percentage
+  useEffect(() => {
+    if (invoice.taxPercentage > 0 && !invoice.taxEdited) {
       const subtotal = calculateSubtotal();
       const taxableAmount = subtotal - invoice.discountAmount;
       setInvoice((prev) => ({
         ...prev,
         tax: (taxableAmount * invoice.taxPercentage) / 100,
       }));
-    } else {
-      setInvoice((prev) => ({
-        ...prev,
-        tax: 0,
-      }));
     }
   }, [invoice.taxPercentage, invoice.discountAmount, items]);
 
+  // Update tax percentage based on amount
+  useEffect(() => {
+    if (invoice.tax > 0 && invoice.taxEdited) {
+      const subtotal = calculateSubtotal();
+      const taxableAmount = subtotal - invoice.discountAmount;
+      const calculatedPercentage =
+        taxableAmount > 0 ? (invoice.tax / taxableAmount) * 100 : 0;
+      setInvoice((prev) => ({
+        ...prev,
+        taxPercentage: parseFloat(calculatedPercentage.toFixed(1)),
+      }));
+    }
+  }, [invoice.tax, invoice.discountAmount, items]);
+
   const handleItemFormChange = (e) => {
     const { name, value } = e.target;
-    setItemForm({
-      ...itemForm,
+    setItemForm((prev) => ({
+      ...prev,
       [name]:
         name === "searchQuery"
           ? value
           : name === "itemId"
           ? value
           : parseFloat(value) || 0,
-    });
+      ...(name === "discountPercentage"
+        ? { discountAmountEdited: false, discountAmount: 0 }
+        : {}),
+      ...(name === "discountAmount"
+        ? { discountAmountEdited: true, discountPercentage: 0 }
+        : {}),
+    }));
   };
 
   const handleSelectProduct = (product) => {
@@ -272,12 +332,26 @@ const PurchaseInvoiceForm = ({
   const handleBuyingCostKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      discountPercentageInputRef.current?.focus();
+    }
+  };
+
+  const handleDiscountPercentageKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      discountAmountInputRef.current?.focus();
+    }
+  };
+
+  const handleDiscountAmountKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
       addItem();
       searchInputRef.current?.focus();
     }
   };
 
-  const handleDiscountPercentageKeyDown = (e) => {
+  const handleInvoiceDiscountPercentageKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       taxPercentageInputRef.current?.focus();
@@ -303,15 +377,48 @@ const PurchaseInvoiceForm = ({
         name === "tax"
           ? parseFloat(value) || 0
           : value,
-      // Reset taxPercentage if tax is manually edited
-      ...(name === "tax" && value !== prev.tax ? { taxPercentage: 0 } : {}),
-      // Reset discountPercentage if discountAmount is manually edited
-      ...(name === "discountAmount" && value !== prev.discountAmount
-        ? { discountPercentage: 0 }
+      ...(name === "discountPercentage"
+        ? { discountAmountEdited: false, discountAmount: 0 }
         : {}),
+      ...(name === "discountAmount"
+        ? { discountAmountEdited: true, discountPercentage: 0 }
+        : {}),
+      ...(name === "taxPercentage" ? { taxEdited: false, tax: 0 } : {}),
+      ...(name === "tax" ? { taxEdited: true, taxPercentage: 0 } : {}),
     }));
   };
 
+  // const addItem = () => {
+  //   const selectedItem = products.find(
+  //     (p) => p.product_id === parseInt(itemForm.itemId)
+  //   );
+  //   if (!selectedItem) {
+  //     setErrors({ item: "Please select a valid item." });
+  //     toast.error("Please select a valid item.");
+  //     return;
+  //   }
+
+  //   const totalQuantity = itemForm.quantity + itemForm.freeItems;
+  //   const subtotal = totalQuantity * itemForm.buyingCost;
+  //   const total = subtotal - itemForm.discountAmount;
+
+  //   const newItem = {
+  //     id: items.length + 1,
+  //     productId: selectedItem.product_id,
+  //     description: selectedItem.product_name,
+  //     quantity: itemForm.quantity,
+  //     freeItems: itemForm.freeItems,
+  //     buyingCost: itemForm.buyingCost,
+  //     discountPercentage: itemForm.discountPercentage,
+  //     discountAmount: itemForm.discountAmount,
+  //     subtotal,
+  //     total,
+  //   };
+
+  //   setItems([...items, newItem]);
+  //   resetItemForm();
+  //   searchInputRef.current?.focus();
+  // };
   const addItem = () => {
     const selectedItem = products.find(
       (p) => p.product_id === parseInt(itemForm.itemId)
@@ -323,7 +430,8 @@ const PurchaseInvoiceForm = ({
     }
 
     const totalQuantity = itemForm.quantity + itemForm.freeItems;
-    const total = totalQuantity * itemForm.buyingCost;
+    const subtotal = totalQuantity * itemForm.buyingCost;
+    const total = subtotal - itemForm.discountAmount;
 
     const newItem = {
       id: items.length + 1,
@@ -332,6 +440,9 @@ const PurchaseInvoiceForm = ({
       quantity: itemForm.quantity,
       freeItems: itemForm.freeItems,
       buyingCost: itemForm.buyingCost,
+      discountPercentage: itemForm.discountPercentage,
+      discountAmount: itemForm.discountAmount,
+      subtotal,
       total,
     };
 
@@ -339,7 +450,6 @@ const PurchaseInvoiceForm = ({
     resetItemForm();
     searchInputRef.current?.focus();
   };
-
   const resetItemForm = () => {
     setItemForm({
       itemId: "",
@@ -347,6 +457,9 @@ const PurchaseInvoiceForm = ({
       quantity: 1,
       freeItems: 0,
       buyingCost: 0,
+      discountPercentage: 0,
+      discountAmount: 0,
+      discountAmountEdited: false,
     });
     setShowSuggestions(false);
     setHighlightedIndex(-1);
@@ -357,11 +470,19 @@ const PurchaseInvoiceForm = ({
     setItems(items.filter((_, idx) => idx !== index));
   };
 
-  const calculateSubtotal = () => {
+  const calculateItemSubtotal = () => {
     return items.reduce(
       (sum, item) => sum + (item.quantity + item.freeItems) * item.buyingCost,
       0
     );
+  };
+
+  const calculateTotalItemDiscount = () => {
+    return items.reduce((sum, item) => sum + item.discountAmount, 0);
+  };
+
+  const calculateSubtotal = () => {
+    return calculateItemSubtotal() - calculateTotalItemDiscount();
   };
 
   const calculateFinalTotal = () => {
@@ -385,15 +506,22 @@ const PurchaseInvoiceForm = ({
     if (items.length === 0) newErrors.items = "At least one item is required";
     if (invoice.paidAmount < 0)
       newErrors.paidAmount = "Paid amount cannot be negative";
-    if (invoice.paidAmount > calculateFinalTotal())
-      newErrors.paidAmount = "Paid amount cannot exceed total";
     if (invoice.discountPercentage < 0)
-      newErrors.discountPercentage = "Discount percentage cannot be negative";
+      newErrors.discountPercentage =
+        "Invoice discount percentage cannot be negative";
     if (invoice.discountAmount < 0)
-      newErrors.discountAmount = "Discount amount cannot be negative";
+      newErrors.discountAmount = "Invoice discount amount cannot be negative";
     if (invoice.taxPercentage < 0)
       newErrors.taxPercentage = "Tax percentage cannot be negative";
     if (invoice.tax < 0) newErrors.tax = "Tax cannot be negative";
+    items.forEach((item, index) => {
+      if (item.discountPercentage < 0)
+        newErrors[`item_${index}_discountPercentage`] =
+          "Item discount percentage cannot be negative";
+      if (item.discountAmount < 0)
+        newErrors[`item_${index}_discountAmount`] =
+          "Item discount amount cannot be negative";
+    });
     setErrors((prev) => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
@@ -424,6 +552,8 @@ const PurchaseInvoiceForm = ({
         quantity: item.quantity + item.freeItems,
         freeItems: item.freeItems,
         buyingCost: item.buyingCost,
+        discountPercentage: item.discountPercentage,
+        discountAmount: item.discountAmount,
       })),
       total: calculateFinalTotal(),
     };
@@ -613,7 +743,7 @@ const PurchaseInvoiceForm = ({
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
                   Add Item
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
                   <div ref={searchRef} className="relative">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Search Item
@@ -714,7 +844,73 @@ const PurchaseInvoiceForm = ({
                       disabled={loading}
                     />
                   </div>
-                  <div className="flex items-end gap-2">
+                  {/* <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Discount
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        ref={discountPercentageInputRef}
+                        type="number"
+                        name="discountPercentage"
+                        value={itemForm.discountPercentage.toFixed(1)}
+                        onChange={handleItemFormChange}
+                        onKeyDown={handleDiscountPercentageKeyDown}
+                        className="w-1/2 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        placeholder="%"
+                        min="0"
+                        step="0.1"
+                        disabled={loading || !itemForm.itemId}
+                      />
+                      <input
+                        ref={discountAmountInputRef}
+                        type="number"
+                        name="discountAmount"
+                        value={itemForm.discountAmount.toFixed(2)}
+                        onChange={handleItemFormChange}
+                        onKeyDown={handleDiscountAmountKeyDown}
+                        className="w-1/2 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        min="0"
+                        step="0.01"
+                        disabled={loading || !itemForm.itemId}
+                      />
+                    </div>
+                  </div> */}
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Discount
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        ref={discountPercentageInputRef}
+                        type="number"
+                        name="discountPercentage"
+                        value={itemForm.discountPercentage}
+                        onChange={handleItemFormChange}
+                        onKeyDown={handleDiscountPercentageKeyDown}
+                        className="w-16 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        placeholder="%"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        disabled={loading || !itemForm.itemId}
+                      />
+                      <input
+                        ref={discountAmountInputRef}
+                        type="number"
+                        name="discountAmount"
+                        value={itemForm.discountAmount}
+                        onChange={handleItemFormChange}
+                        onKeyDown={handleDiscountAmountKeyDown}
+                        className="w-24 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        min="0"
+                        step="0.01"
+                        disabled={loading || !itemForm.itemId}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
                     <button
                       type="button"
                       onClick={addItem}
@@ -749,6 +945,9 @@ const PurchaseInvoiceForm = ({
                           <th className="p-2 border">Quantity</th>
                           <th className="p-2 border">Free Items</th>
                           <th className="p-2 border">Buying Cost</th>
+                          <th className="p-2 border">Subtotal</th>
+                          <th className="p-2 border">Discount (%)</th>
+                          <th className="p-2 border">Discount ($)</th>
                           <th className="p-2 border">Total</th>
                           <th className="p-2 border">Action</th>
                         </tr>
@@ -765,6 +964,15 @@ const PurchaseInvoiceForm = ({
                             <td className="p-2 border">{item.freeItems}</td>
                             <td className="p-2 border">
                               {item.buyingCost.toFixed(2)}
+                            </td>
+                            <td className="p-2 border">
+                              {item.subtotal.toFixed(2)}
+                            </td>
+                            <td className="p-2 border">
+                              {item.discountPercentage.toFixed(1)}
+                            </td>
+                            <td className="p-2 border">
+                              {item.discountAmount.toFixed(2)}
                             </td>
                             <td className="p-2 border">
                               {item.total.toFixed(2)}
@@ -787,21 +995,30 @@ const PurchaseInvoiceForm = ({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="text-right pr-4">
                       <span className="text-lg font-semibold text-yellow-600 dark:text-gray-200">
+                        Item Subtotal: ${calculateItemSubtotal().toFixed(2)}
+                      </span>
+                      <br />
+                      <span className="text-lg font-semibold text-red-600 dark:text-gray-200">
+                        Total Item Discount: $
+                        {calculateTotalItemDiscount().toFixed(2)}
+                      </span>
+                      <br />
+                      <span className="text-lg font-semibold text-yellow-600 dark:text-gray-200">
                         Subtotal: ${calculateSubtotal().toFixed(2)}
                       </span>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Discount
+                        Invoice Discount
                       </label>
                       <div className="flex space-x-2">
                         <input
                           ref={discountPercentageInputRef}
                           type="number"
                           name="discountPercentage"
-                          value={invoice.discountPercentage}
+                          value={invoice.discountPercentage.toFixed(1)}
                           onChange={handleInvoiceChange}
-                          onKeyDown={handleDiscountPercentageKeyDown}
+                          onKeyDown={handleInvoiceDiscountPercentageKeyDown}
                           className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                           placeholder="%"
                           min="0"
@@ -829,13 +1046,14 @@ const PurchaseInvoiceForm = ({
                           ref={taxPercentageInputRef}
                           type="number"
                           name="taxPercentage"
-                          value={invoice.taxPercentage}
+                          value={invoice.taxPercentage.toFixed(1)}
                           onChange={handleInvoiceChange}
                           onKeyDown={handleTaxPercentageKeyDown}
                           className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                           placeholder="%"
                           min="0"
                           step="0.1"
+                          disabled={calculateSubtotal() === 0}
                         />
                         <input
                           ref={taxInputRef}
@@ -846,6 +1064,7 @@ const PurchaseInvoiceForm = ({
                           className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                           min="0"
                           step="0.01"
+                          disabled={calculateSubtotal() === 0}
                         />
                       </div>
                     </div>

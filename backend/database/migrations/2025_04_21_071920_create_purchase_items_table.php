@@ -15,6 +15,8 @@ class CreatePurchaseItemsTable extends Migration
             $table->integer('quantity');
             $table->integer('free_items')->default(0);
             $table->decimal('buying_cost', 10, 2);
+            $table->decimal('discount_percentage', 5, 2);
+            $table->decimal('discount_amount', 10, 2);
             $table->timestamps();
         });
     }

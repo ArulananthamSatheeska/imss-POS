@@ -20,6 +20,7 @@ use App\Http\Controllers\{
     ProductionCategoryController,
     ProductionItemController,
     PurchaseController,
+    PurchaseReturnController,
     RawMaterialController,
     SalesInvoiceController
 };
@@ -163,3 +164,13 @@ Route::get('units', [RawMaterialController::class, 'getUnits']);
 
 
 Route::apiResource('production-items', ProductionItemController::class);
+
+
+Route::post('/purchase-returns', [PurchaseReturnController::class, 'createPurchaseReturn']);
+    Route::get('/purchase-returns', [PurchaseReturnController::class, 'getPurchaseReturns']);
+    // routes/api.php
+Route::get('/purchase-returns/{id}', [PurchaseReturnController::class, 'show']);
+// routes/api.php
+Route::put('/purchase-returns/{id}', [PurchaseReturnController::class, 'update']);
+// routes/api.php
+Route::delete('/purchase-returns/{id}', [PurchaseReturnController::class, 'destroy']);

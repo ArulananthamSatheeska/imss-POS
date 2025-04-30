@@ -55,10 +55,9 @@ class PurchaseController extends Controller
                     'quantity' => $item['quantity'],
                     'free_items' => $item['free_items'] ?? 0,
                     'buying_cost' => $item['buying_cost'],
+                    'discount_percentage' => $item['discount_percentage'] ?? 0,
+                    'discount_amount' => $item['discount_amount'] ?? 0,
                 ]);
-
-                // Removed stock update logic
-                // Stock will be calculated dynamically in the StockReportController
             }
 
             DB::commit();
@@ -90,9 +89,6 @@ class PurchaseController extends Controller
 
             $purchase = Purchase::findOrFail($id);
 
-            // Removed reversing stock logic since we are not modifying opening_stock_quantity
-
-            // Update purchase details
             $purchase->update([
                 'bill_number' => $validatedData['bill_number'],
                 'invoice_number' => $validatedData['invoice_number'],
@@ -108,20 +104,17 @@ class PurchaseController extends Controller
                 'total' => $validatedData['total'],
             ]);
 
-            // Delete existing items
             $purchase->items()->delete();
 
-            // Add new items
             foreach ($validatedData['items'] as $item) {
                 $purchase->items()->create([
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
                     'free_items' => $item['free_items'] ?? 0,
                     'buying_cost' => $item['buying_cost'],
+                    'discount_percentage' => $item['discount_percentage'] ?? 0,
+                    'discount_amount' => $item['discount_amount'] ?? 0,
                 ]);
-
-                // Removed stock update logic
-                // Stock will be calculated dynamically in the StockReportController
             }
 
             DB::commit();
@@ -160,8 +153,6 @@ class PurchaseController extends Controller
 
             DB::beginTransaction();
 
-            // Removed reversing stock logic since we are not modifying opening_stock_quantity
-
             $purchase->items()->delete();
             $purchase->delete();
 
@@ -195,6 +186,8 @@ class PurchaseController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.free_items' => 'nullable|integer|min:0',
             'items.*.buying_cost' => 'required|numeric|min:0',
+            'items.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'items.*.discount_amount' => 'nullable|numeric|min:0',
         ];
     }
 }

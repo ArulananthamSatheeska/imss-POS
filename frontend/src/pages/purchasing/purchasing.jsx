@@ -37,6 +37,8 @@ const PurchasingEntryForm = () => {
   const [fromDate, setFromDate] = useState(lastMonth);
   const [toDate, setToDate] = useState(today);
   const [expandedRow, setExpandedRow] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     if (user?.token) {
@@ -60,6 +62,8 @@ const PurchasingEntryForm = () => {
             params: { fromDate, toDate },
           }),
         ]);
+
+      console.log("Purchases API Response:", purchasesRes.data); // Debug: Check if items have discount_amount
 
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
@@ -107,6 +111,7 @@ const PurchasingEntryForm = () => {
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
+    setCurrentPage(1);
   };
 
   const filteredPurchases = purchases.filter(
@@ -142,7 +147,16 @@ const PurchasingEntryForm = () => {
         ) || 0),
       0
     );
-    const totalDiscount = purchases.reduce(
+    const totalItemDiscount = purchases.reduce(
+      (acc, purchase) =>
+        acc +
+        (purchase.items?.reduce(
+          (sum, item) => sum + (parseFloat(item.discount_amount) || 0),
+          0
+        ) || 0),
+      0
+    );
+    const totalInvoiceDiscount = purchases.reduce(
       (acc, purchase) => acc + (parseFloat(purchase.discount_amount) || 0),
       0
     );
@@ -154,21 +168,28 @@ const PurchasingEntryForm = () => {
       (acc, purchase) => acc + (parseFloat(purchase.total) || 0),
       0
     );
-    return { subtotal, totalDiscount, totalTax, grandTotal };
+    return {
+      subtotal,
+      totalItemDiscount,
+      totalInvoiceDiscount,
+      totalTax,
+      grandTotal,
+    };
   };
 
   const calculateTaxPercentage = (purchase) => {
-    const subtotal =
+    const itemSubtotal =
       purchase.items?.reduce(
         (sum, item) =>
           sum +
           (parseFloat(item.quantity) || 0) *
-            (parseFloat(item.buying_cost) || 0),
+            (parseFloat(item.buying_cost) || 0) -
+          (parseFloat(item.discount_amount) || 0),
         0
       ) || 0;
-    const discountAmount = parseFloat(purchase.discount_amount) || 0;
+    const invoiceDiscountAmount = parseFloat(purchase.discount_amount) || 0;
     const tax = parseFloat(purchase.tax) || 0;
-    const taxableAmount = subtotal - discountAmount;
+    const taxableAmount = itemSubtotal - invoiceDiscountAmount;
     return taxableAmount > 0 ? (tax / taxableAmount) * 100 : 0;
   };
 
@@ -185,14 +206,26 @@ const PurchasingEntryForm = () => {
             Item:
               products.find((p) => p.product_id === item.product_id)
                 ?.product_name || "Unknown",
-            Quantity: item.quantity,
+            Quantity: item.quantity - (item.free_items || 0),
             "Free Items": item.free_items || 0,
-            "Buying Cost": item.buying_cost,
-            "Discount Percentage": purchase.discount_percentage || 0,
-            Discount: purchase.discount_amount,
+            "Buying Cost": parseFloat(item.buying_cost) || 0,
+            "Item Discount Percentage":
+              parseFloat(item.discount_percentage) || 0,
+            "Item Discount Amount": parseFloat(item.discount_amount) || 0,
+            "Item Subtotal":
+              (parseFloat(item.quantity) || 0) *
+              (parseFloat(item.buying_cost) || 0),
+            "Item Total":
+              (parseFloat(item.quantity) || 0) *
+                (parseFloat(item.buying_cost) || 0) -
+              (parseFloat(item.discount_amount) || 0),
+            "Invoice Discount Percentage":
+              parseFloat(purchase.discount_percentage) || 0,
+            "Invoice Discount Amount":
+              parseFloat(purchase.discount_amount) || 0,
             "Tax Percentage": calculateTaxPercentage(purchase).toFixed(2),
-            Tax: purchase.tax,
-            Total: purchase.total / purchase.items.length,
+            Tax: parseFloat(purchase.tax) || 0,
+            "Invoice Total": parseFloat(purchase.total) || 0,
             Date: purchase.date_of_purchase,
             Status: purchase.status,
           }))
@@ -204,6 +237,7 @@ const PurchasingEntryForm = () => {
         workbook,
         `Purchase_Entries_${new Date().toISOString().split("T")[0]}.xlsx`
       );
+      toast.success("Exported to Excel successfully!");
     } catch (error) {
       console.error("Export to Excel Error:", error);
       toast.error("Error exporting to Excel");
@@ -211,7 +245,7 @@ const PurchasingEntryForm = () => {
   };
 
   const openEditInvoice = (purchase) => {
-    setEditingInvoice({
+    const invoice = {
       id: purchase.id,
       billNumber: purchase.bill_number || "",
       invoiceNumber: purchase.invoice_number || "",
@@ -223,24 +257,43 @@ const PurchasingEntryForm = () => {
       status: purchase.status || "pending",
       discountPercentage: parseFloat(purchase.discount_percentage) || 0,
       discountAmount: parseFloat(purchase.discount_amount) || 0,
+      discountAmountEdited: purchase.discount_amount > 0,
       taxPercentage: calculateTaxPercentage(purchase),
       tax: parseFloat(purchase.tax) || 0,
+      taxEdited: purchase.tax > 0,
       items:
-        purchase.items?.map((item, index) => ({
-          id: index + 1,
-          productId: item.product_id || "",
-          description:
-            products.find((p) => p.product_id === item.product_id)
-              ?.product_name || "Unknown",
-          quantity: parseInt(item.quantity - (item.free_items || 0)) || 1,
-          freeItems: parseInt(item.free_items) || 0,
-          buyingCost: parseFloat(item.buying_cost) || 0,
-          total:
-            (parseFloat(item.quantity) || 0) *
-            (parseFloat(item.buying_cost) || 0),
-        })) || [],
+        purchase.items?.map((item, index) => {
+          const discountAmount = parseFloat(item.discount_amount) || 0;
+          const discountPercentage = parseFloat(item.discount_percentage) || 0;
+          console.log(`Item ${index + 1} Discount:`, {
+            discountAmount,
+            discountPercentage,
+          }); // Debug: Check item discounts
+          return {
+            id: index + 1,
+            productId: item.product_id || "",
+            description:
+              products.find((p) => p.product_id === item.product_id)
+                ?.product_name || "Unknown",
+            quantity: parseInt(item.quantity - (item.free_items || 0)) || 1,
+            freeItems: parseInt(item.free_items) || 0,
+            buyingCost: parseFloat(item.buying_cost) || 0,
+            discountPercentage,
+            discountAmount,
+            discountAmountEdited: discountAmount > 0,
+            subtotal:
+              (parseFloat(item.quantity) || 0) *
+              (parseFloat(item.buying_cost) || 0),
+            total:
+              (parseFloat(item.quantity) || 0) *
+                (parseFloat(item.buying_cost) || 0) -
+              discountAmount,
+          };
+        }) || [],
       total: parseFloat(purchase.total) || 0,
-    });
+    };
+    console.log("Edit Invoice Data:", invoice); // Debug: Check full invoice data
+    setEditingInvoice(invoice);
     setIsInvoiceFormOpen(true);
   };
 
@@ -260,22 +313,36 @@ const PurchasingEntryForm = () => {
       taxPercentage: calculateTaxPercentage(purchase),
       tax: parseFloat(purchase.tax) || 0,
       items:
-        purchase.items?.map((item, index) => ({
-          id: index + 1,
-          productId: item.product_id || "",
-          description:
-            products.find((p) => p.product_id === item.product_id)
-              ?.product_name || "Unknown",
-          quantity: parseInt(item.quantity - (item.free_items || 0)) || 1,
-          freeItems: parseInt(item.free_items) || 0,
-          buyingCost: parseFloat(item.buying_cost) || 0,
-          total:
-            (parseFloat(item.quantity) || 0) *
-            (parseFloat(item.buying_cost) || 0),
-        })) || [],
+        purchase.items?.map((item, index) => {
+          const discountAmount = parseFloat(item.discount_amount) || 0;
+          const discountPercentage = parseFloat(item.discount_percentage) || 0;
+          console.log(`View Item ${index + 1} Discount:`, {
+            discountAmount,
+            discountPercentage,
+          }); // Debug: Check item discounts
+          return {
+            id: index + 1,
+            productId: item.product_id || "",
+            description:
+              products.find((p) => p.product_id === item.product_id)
+                ?.product_name || "Unknown",
+            quantity: parseInt(item.quantity - (item.free_items || 0)) || 1,
+            freeItems: parseInt(item.free_items) || 0,
+            buyingCost: parseFloat(item.buying_cost) || 0,
+            discountPercentage,
+            discountAmount,
+            subtotal:
+              (parseFloat(item.quantity) || 0) *
+              (parseFloat(item.buying_cost) || 0),
+            total:
+              (parseFloat(item.quantity) || 0) *
+                (parseFloat(item.buying_cost) || 0) -
+              discountAmount,
+          };
+        }) || [],
       total: parseFloat(purchase.total) || 0,
     };
-    console.log("Opening View Invoice:", invoice);
+    console.log("View Invoice Data:", invoice); // Debug: Check full invoice data
     setViewingInvoice(invoice);
     setIsViewModalOpen(true);
   };
@@ -295,14 +362,24 @@ const PurchasingEntryForm = () => {
         discount_amount: newInvoice.discountAmount || 0,
         tax: newInvoice.tax || 0,
         status: newInvoice.status || "pending",
-        items: newInvoice.items.map((item) => ({
-          product_id: item.productId,
-          quantity: item.quantity,
-          free_items: item.freeItems || 0,
-          buying_cost: item.buyingCost,
-        })),
+        items: newInvoice.items.map((item) => {
+          console.log("Saving Item Discount:", {
+            discountPercentage: item.discountPercentage,
+            discountAmount: item.discountAmount,
+          }); // Debug: Check item discounts being sent
+          return {
+            product_id: item.productId,
+            quantity: item.quantity + (item.freeItems || 0),
+            free_items: item.freeItems || 0,
+            buying_cost: item.buyingCost,
+            discount_percentage: item.discountPercentage || 0,
+            discount_amount: item.discountAmount || 0,
+          };
+        }),
         total: newInvoice.total,
       };
+
+      console.log("Sending Invoice Data:", invoiceData); // Debug: Check full payload
 
       if (newInvoice.id) {
         await putData(`/purchases/${newInvoice.id}`, invoiceData);
@@ -318,14 +395,18 @@ const PurchasingEntryForm = () => {
       setEditingInvoice(null);
     } catch (error) {
       console.error("Generate Invoice Error:", error);
-      setNotification("Error recording purchase invoice: " + error.message);
-      toast.error("Error recording purchase invoice: " + error.message);
+      const errorMsg =
+        error.response?.data?.message || "Error recording purchase invoice";
+      setNotification(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
   const deleteInvoice = async (purchaseId) => {
+    if (!window.confirm("Are you sure you want to delete this purchase?"))
+      return;
     try {
       setLoading(true);
       await deleteData(`/purchases/${purchaseId}`);
@@ -334,8 +415,10 @@ const PurchasingEntryForm = () => {
       toast.success("Purchase invoice deleted successfully!");
     } catch (error) {
       console.error("Delete Invoice Error:", error);
-      setNotification("Error deleting purchase invoice: " + error.message);
-      toast.error("Error deleting purchase invoice: " + error.message);
+      const errorMsg =
+        error.response?.data?.message || "Error deleting purchase invoice";
+      setNotification(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -348,7 +431,7 @@ const PurchasingEntryForm = () => {
   const formatCurrency = (amount) => {
     return isNaN(amount)
       ? "LKR 0.00"
-      : new Intl.NumberFormat("en-IN", {
+      : new Intl.NumberFormat("en-LK", {
           style: "currency",
           currency: "LKR",
           minimumFractionDigits: 2,
@@ -359,20 +442,19 @@ const PurchasingEntryForm = () => {
     const printWindow = window.open("", "_blank");
     const currentTime = new Date().toLocaleTimeString();
 
-    // Map invoice data to PrintableInvoice props
     const printableData = {
       supplier: {
         name: invoice.supplierName || "Unknown",
-        address: "Not Provided", // Placeholder, as address not available in invoice
-        phone: "Not Provided", // Placeholder
+        address: "Not Provided",
+        phone: "Not Provided",
       },
-      items: invoice.items.map((item, index) => ({
+      items: invoice.items.map((item) => ({
         description: item.description,
         qty: item.quantity,
         unitPrice: item.buyingCost,
         freeQty: item.freeItems || 0,
-        discountAmount: index === 0 ? invoice.discountAmount : 0, // Apply discount to first item
-        discountPercentage: index === 0 ? invoice.discountPercentage : 0,
+        discountPercentage: item.discountPercentage || 0,
+        discountAmount: item.discountAmount || 0,
         total: item.total,
       })),
       invoice: {
@@ -382,11 +464,10 @@ const PurchasingEntryForm = () => {
       },
       total: invoice.total,
       footerDetails: {
-        dateTime: new Date().toLocaleString(), // Current date and time
+        dateTime: new Date().toLocaleString(),
       },
     };
 
-    // HTML content for the print window
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -442,6 +523,9 @@ const PurchasingEntryForm = () => {
               <p class="text-gray-900"><strong>Tax Percentage:</strong> ${invoice.taxPercentage.toFixed(
                 2
               )}%</p>
+              <p class="text-gray-900"><strong>Invoice Discount:</strong> ${formatCurrency(
+                invoice.discountAmount
+              )}</p>
             </div>
           </div>
 
@@ -455,8 +539,8 @@ const PurchasingEntryForm = () => {
                   <th class="p-2 text-center border border-gray-300">Qty</th>
                   <th class="p-2 text-center border border-gray-300">Unit Price (LKR)</th>
                   <th class="p-2 text-center border border-gray-300">Free (Qty)</th>
-                  <th class="p-2 text-center border border-gray-300">Dis (LKR)</th>
                   <th class="p-2 text-center border border-gray-300">Dis (%)</th>
+                  <th class="p-2 text-center border border-gray-300">Dis (LKR)</th>
                   <th class="p-2 text-center border border-gray-300">Total (LKR)</th>
                 </tr>
               </thead>
@@ -474,21 +558,21 @@ const PurchasingEntryForm = () => {
                     <td class="p-3 text-center border border-gray-300 text-gray-900">${
                       item.qty
                     }</td>
-                    <td class="p-3 text-right border border-gray-300 text-gray-900">LKR ${(
-                      Number(item.unitPrice) || 0
-                    ).toFixed(2)}</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">${formatCurrency(
+                      item.unitPrice
+                    )}</td>
                     <td class="p-3 text-center border border-gray-300 text-gray-900">${
                       item.freeQty
                     }</td>
-                    <td class="p-3 text-right border border-gray-300 text-gray-900">LKR ${(
-                      Number(item.discountAmount) || 0
-                    ).toFixed(2)}</td>
-                    <td class="p-3 text-right border border-gray-300 text-gray-900">${(
-                      Number(item.discountPercentage) || 0
-                    ).toFixed(2)}%</td>
-                    <td class="p-3 text-right border border-gray-300 text-gray-900">LKR ${(
-                      Number(item.total) || 0
-                    ).toFixed(2)}</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">${item.discountPercentage.toFixed(
+                      2
+                    )}%</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">${formatCurrency(
+                      item.discountAmount
+                    )}</td>
+                    <td class="p-3 text-right border border-gray-300 text-gray-900">${formatCurrency(
+                      item.total
+                    )}</td>
                   </tr>
                 `
                   )
@@ -499,9 +583,9 @@ const PurchasingEntryForm = () => {
 
           <!-- Total Amount -->
           <div class="text-right mb-4">
-            <h3 class="font-semibold text-xl text-blue-900 uppercase">Total: LKR ${(
-              Number(printableData.total) || 0
-            ).toFixed(2)}</h3>
+            <h3 class="font-semibold text-xl text-blue-900 uppercase">Total: ${formatCurrency(
+              printableData.total
+            )}</h3>
           </div>
 
           <!-- Footer Details -->
@@ -573,7 +657,7 @@ const PurchasingEntryForm = () => {
                 Purchase Date
               </label>
               <p className="mt-1 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
-                {invoice.purchaseDate}‬{" "}
+                {invoice.purchaseDate}
               </p>
             </div>
             <div>
@@ -628,6 +712,9 @@ const PurchasingEntryForm = () => {
                   <th className="p-2 border">Quantity</th>
                   <th className="p-2 border">Free Items</th>
                   <th className="p-2 border">Buying Cost</th>
+                  <th className="p-2 border">Discount (%)</th>
+                  <th className="p-2 border">Discount (LKR)</th>
+                  <th className="p-2 border">Subtotal</th>
                   <th className="p-2 border">Total</th>
                 </tr>
               </thead>
@@ -640,6 +727,15 @@ const PurchasingEntryForm = () => {
                     <td className="p-2 border">
                       {formatCurrency(item.buyingCost)}
                     </td>
+                    <td className="p-2 border">
+                      {item.discountPercentage.toFixed(2)}%
+                    </td>
+                    <td className="p-2 border">
+                      {formatCurrency(item.discountAmount)}
+                    </td>
+                    <td className="p-2 border">
+                      {formatCurrency(item.subtotal)}
+                    </td>
                     <td className="p-2 border">{formatCurrency(item.total)}</td>
                   </tr>
                 ))}
@@ -648,16 +744,26 @@ const PurchasingEntryForm = () => {
           </div>
           <div className="text-right space-y-1">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Subtotal:{" "}
+              Item Subtotal:{" "}
               {formatCurrency(
-                invoice.items.reduce((sum, item) => sum + item.total, 0)
+                invoice.items.reduce((sum, item) => sum + item.subtotal, 0)
               )}
             </p>
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Discount Percentage: {invoice.discountPercentage.toFixed(2)}%
+              Total Item Discount:{" "}
+              {formatCurrency(
+                invoice.items.reduce(
+                  (sum, item) => sum + item.discountAmount,
+                  0
+                )
+              )}
             </p>
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Discount Amount: {formatCurrency(invoice.discountAmount)}
+              Invoice Discount Percentage:{" "}
+              {invoice.discountPercentage.toFixed(2)}%
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Invoice Discount Amount: {formatCurrency(invoice.discountAmount)}
             </p>
             <p className="text-sm text-gray-700 dark:text-gray-300">
               Tax Percentage: {invoice.taxPercentage.toFixed(2)}%
@@ -667,6 +773,9 @@ const PurchasingEntryForm = () => {
             </p>
             <p className="text-sm font-bold text-gray-900 dark:text-white">
               Total: {formatCurrency(invoice.total)}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Balance: {formatCurrency(invoice.total - invoice.paidAmount)}
             </p>
           </div>
           <div className="flex justify-end mt-4 gap-2">
@@ -686,6 +795,19 @@ const PurchasingEntryForm = () => {
         </div>
       </div>
     );
+  };
+
+  const paginatedPurchases = filteredPurchases.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
 
   return (
@@ -763,6 +885,7 @@ const PurchasingEntryForm = () => {
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-gray-600 dark:text-gray-100"
+                max={toDate}
               />
             </div>
             <div>
@@ -772,6 +895,8 @@ const PurchasingEntryForm = () => {
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-gray-600 dark:text-gray-100"
+                min={fromDate}
+                max={today}
               />
             </div>
             <div className="flex items-end">
@@ -790,10 +915,10 @@ const PurchasingEntryForm = () => {
         <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
           Purchase Summary
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
           <div className="p-4 rounded-xl shadow-sm border-l-4 border-blue-500 bg-white dark:bg-slate-900">
             <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-              Subtotal
+              Item Subtotal
             </h4>
             <p className="text-xl font-bold text-gray-900 dark:text-blue-400">
               {formatCurrency(calculateTotals().subtotal)}
@@ -801,10 +926,18 @@ const PurchasingEntryForm = () => {
           </div>
           <div className="p-4 rounded-xl shadow-sm border-l-4 border-red-500 bg-white dark:bg-slate-900">
             <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-              Total Discount
+              Total Item Discount
             </h4>
             <p className="text-xl font-bold text-gray-900 dark:text-red-400">
-              {formatCurrency(calculateTotals().totalDiscount)}
+              {formatCurrency(calculateTotals().totalItemDiscount)}
+            </p>
+          </div>
+          <div className="p-4 rounded-xl shadow-sm border-l-4 border-red-500 bg-white dark:bg-slate-900">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
+              Invoice Discount
+            </h4>
+            <p className="text-xl font-bold text-gray-900 dark:text-red-400">
+              {formatCurrency(calculateTotals().totalInvoiceDiscount)}
             </p>
           </div>
           <div className="p-4 rounded-xl shadow-sm border-l-4 border-yellow-500 bg-white dark:bg-slate-900">
@@ -857,7 +990,7 @@ const PurchasingEntryForm = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
-                {filteredPurchases.length === 0 ? (
+                {paginatedPurchases.length === 0 ? (
                   <tr>
                     <td
                       colSpan={10}
@@ -867,7 +1000,7 @@ const PurchasingEntryForm = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredPurchases.map((purchase, index) => (
+                  paginatedPurchases.map((purchase, index) => (
                     <React.Fragment key={purchase.id}>
                       <tr
                         className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors cursor-pointer ${
@@ -878,7 +1011,7 @@ const PurchasingEntryForm = () => {
                         onClick={() => toggleRow(index)}
                       >
                         <td className="px-6 py-4 font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                          {index + 1}
+                          {(currentPage - 1) * itemsPerPage + index + 1}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
                           {purchase.bill_number}
@@ -963,6 +1096,11 @@ const PurchasingEntryForm = () => {
                                     <th className="p-2 border">Quantity</th>
                                     <th className="p-2 border">Free Items</th>
                                     <th className="p-2 border">Buying Cost</th>
+                                    <th className="p-2 border">Discount (%)</th>
+                                    <th className="p-2 border">
+                                      Discount (LKR)
+                                    </th>
+                                    <th className="p-2 border">Subtotal</th>
                                     <th className="p-2 border">Total</th>
                                   </tr>
                                 </thead>
@@ -992,9 +1130,31 @@ const PurchasingEntryForm = () => {
                                         )}
                                       </td>
                                       <td className="p-2 border">
+                                        {(
+                                          parseFloat(
+                                            item.discount_percentage
+                                          ) || 0
+                                        ).toFixed(2)}
+                                        %
+                                      </td>
+                                      <td className="p-2 border">
+                                        {formatCurrency(
+                                          parseFloat(item.discount_amount) || 0
+                                        )}
+                                      </td>
+                                      <td className="p-2 border">
                                         {formatCurrency(
                                           (parseFloat(item.quantity) || 0) *
                                             (parseFloat(item.buying_cost) || 0)
+                                        )}
+                                      </td>
+                                      <td className="p-2 border">
+                                        {formatCurrency(
+                                          (parseFloat(item.quantity) || 0) *
+                                            (parseFloat(item.buying_cost) ||
+                                              0) -
+                                            (parseFloat(item.discount_amount) ||
+                                              0)
                                         )}
                                       </td>
                                     </tr>
@@ -1003,7 +1163,7 @@ const PurchasingEntryForm = () => {
                               </table>
                               <div className="text-right space-y-1">
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                                  Subtotal:{" "}
+                                  Item Subtotal:{" "}
                                   {formatCurrency(
                                     purchase.items?.reduce(
                                       (sum, item) =>
@@ -1015,7 +1175,18 @@ const PurchasingEntryForm = () => {
                                   )}
                                 </p>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                                  Discount Percentage:{" "}
+                                  Total Item Discount:{" "}
+                                  {formatCurrency(
+                                    purchase.items?.reduce(
+                                      (sum, item) =>
+                                        sum +
+                                        (parseFloat(item.discount_amount) || 0),
+                                      0
+                                    ) || 0
+                                  )}
+                                </p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  Invoice Discount Percentage:{" "}
                                   {(
                                     parseFloat(purchase.discount_percentage) ||
                                     0
@@ -1023,7 +1194,7 @@ const PurchasingEntryForm = () => {
                                   %
                                 </p>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                                  Discount Amount:{" "}
+                                  Invoice Discount Amount:{" "}
                                   {formatCurrency(
                                     parseFloat(purchase.discount_amount) || 0
                                   )}
@@ -1058,6 +1229,38 @@ const PurchasingEntryForm = () => {
         )}
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            className="px-3 py-1 mx-1 bg-gray-200 dark:bg-slate-700 rounded hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50"
+            disabled={currentPage === 1}
+          >
+            Previous
+          </button>
+          {[...Array(totalPages).keys()].map((page) => (
+            <button
+              key={page + 1}
+              onClick={() => handlePageChange(page + 1)}
+              className={`px-3 py-1 mx-1 rounded ${
+                currentPage === page + 1
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600"
+              }`}
+            >
+              {page + 1}
+            </button>
+          ))}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            className="px-3 py-1 mx-1 bg-gray-200 dark:bg-slate-700 rounded hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50"
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       {isInvoiceFormOpen && (
         <PurchaseInvoiceForm
           onGenerateInvoice={handleGenerateInvoice}
@@ -1066,6 +1269,9 @@ const PurchasingEntryForm = () => {
             setEditingInvoice(null);
           }}
           existingInvoice={editingInvoice}
+          suppliers={suppliers}
+          stores={stores}
+          products={products}
         />
       )}
 
