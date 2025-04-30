@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\InvoiceItem;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\SaleItem;
@@ -50,56 +51,43 @@ class StockReportController extends Controller
 
             // Prepare the detailed stock report data
             $stockReports = $products->map(function ($product) use ($fromDate, $toDate) {
-                // Calculate total sold quantity for the product within the date range
-                $totalSoldQuantity = 0;
-                try {
-                    $saleQuery = SaleItem::where('product_id', $product->product_id);
-                    if ($fromDate && $toDate) {
-                        $saleQuery->whereHas('sale', function ($q) use ($fromDate, $toDate) {
-                            $q->whereBetween('created_at', [$fromDate, $toDate]);
-                        });
-                    }
-                    $totalSoldQuantity = $saleQuery->sum('quantity') ?? 0;
-                    Log::debug('Total sold quantity for product ID ' . $product->product_id . ': ' . $totalSoldQuantity);
-                } catch (\Exception $e) {
-                    Log::warning('Error calculating total sold quantity for product ID ' . $product->product_id . ': ' . $e->getMessage());
-                }
+                // Calculate total sold quantity within the date range
+                $saleQuery = InvoiceItem::where('product_id', $product->product_id)
+                    ->whereHas('invoice', function ($q) use ($fromDate, $toDate) {
+                        if ($fromDate && $toDate) {
+                            $q->whereBetween('invoice_date', [$fromDate, $toDate]);
+                        }
+                    });
+                $totalSoldQuantity = $saleQuery->sum('quantity') ?? 0;
+                Log::debug('Total sold quantity for product ID ' . $product->product_id . ': ' . $totalSoldQuantity);
 
-                // Calculate total purchased quantity for the product within the date range
-                $totalPurchasedQuantity = 0;
-                try {
-                    $purchaseQuery = PurchaseItem::where('product_id', $product->product_id);
-                    if ($fromDate && $toDate) {
-                        $purchaseQuery->whereHas('purchase', function ($q) use ($fromDate, $toDate) {
+                // Calculate total purchased quantity within the date range
+                $purchaseQuery = PurchaseItem::where('product_id', $product->product_id)
+                    ->whereHas('purchase', function ($q) use ($fromDate, $toDate) {
+                        if ($fromDate && $toDate) {
                             $q->whereBetween('date_of_purchase', [$fromDate, $toDate]);
-                        });
-                    }
-                    Log::debug('Purchase query for product ID ' . $product->product_id . ': ' . $purchaseQuery->toSql());
-                    Log::debug('Purchase query bindings: ' . json_encode($purchaseQuery->getBindings()));
-                    $totalPurchasedQuantity = $purchaseQuery->sum('quantity') ?? 0; // Removed free_items for now
-                    Log::debug('Total purchased quantity for product ID ' . $product->product_id . ': ' . $totalPurchasedQuantity);
-                } catch (\Exception $e) {
-                    Log::warning('Error calculating total purchased quantity for product ID ' . $product->product_id . ': ' . $e->getMessage());
-                }
+                        }
+                    });
+                $totalPurchasedQuantity = $purchaseQuery->sum('quantity') ?? 0;
+                Log::debug('Total purchased quantity for product ID ' . $product->product_id . ': ' . $totalPurchasedQuantity);
 
-                // Calculate closing stock with null checks
+                // Calculate closing stock
                 $openingStock = $product->opening_stock_quantity ?? 0;
                 $closingStock = $openingStock + $totalPurchasedQuantity - $totalSoldQuantity;
 
-                // Calculate total purchase value (cost) with null checks
+                // Calculate total purchase value (cost)
                 $buyingCost = $product->buying_cost ?? 0;
                 $totalPurchaseValue = ($openingStock + $totalPurchasedQuantity) * $buyingCost;
 
-                // Calculate total sales value (selling price) with null checks
+                // Calculate total sales value (selling price)
                 $sellingPrice = $product->sales_price ?? 0;
                 $totalSalesValue = $closingStock * $sellingPrice;
 
-                // Parse location into type and identifier
+                // Parse location
                 $locationParts = explode(' ', $product->store_location ?? 'Unknown N/A', 2);
                 $locationType = $locationParts[0] ?? 'Unknown';
                 $locationIdentifier = $locationParts[1] ?? 'N/A';
 
-                // Return detailed stock report data with null checks
                 return [
                     'itemCode' => $product->item_code ?? 'N/A',
                     'itemName' => $product->product_name ?? 'N/A',

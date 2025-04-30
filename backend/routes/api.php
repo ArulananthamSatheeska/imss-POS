@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\{
     UnitController,
     ProductController,
@@ -97,7 +98,9 @@ Route::middleware(['api'])->group(function () {
     Route::apiResource('sales', SaleController::class);
     Route::get('/stock-reports', [StockReportController::class, 'index']);
     Route::get('/detailed-stock-reports', [StockReportController::class, 'detailedReport']);
-    Route::get('/product/{id}', [ProductController::class, 'barcode']);
+Route::get('/product/{id}', [ProductController::class, 'barcode']);
+
+Route::get('/dashboard', [DashboardController::class, 'dashboard']);
 });
 
 // Protected routes (requires authentication)
@@ -148,7 +151,7 @@ Route::post('/purchases', [PurchaseController::class, 'store']);
     });
     
 Route::apiResource('invoices', SalesInvoiceController::class);
-
+Route::get('/invoices/check-invoice-no', [SalesInvoiceController::class, 'checkInvoiceNo']);
 
 
 //     Route::get('/suppliers', [SupplierController::class, 'index']);

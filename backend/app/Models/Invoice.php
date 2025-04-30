@@ -33,7 +33,11 @@ class Invoice extends Model
     //     'balance',
     //     'status',
     // ];
-    protected $guarded = []; // Allow mass assignment for all fields
+    protected $fillable = [
+        'invoice_no', 'invoice_date', 'invoice_time', 'customer_name',
+        'customer_address', 'customer_phone', 'customer_email', 'payment_method',
+        'purchase_amount', 'subtotal', 'tax_amount', 'total_amount', 'balance', 'status'
+    ];
 
     /**
      * The attributes that should be cast.
