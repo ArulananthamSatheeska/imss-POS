@@ -84,7 +84,7 @@ const SalesReport = () => {
   // CREATE Invoice
   const handleGenerateInvoiceApiCall = async (newInvoiceData) => {
     const url = `${API_BASE_URL}/invoices`;
-    console.log(`POST to: ${url}`, newInvoiceData);
+    console.log(`POST to: ${url}`, JSON.stringify(newInvoiceData, null, 2));
     try {
         // Use postData service or axios directly
         const response = await axios.post(url, newInvoiceData, {
@@ -97,8 +97,15 @@ const SalesReport = () => {
         return response.data;
     } catch (error) {
         console.error(`API Error during POST ${url}:`, error.response || error);
-        // Let SalesInvoice handle displaying the error message by re-throwing
-        throw error; // Re-throw to be caught in SalesInvoice for displaying errors
+        // Extract validation errors
+      const errorMessage = error.response?.data?.message || 'Failed to create invoice.';
+      const errorDetails = error.response?.data?.errors
+        ? Object.entries(error.response.data.errors)
+            .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+            .join('\n')
+        : error.message;
+      alert(`Error: ${errorMessage}\nDetails: ${errorDetails}`);
+      throw error; // Re-throw for SalesInvoice to handle
     }
   };
 

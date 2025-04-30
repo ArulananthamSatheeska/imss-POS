@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Invoice extends Model
 {
@@ -60,5 +61,37 @@ class Invoice extends Model
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);
+    }
+
+    public static function generateInvoiceNumber(): string
+    {
+        $year = now()->format('Y'); // Current year, e.g., 2025
+        $prefix = "INV-{$year}-";
+
+        // Find the last invoice number for the current year
+        $lastInvoice = DB::table('invoices')
+            ->where('invoice_no', 'like', $prefix . '%')
+            ->orderBy('invoice_no', 'desc')
+            ->first();
+
+        $nextNumber = 1;
+        if ($lastInvoice) {
+            $lastNumber = (int) substr($lastInvoice->invoice_no, strlen($prefix));
+            $nextNumber = $lastNumber + 1;
+        }
+
+        // Format with leading zeros (e.g., 0001)
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($invoice) {
+            if (empty($invoice->invoice_no)) {
+                $invoice->invoice_no = static::generateInvoiceNumber();
+            }
+        });
     }
 }
