@@ -10,6 +10,7 @@ export const BarcodePage = () => {
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [quantity, setQuantity] = useState(1);
   const [templateSize, setTemplateSize] = useState("50mmx25mm");
   const [paperSize, setPaperSize] = useState("50mm");
@@ -17,6 +18,12 @@ export const BarcodePage = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const printRef = useRef();
+  const dropdownRef = useRef();
+  const templateSizeRef = useRef();
+  const paperSizeRef = useRef();
+  const quantityRef = useRef();
+  const generateButtonRef = useRef();
+  const printButtonRef = useRef();
 
   useEffect(() => {
     let isMounted = true;
@@ -139,6 +146,7 @@ export const BarcodePage = () => {
     setSelectedProduct(product);
     setBarcodesToPrint([]);
     setSearchQuery("");
+    setHighlightedIndex(-1);
   };
 
   const filteredProducts = products.filter(
@@ -161,7 +169,6 @@ export const BarcodePage = () => {
       return;
     }
 
-    // Generate one barcode for preview, but store quantity for printing
     setBarcodesToPrint([selectedProduct]);
     console.log(
       `Prepared to generate ${quantity} barcodes for:`,
@@ -175,13 +182,11 @@ export const BarcodePage = () => {
       return;
     }
 
-    // Generate the specified quantity of barcodes for printing
     const printBarcodes = Array.from(
       { length: quantity },
       () => selectedProduct
     );
 
-    // Create canvas elements for each barcode
     const barcodeImages = [];
     printBarcodes.forEach((product, index) => {
       const canvas = document.createElement("canvas");
@@ -207,7 +212,6 @@ export const BarcodePage = () => {
       }
     });
 
-    // Generate print content with all barcodes
     const [labelWidth, labelHeight] = templateSize.split("x").map((dim) => dim);
     const printContent = printBarcodes
       .map(
@@ -219,7 +223,7 @@ export const BarcodePage = () => {
           <div style="margin: 1px 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             කල්. දිනය/ EXP Date: ${product.expiry_date}
           </div>
-          <div style="margin: 1px 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <div style="margin: 1px 0; line-height: "1.1"; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             කු. අං/ Batch No: ${product.batch_number}
           </div>
           <img src="${
@@ -252,22 +256,22 @@ export const BarcodePage = () => {
         }
         @media print {
           .barcode-label { 
-            margin: 2mm 0 2mm 2mm; /* Keep margins for spacing */
-            page-break-inside: avoid; /* Prevent sticker from splitting */
-            break-inside: avoid; /* Additional support for continuous printing */
-            width: 100%; /* Fill the grid cell */
-            max-width: calc(${labelWidth} - 2mm); /* Ensure label doesn't exceed adjusted width */
+            margin: 2mm 0 2mm 2mm;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            width: 100%;
+            max-width: calc(${labelWidth} - 2mm);
           }
           @page { 
-            size: ${paperWidth} auto; /* Match roll width, auto height for continuous printing */
-            margin: 0; /* Remove page margins */
+            size: ${paperWidth} auto;
+            margin: 0;
           }
           .barcode-container {
             width: ${paperWidth};
-            display: grid; /* Use CSS Grid for column layout */
-            grid-template-columns: repeat(${columns}, 1fr); /* 1 or 2 columns based on paperWidth */
-            gap: 0; /* No gap between grid cells */
-            break-after: auto; /* Allow continuous flow */
+            display: grid;
+            grid-template-columns: repeat(${columns}, 1fr);
+            gap: 0;
+            break-after: auto;
             page-break-before: auto;
             page-break-after: auto;
             page-break-inside: auto;
@@ -306,6 +310,43 @@ export const BarcodePage = () => {
     setTimeout(waitForRender, 500);
   };
 
+  const handleKeyDown = (e) => {
+    if (!searchQuery || filteredProducts.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) =>
+          prev < filteredProducts.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (
+          highlightedIndex >= 0 &&
+          highlightedIndex < filteredProducts.length
+        ) {
+          handleSelectProduct(filteredProducts[highlightedIndex]);
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  useEffect(() => {
+    if (highlightedIndex >= 0 && dropdownRef.current) {
+      const highlightedElement = dropdownRef.current.children[highlightedIndex];
+      if (highlightedElement) {
+        highlightedElement.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedIndex]);
+
   const paperSizeOptions = {
     "30mmx20mm": ["30mm", "60mm"],
     "38mmx25mm": ["38mm", "76mm"],
@@ -317,6 +358,85 @@ export const BarcodePage = () => {
     "70mmx30mm": ["70mm", "140mm"],
     "100mmx50mm": ["100mm", "200mm"],
     "100mmx150mm": ["100mm", "200mm"],
+  };
+
+  const templateSizeOptions = Object.keys(paperSizeOptions);
+
+  const handleTemplateSizeKeyDown = (e) => {
+    const currentIndex = templateSizeOptions.indexOf(templateSize);
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        if (currentIndex < templateSizeOptions.length - 1) {
+          const newTemplateSize = templateSizeOptions[currentIndex + 1];
+          setTemplateSize(newTemplateSize);
+          setPaperSize(paperSizeOptions[newTemplateSize][0]);
+        }
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (currentIndex > 0) {
+          const newTemplateSize = templateSizeOptions[currentIndex - 1];
+          setTemplateSize(newTemplateSize);
+          setPaperSize(paperSizeOptions[newTemplateSize][0]);
+        }
+        break;
+      case "Enter":
+        e.preventDefault();
+        paperSizeRef.current.focus();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handlePaperSizeKeyDown = (e) => {
+    const availablePaperSizes = paperSizeOptions[templateSize];
+    const currentIndex = availablePaperSizes.indexOf(paperSize);
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        if (currentIndex < availablePaperSizes.length - 1) {
+          setPaperSize(availablePaperSizes[currentIndex + 1]);
+        }
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (currentIndex > 0) {
+          setPaperSize(availablePaperSizes[currentIndex - 1]);
+        }
+        break;
+      case "Enter":
+        e.preventDefault();
+        quantityRef.current.focus();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleQuantityKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      generateButtonRef.current.focus();
+    }
+  };
+
+  const handleGenerateButtonKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleGenerateBarcodes();
+      if (barcodesToPrint.length > 0 && printButtonRef.current) {
+        printButtonRef.current.focus();
+      }
+    }
+  };
+
+  const handlePrintButtonKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handlePrint();
+    }
   };
 
   return (
@@ -411,7 +531,11 @@ export const BarcodePage = () => {
                 type="text"
                 placeholder="Search by Product Name or Barcode"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setHighlightedIndex(-1);
+                }}
+                onKeyDown={handleKeyDown}
                 disabled={loading}
                 style={{
                   width: "100%",
@@ -430,6 +554,7 @@ export const BarcodePage = () => {
               />
               {searchQuery && (
                 <div
+                  ref={dropdownRef}
                   style={{
                     maxHeight: "200px",
                     overflowY: "auto",
@@ -440,24 +565,24 @@ export const BarcodePage = () => {
                   }}
                 >
                   {filteredProducts.length > 0 ? (
-                    filteredProducts.map((product) => (
+                    filteredProducts.map((product, index) => (
                       <div
                         key={product.product_id}
                         onClick={() => handleSelectProduct(product)}
+                        onMouseEnter={() => setHighlightedIndex(index)}
                         style={{
                           padding: "12px",
                           cursor: "pointer",
-                          borderBottom: "1px solid #f1f5f9",
+                          borderBottom:
+                            index < filteredProducts.length - 1
+                              ? "1px solid #f1f5f9"
+                              : "none",
+                          backgroundColor:
+                            highlightedIndex === index ? "#dbeafe" : "#fff",
                           color: "#374151",
                           fontSize: "15px",
                           transition: "background-color 0.2s ease",
                         }}
-                        onMouseEnter={(e) =>
-                          (e.target.style.backgroundColor = "#eff6ff")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.target.style.backgroundColor = "#fff")
-                        }
                       >
                         {product.product_name} - {product.barcode}
                       </div>
@@ -547,11 +672,13 @@ export const BarcodePage = () => {
                     </label>
                     <select
                       id="templateSize"
+                      ref={templateSizeRef}
                       value={templateSize}
                       onChange={(e) => {
                         setTemplateSize(e.target.value);
                         setPaperSize(paperSizeOptions[e.target.value][0]);
                       }}
+                      onKeyDown={handleTemplateSizeKeyDown}
                       disabled={loading}
                       style={{
                         width: "100%",
@@ -568,7 +695,7 @@ export const BarcodePage = () => {
                       onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
                       onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
                     >
-                      {Object.keys(paperSizeOptions).map((size) => (
+                      {templateSizeOptions.map((size) => (
                         <option key={size} value={size}>
                           {size.replace("mmx", "mm x ")}
                         </option>
@@ -591,8 +718,10 @@ export const BarcodePage = () => {
                     </label>
                     <select
                       id="paperSize"
+                      ref={paperSizeRef}
                       value={paperSize}
                       onChange={(e) => setPaperSize(e.target.value)}
+                      onKeyDown={handlePaperSizeKeyDown}
                       disabled={loading}
                       style={{
                         width: "100%",
@@ -633,10 +762,12 @@ export const BarcodePage = () => {
                     <input
                       type="number"
                       id="quantity"
+                      ref={quantityRef}
                       value={quantity}
                       onChange={(e) =>
                         setQuantity(parseInt(e.target.value) || 1)
                       }
+                      onKeyDown={handleQuantityKeyDown}
                       min="1"
                       disabled={loading}
                       style={{
@@ -745,8 +876,34 @@ export const BarcodePage = () => {
                             height: "auto",
                           }}
                         />
-                        <div className="mrp">MRP: ${product.mrp}</div>
-                        <div className="seller">
+                        <div
+                          className="mrp"
+                          style={{
+                            textAlign: "center",
+                            fontSize: "8px",
+                            position: "absolute",
+                            bottom: "10px",
+                            width: "100%",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          MRP: ${product.mrp}
+                        </div>
+                        <div
+                          className="seller"
+                          style={{
+                            textAlign: "center",
+                            fontSize: "8px",
+                            position: "absolute",
+                            bottom: "1px",
+                            width: "100%",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
                           Import&Distributed by: ${product.supplier}
                         </div>
                       </div>
@@ -767,7 +924,9 @@ export const BarcodePage = () => {
                 }}
               >
                 <button
+                  ref={generateButtonRef}
                   onClick={handleGenerateBarcodes}
+                  onKeyDown={handleGenerateButtonKeyDown}
                   disabled={loading}
                   style={{
                     padding: "12px 30px",
@@ -799,7 +958,9 @@ export const BarcodePage = () => {
                 </button>
                 {barcodesToPrint.length > 0 && (
                   <button
+                    ref={printButtonRef}
                     onClick={handlePrint}
+                    onKeyDown={handlePrintButtonKeyDown}
                     style={{
                       padding: "12px 30px",
                       backgroundColor: "#28a745",

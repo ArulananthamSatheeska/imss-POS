@@ -25,8 +25,6 @@ class ApiError extends Error {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
-
-// Configuration constants
 const API_URL = "http://localhost:8000/api";
 const DEFAULT_TIMEOUT = 10000;
 
@@ -68,6 +66,9 @@ const createApiInstance = (refreshToken) => {
       if (userData?.token) {
         config.headers.Authorization = `Bearer ${userData.token}`;
         console.debug("Request headers:", config.headers);
+      }
+      if (config.data instanceof FormData) {
+        config.headers["Content-Type"] = "multipart/form-data";
       }
       return config;
     },
@@ -171,14 +172,14 @@ const createApiInstance = (refreshToken) => {
       const { status, data } = error.response;
       let errorMessage = "An error occurred";
       let errorCode = "UNKNOWN_ERROR";
-      let errorDetails = {};
+      let errorDetails = data.errors || data || {};
 
       if (status >= 500) {
         errorMessage = "Server error, please try again later";
         errorCode = "SERVER_ERROR";
-      } else if (status === 400) {
+      } else if (status === 400 || status === 422) {
         errorMessage = data.message || "Invalid request";
-        errorDetails = data.errors || {};
+        errorDetails = data.errors || data || {};
       } else if (status === 403) {
         errorMessage = "You don't have permission to perform this action";
         errorCode = "PERMISSION_DENIED";
@@ -187,6 +188,11 @@ const createApiInstance = (refreshToken) => {
         errorCode = "NOT_FOUND";
       }
 
+      console.error("API error details:", {
+        status,
+        errorMessage,
+        errorDetails,
+      });
       return Promise.reject(
         new ApiError(errorMessage, status, errorCode, errorDetails)
       );
@@ -209,7 +215,7 @@ const requestWithRetry = async (api, requestFn, endpoint, data = null) => {
     } catch (error) {
       lastError = error;
 
-      if (error.status && [400, 401, 403, 404].includes(error.status)) {
+      if (error.status && [400, 401, 403, 404, 422].includes(error.status)) {
         break;
       }
 
