@@ -34,6 +34,7 @@ class InvoiceItem extends Model
         'discount_amount',
         'discount_percentage',
         'total',
+        'total_buying_cost',
     ];
 
 
@@ -48,6 +49,7 @@ class InvoiceItem extends Model
         'discount_amount' => 'decimal:2',
         'discount_percentage' => 'decimal:2',
         'total' => 'decimal:2',
+        'total_buying_cost' => 'decimal:2', 
     ];
 
     /**
