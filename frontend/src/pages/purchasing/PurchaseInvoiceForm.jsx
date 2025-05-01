@@ -65,6 +65,7 @@ const PurchaseInvoiceForm = ({
   const itemDiscountAmountInputRef = useRef(null);
   const taxPercentageInputRef = useRef(null);
   const taxInputRef = useRef(null);
+  const paidAmountInputRef = useRef(null);
   const supplierSelectRef = useRef(null);
   const storeSelectRef = useRef(null);
   const generateInvoiceButtonRef = useRef(null);
@@ -395,6 +396,13 @@ const PurchaseInvoiceForm = ({
   const handleTaxKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      paidAmountInputRef.current?.focus();
+    }
+  };
+
+  const handlePaidAmountKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
       generateInvoiceButtonRef.current?.focus();
     }
   };
@@ -614,7 +622,7 @@ const PurchaseInvoiceForm = ({
 
   return (
     <div className="fixed inset-0 w-full flex items-center justify-center bg-slate-400 bg-opacity-50 z-50 overflow-y-auto">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-6xl relative my-8">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-xl w-full max-w-6xl max-h-[80vh] overflow-y-auto relative my-4">
         <button
           onClick={onCancel}
           className="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition"
@@ -655,7 +663,7 @@ const PurchaseInvoiceForm = ({
               {/* Purchase Details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
                     Purchase Date
                   </label>
                   <input
@@ -669,7 +677,7 @@ const PurchaseInvoiceForm = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
                     Bill Number
                   </label>
                   <input
@@ -700,7 +708,7 @@ const PurchaseInvoiceForm = ({
                   />
                 </div> */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
                     Payment Method
                   </label>
                   <select
@@ -716,7 +724,7 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
                     Supplier
                   </label>
                   <select
@@ -738,7 +746,7 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
                     Store
                   </label>
                   <select
@@ -759,7 +767,7 @@ const PurchaseInvoiceForm = ({
                     ))}
                   </select>
                 </div>
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Paid Amount
                   </label>
@@ -774,7 +782,7 @@ const PurchaseInvoiceForm = ({
                     placeholder="0.00"
                     disabled={loading}
                   />
-                </div>
+                </div> */}
                 {existingInvoice && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1021,7 +1029,7 @@ const PurchaseInvoiceForm = ({
                         {items.map((item, index) => (
                           <tr
                             key={item.id}
-                            className="border text-center dark:text-white"
+                            className="border text-center text-white"
                           >
                             <td className="p-2 border">{index + 1}</td>
                             <td className="p-2 border">{item.description}</td>
@@ -1073,7 +1081,7 @@ const PurchaseInvoiceForm = ({
                       </span>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
                         Invoice Discount
                       </label>
                       <div className="flex space-x-2">
@@ -1104,7 +1112,7 @@ const PurchaseInvoiceForm = ({
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
                         Tax
                       </label>
                       <div className="flex space-x-2">
@@ -1132,6 +1140,25 @@ const PurchaseInvoiceForm = ({
                           min="0"
                           step="0.01"
                           disabled={calculateSubtotal() === 0}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-white dark:text-gray-300 mb-1">
+                          Paid Amount
+                        </label>
+                        <input
+                          ref={paidAmountInputRef}
+                          type="number"
+                          name="paidAmount"
+                          value={invoice.paidAmount}
+                          onChange={handleInvoiceChange}
+                          onKeyDown={handlePaidAmountKeyDown}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          disabled={loading}
                         />
                       </div>
                     </div>
