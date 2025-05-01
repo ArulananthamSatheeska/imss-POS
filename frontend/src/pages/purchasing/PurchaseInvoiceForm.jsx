@@ -613,11 +613,11 @@ const PurchaseInvoiceForm = ({
   };
 
   return (
-    <div className="fixed inset-0 w-full flex items-center justify-center bg-slate-400 bg-opacity-50 z-50 overflow-y-auto">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-6xl relative my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center w-full overflow-y-auto bg-opacity-50 bg-slate-400">
+      <div className="relative w-full max-w-6xl p-6 my-8 bg-white rounded-lg shadow-xl dark:bg-gray-800">
         <button
           onClick={onCancel}
-          className="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition"
+          className="absolute text-gray-500 transition top-4 right-4 hover:text-red-500"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -634,28 +634,28 @@ const PurchaseInvoiceForm = ({
             />
           </svg>
         </button>
-        <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
+        <h2 className="mb-6 text-2xl font-semibold text-gray-900 dark:text-gray-100">
           {existingInvoice
             ? "Edit Purchase Invoice"
             : "Create Purchase Invoice"}
         </h2>
-        <div className="space-y-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg max-w-full mx-auto">
+        <div className="max-w-full p-4 mx-auto space-y-4 rounded-lg bg-gray-50 dark:bg-gray-700">
           {Object.keys(errors).length > 0 && (
-            <div className="p-2 mb-4 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded">
+            <div className="p-2 mb-4 text-red-800 bg-red-100 rounded dark:bg-red-900 dark:text-red-200">
               {Object.values(errors).filter(Boolean).join(", ")}
             </div>
           )}
           {loading && (
-            <div className="flex justify-center items-center p-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="flex items-center justify-center p-8">
+              <div className="w-12 h-12 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin"></div>
             </div>
           )}
           {!loading && (
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Purchase Details */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Purchase Date
                   </label>
                   <input
@@ -669,7 +669,7 @@ const PurchaseInvoiceForm = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Bill Number
                   </label>
                   <input
@@ -685,7 +685,7 @@ const PurchaseInvoiceForm = ({
                 </div>
                 {/* Hide Invoice Number Field */}
                 {/* <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Invoice Number
                   </label>
                   <input
@@ -700,7 +700,7 @@ const PurchaseInvoiceForm = ({
                   />
                 </div> */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Payment Method
                   </label>
                   <select
@@ -716,7 +716,7 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Supplier
                   </label>
                   <select
@@ -738,7 +738,7 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Store
                   </label>
                   <select
@@ -760,7 +760,7 @@ const PurchaseInvoiceForm = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Paid Amount
                   </label>
                   <input
@@ -777,7 +777,7 @@ const PurchaseInvoiceForm = ({
                 </div>
                 {existingInvoice && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Status
                     </label>
                     <select
@@ -796,13 +796,13 @@ const PurchaseInvoiceForm = ({
               </div>
 
               {/* Item Selection */}
-              <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+              <div className="p-4 bg-gray-100 rounded-lg shadow-md dark:bg-gray-800">
+                <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">
                   Add Item
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+                <div className="grid items-center grid-cols-1 gap-4 md:grid-cols-7">
                   <div ref={searchRef} className="relative">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Search Item
                     </label>
                     <div className="relative">
@@ -820,10 +820,10 @@ const PurchaseInvoiceForm = ({
                         className="w-full p-2 pl-8 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                         disabled={loading}
                       />
-                      <FiSearch className="absolute left-2 top-3 text-gray-400" />
+                      <FiSearch className="absolute text-gray-400 left-2 top-3" />
                     </div>
                     {showSuggestions && filteredProducts.length > 0 && (
-                      <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                      <ul className="absolute z-10 w-full mt-1 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg dark:bg-gray-700 dark:border-gray-600 max-h-48">
                         {filteredProducts.map((p, index) => (
                           <li
                             key={p.product_id}
@@ -845,13 +845,13 @@ const PurchaseInvoiceForm = ({
                     {showSuggestions &&
                       itemForm.searchQuery &&
                       filteredProducts.length === 0 && (
-                        <div className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg p-4 text-gray-500 dark:text-gray-300">
+                        <div className="absolute z-10 w-full p-4 text-gray-500 bg-white border border-gray-200 rounded-md shadow-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
                           No products found
                         </div>
                       )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Quantity
                     </label>
                     <input
@@ -868,7 +868,7 @@ const PurchaseInvoiceForm = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Free Items
                     </label>
                     <input
@@ -885,7 +885,7 @@ const PurchaseInvoiceForm = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Buying Cost
                     </label>
                     <input
@@ -902,7 +902,7 @@ const PurchaseInvoiceForm = ({
                     />
                   </div>
                   {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Discount
                     </label>
                     <div className="flex space-x-2">
@@ -935,7 +935,7 @@ const PurchaseInvoiceForm = ({
                   </div> */}
 
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       Discount
                     </label>
                     <div className="flex space-x-2">
@@ -979,7 +979,7 @@ const PurchaseInvoiceForm = ({
                           searchInputRef.current?.focus();
                         }
                       }}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md w-full"
+                      className="w-full px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600"
                       disabled={
                         loading || !itemForm.itemId || itemForm.quantity <= 0
                       }
@@ -989,7 +989,7 @@ const PurchaseInvoiceForm = ({
                     <button
                       type="button"
                       onClick={resetItemForm}
-                      className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md w-full"
+                      className="w-full px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
                       disabled={loading}
                     >
                       Reset
@@ -1002,9 +1002,9 @@ const PurchaseInvoiceForm = ({
               {items.length > 0 && (
                 <div className="space-y-4">
                   <div className="overflow-auto max-h-64">
-                    <table className="w-full border-collapse border rounded-lg overflow-hidden">
+                    <table className="w-full overflow-hidden border border-collapse rounded-lg">
                       <thead>
-                        <tr className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white">
+                        <tr className="text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-white">
                           <th className="p-2 border">#</th>
                           <th className="p-2 border">Description</th>
                           <th className="p-2 border">Quantity</th>
@@ -1012,7 +1012,7 @@ const PurchaseInvoiceForm = ({
                           <th className="p-2 border">Buying Cost</th>
                           <th className="p-2 border">Subtotal</th>
                           <th className="p-2 border">Discount (%)</th>
-                          <th className="p-2 border">Discount ($)</th>
+                          <th className="p-2 border">Discount (LKR)</th>
                           <th className="p-2 border">Total</th>
                           <th className="p-2 border">Action</th>
                         </tr>
@@ -1021,7 +1021,7 @@ const PurchaseInvoiceForm = ({
                         {items.map((item, index) => (
                           <tr
                             key={item.id}
-                            className="border text-center dark:text-white"
+                            className="text-center border dark:text-white"
                           >
                             <td className="p-2 border">{index + 1}</td>
                             <td className="p-2 border">{item.description}</td>
@@ -1057,23 +1057,22 @@ const PurchaseInvoiceForm = ({
                       </tbody>
                     </table>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-right pr-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="pr-4 text-right">
                       <span className="text-lg font-semibold text-yellow-600 dark:text-gray-200">
-                        Item Subtotal: ${calculateItemSubtotal().toFixed(2)}
+                        Item Subtotal: LKR {calculateItemSubtotal().toFixed(2)}
                       </span>
                       <br />
                       <span className="text-lg font-semibold text-red-600 dark:text-gray-200">
-                        Total Item Discount: $
-                        {calculateTotalItemDiscount().toFixed(2)}
+                        Total Item Discount: LKR {calculateTotalItemDiscount().toFixed(2)}
                       </span>
                       <br />
                       <span className="text-lg font-semibold text-yellow-600 dark:text-gray-200">
-                        Subtotal: ${calculateSubtotal().toFixed(2)}
+                        Subtotal: LKR {calculateSubtotal().toFixed(2)}
                       </span>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                         Invoice Discount
                       </label>
                       <div className="flex space-x-2">
@@ -1104,7 +1103,7 @@ const PurchaseInvoiceForm = ({
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                         Tax
                       </label>
                       <div className="flex space-x-2">
@@ -1136,21 +1135,20 @@ const PurchaseInvoiceForm = ({
                       </div>
                     </div>
                   </div>
-                  <div className="text-right pr-4 space-y-2">
+                  <div className="pr-4 space-y-2 text-right">
                     <div>
                       <span className="text-lg font-semibold text-blue-800 dark:text-gray-200">
-                        Total: ${calculateFinalTotal().toFixed(2)}
+                        Total: LKR {calculateFinalTotal().toFixed(2)}
                       </span>
                     </div>
                     <div>
                       <span className="text-lg font-semibold text-green-800 dark:text-gray-200">
-                        Paid Amount: ${invoice.paidAmount.toFixed(2)}
+                        Paid Amount: LKR {invoice.paidAmount.toFixed(2)}
                       </span>
                     </div>
                     <div>
                       <span className="text-lg font-semibold text-green-800 dark:text-gray-200">
-                        Balance: $
-                        <span
+                        Balance: LKR <span
                           className={
                             calculateBalance() < 0
                               ? "text-red-500"
@@ -1170,7 +1168,7 @@ const PurchaseInvoiceForm = ({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition"
+                  className="px-4 py-2 text-white transition bg-gray-500 rounded-lg hover:bg-gray-600"
                   disabled={loading}
                 >
                   Cancel
@@ -1179,7 +1177,7 @@ const PurchaseInvoiceForm = ({
                   ref={generateInvoiceButtonRef}
                   type="submit"
                   onKeyDown={handleGenerateInvoiceKeyDown}
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                  className="px-4 py-2 text-white transition bg-green-500 rounded-lg hover:bg-green-600"
                   disabled={loading || items.length === 0}
                 >
                   {existingInvoice ? "Update Invoice" : "Generate Invoice"}
