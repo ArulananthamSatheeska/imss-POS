@@ -6,9 +6,11 @@ use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\Supplier;
 use App\Models\Product;
+use App\Models\PurchaseItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseReturnController extends Controller
 {
@@ -89,6 +91,7 @@ class PurchaseReturnController extends Controller
             'items.*.reason' => 'required|string|max:255',
             'refund_method' => 'required|in:cash,bank,credit',
             'remarks' => 'nullable|string|max:1000',
+            'status' => 'required|in:pending,approved,rejected',
         ]);
 
         if ($validator->fails()) {
@@ -106,7 +109,7 @@ class PurchaseReturnController extends Controller
                 'supplier_id' => $request->supplier_id,
                 'refund_method' => $request->refund_method,
                 'remarks' => $request->remarks,
-                'status' => 'pending',
+                'status' => $request->status,
             ]);
 
             foreach ($request->items as $item) {
@@ -122,6 +125,11 @@ class PurchaseReturnController extends Controller
                     'buying_cost' => $item['buying_cost'],
                     'reason' => $item['reason'],
                 ]);
+
+                // If status is approved, update purchase quantity
+                if ($request->status === 'approved') {
+                    $this->updatePurchaseOnApproval($item['product_id'], $item['quantity']);
+                }
             }
 
             DB::commit();
@@ -170,6 +178,16 @@ class PurchaseReturnController extends Controller
             DB::beginTransaction();
 
             $purchaseReturn = PurchaseReturn::findOrFail($id);
+            $oldStatus = $purchaseReturn->status;
+
+            // If status is changing from approved to something else, revert purchase changes
+            if ($oldStatus === 'approved' && $request->status !== 'approved') {
+                $oldItems = PurchaseReturnItem::where('purchase_return_id', $id)->get();
+                foreach ($oldItems as $item) {
+                    $this->revertPurchaseOnApproval($item->product_id, $item->quantity);
+                }
+            }
+
             $purchaseReturn->update([
                 'supplier_id' => $request->supplier_id,
                 'refund_method' => $request->refund_method,
@@ -192,6 +210,11 @@ class PurchaseReturnController extends Controller
                     'buying_cost' => $item['buying_cost'],
                     'reason' => $item['reason'],
                 ]);
+
+                // If new status is approved, update purchase quantity
+                if ($request->status === 'approved' && $oldStatus !== 'approved') {
+                    $this->updatePurchaseOnApproval($item['product_id'], $item['quantity']);
+                }
             }
 
             DB::commit();
@@ -217,16 +240,85 @@ class PurchaseReturnController extends Controller
     public function destroy($id)
     {
         try {
+            DB::beginTransaction();
+
             $purchaseReturn = PurchaseReturn::findOrFail($id);
+            if ($purchaseReturn->status === 'approved') {
+                $items = PurchaseReturnItem::where('purchase_return_id', $id)->get();
+                foreach ($items as $item) {
+                    $this->revertPurchaseOnApproval($item->product_id, $item->quantity);
+                }
+            }
+
             $purchaseReturn->delete();
+            DB::commit();
             return response()->json([
                 'message' => 'Purchase return deleted successfully'
             ], 200);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'message' => 'Error deleting purchase return',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Update purchase quantity when a purchase return is approved.
+     *
+     * @param int $productId
+     * @param int $quantity
+     * @return void
+     */
+    private function updatePurchaseOnApproval($productId, $quantity)
+    {
+        try {
+            // Find the latest purchase item for the product
+            $purchaseItem = PurchaseItem::where('product_id', $productId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($purchaseItem) {
+                // Reduce the purchased quantity
+                $newQuantity = max(0, $purchaseItem->quantity - $quantity);
+                $purchaseItem->update(['quantity' => $newQuantity]);
+                Log::info("Updated PurchaseItem ID {$purchaseItem->id} quantity to {$newQuantity} for product ID {$productId}");
+            } else {
+                Log::warning("No PurchaseItem found for product ID {$productId}");
+            }
+        } catch (\Exception $e) {
+            Log::error("Error updating purchase quantity for product ID {$productId}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Revert purchase quantity changes when a purchase return is unapproved or deleted.
+     *
+     * @param int $productId
+     * @param int $quantity
+     * @return void
+     */
+    private function revertPurchaseOnApproval($productId, $quantity)
+    {
+        try {
+            // Find the latest purchase item for the product
+            $purchaseItem = PurchaseItem::where('product_id', $productId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($purchaseItem) {
+                // Increase the purchased quantity
+                $newQuantity = $purchaseItem->quantity + $quantity;
+                $purchaseItem->update(['quantity' => $newQuantity]);
+                Log::info("Reverted PurchaseItem ID {$purchaseItem->id} quantity to {$newQuantity} for product ID {$productId}");
+            } else {
+                Log::warning("No PurchaseItem found for product ID {$productId}");
+            }
+        } catch (\Exception $e) {
+            Log::error("Error reverting purchase quantity for product ID {$productId}: " . $e->getMessage());
+            throw $e;
         }
     }
 }
