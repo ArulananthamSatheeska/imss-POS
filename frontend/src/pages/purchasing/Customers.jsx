@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getData, postData, putData, deleteData } from "../../services/api";
+import { getData, postData, deleteData } from "../../services/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,20 +64,7 @@ const CustomerManagement = () => {
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    if (!form.customer_name.trim())
-      newErrors.customer_name = "Name is required";
-    if (form.email && !/\S+@\S+\.\S+/.test(form.email.trim()))
-      newErrors.email = "Invalid email format";
-    if (!form.phone.trim()) newErrors.phone = "Phone number is required";
-    if (form.phone && !/^\+?\d{10,15}$/.test(form.phone.trim()))
-      newErrors.phone = "Invalid phone number (10-15 digits)";
-    if (!form.nic_number.trim())
-      newErrors.nic_number = "NIC number is required";
-    if (form.nic_number && !/^\d{9}[vVxX]?$/.test(form.nic_number.trim()))
-      newErrors.nic_number =
-        "NIC must be 9 digits optionally followed by v or x";
-    return newErrors;
+    return {};
   };
 
   const handleAddOrUpdateCustomer = async () => {
@@ -123,9 +110,12 @@ const CustomerManagement = () => {
 
     try {
       let response;
-      if (editingCustomer) {
-        console.log(`Sending PUT request to ${API_URL}/${editingCustomer.id}`);
-        response = await putData(`${API_URL}/${editingCustomer.id}`, formData);
+      if (editingCustomer && editingCustomer.id) {
+        formData.append("_method", "PUT");
+        console.log(
+          `Sending POST request with _method=PUT to ${API_URL}/${editingCustomer.id}`
+        );
+        response = await postData(`${API_URL}/${editingCustomer.id}`, formData);
       } else {
         console.log(`Sending POST request to ${API_URL}`);
         response = await postData(API_URL, formData);
@@ -243,9 +233,6 @@ const CustomerManagement = () => {
               placeholder="Email"
               className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             />
-            {errors.email && (
-              <p className="text-red-600 text-sm">{errors.email}</p>
-            )}
           </div>
           <div>
             <Input
