@@ -24,13 +24,14 @@ class CustomerController extends Controller
 
     public function store(Request $request)
     {
+        // Validation removed as per request
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:customers,email',
-            'phone' => 'required|string|max:20|unique:customers,phone',
-            'address' => 'nullable|string|max:255',
-            'nic_number' => 'required|string|max:12|unique:customers,nic_number',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            // 'customer_name' => 'required|string|max:255',
+            // 'email' => 'nullable|email|unique:customers,email',
+            // 'phone' => 'required|string|max:20|unique:customers,phone',
+            // 'address' => 'nullable|string|max:255',
+            // 'nic_number' => 'required|string|max:12|unique:customers,nic_number',
+            // 'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -72,13 +73,14 @@ class CustomerController extends Controller
     {
         $customer = Customer::findOrFail($id);
 
+        // Validation removed as per request
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:customers,email,' . $id,
-            'phone' => 'required|string|max:20|unique:customers,phone,' . $id,
-            'address' => 'nullable|string|max:255',
-            'nic_number' => 'required|string|max:12|unique:customers,nic_number,' . $id,
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            // 'customer_name' => 'required|string|max:255',
+            // 'email' => 'nullable|email|unique:customers,email,' . $id,
+            // 'phone' => 'required|string|max:20|unique:customers,phone,' . $id,
+            // 'address' => 'nullable|string|max:255',
+            // 'nic_number' => 'required|string|max:12|unique:customers,nic_number,' . $id,
+            // 'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         if ($validator->fails()) {
