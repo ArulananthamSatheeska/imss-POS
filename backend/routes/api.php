@@ -111,8 +111,7 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::get('/verify-token', [AuthController::class, 'verifyToken']);
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
 
-    
-});
+    });
 
 Route::prefix('discount-schemes')->group(function () {
     Route::get('/', [DiscountSchemeController::class, 'index']);
@@ -121,6 +120,14 @@ Route::prefix('discount-schemes')->group(function () {
     Route::put('/{scheme}', [DiscountSchemeController::class, 'update']);
     Route::delete('/{scheme}', [DiscountSchemeController::class, 'destroy']);
 });
+
+
+// Held Sales Routes
+    Route::get('/holds', [\App\Http\Controllers\Api\HeldSaleController::class, 'index']);
+    Route::post('/holds', [\App\Http\Controllers\Api\HeldSaleController::class, 'store']);
+    Route::get('/holds/{id}', [\App\Http\Controllers\Api\HeldSaleController::class, 'show']);
+    Route::delete('/holds/{id}', [\App\Http\Controllers\Api\HeldSaleController::class, 'destroy']);
+    Route::post('/holds/{id}/recall', [\App\Http\Controllers\Api\HeldSaleController::class, 'recall']);
 
 
 // Route::middleware('auth:sanctum')->group(function () {

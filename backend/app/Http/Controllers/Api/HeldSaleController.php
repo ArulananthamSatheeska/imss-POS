@@ -35,9 +35,30 @@ class HeldSaleController extends Controller
             $query = $query->active();
         }
 
+        $heldSales = $query->orderBy('created_at', 'desc')->get();
+
+        // Map held sales to include total_items and total_amount for clarity
+        $mappedSales = $heldSales->map(function ($sale) {
+            $totalItems = 0;
+            $totalAmount = 0.0;
+
+            if (isset($sale->sale_data['products']) && is_array($sale->sale_data['products'])) {
+                $totalItems = count($sale->sale_data['products']);
+            }
+
+            if (isset($sale->sale_data['totals']['finalTotal'])) {
+                $totalAmount = $sale->sale_data['totals']['finalTotal'];
+            }
+
+            return array_merge($sale->toArray(), [
+                'total_items' => $totalItems,
+                'total_amount' => $totalAmount,
+            ]);
+        });
+
         return response()->json([
             'status' => 'success',
-            'data' => $query->orderBy('created_at', 'desc')->get()
+            'data' => $mappedSales
         ]);
     }
 
@@ -103,6 +124,9 @@ class HeldSaleController extends Controller
     public function recall($id)
     {
         $heldSale = HeldSale::where('hold_id', $id)->active()->firstOrFail();
+
+        // Update status to 'completed' or 'recalled' so it no longer appears in active holds
+        $heldSale->update(['status' => 'completed']);
 
         return response()->json([
             'status' => 'success',

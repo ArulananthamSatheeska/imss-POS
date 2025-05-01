@@ -113,7 +113,7 @@ const applyDiscountScheme = (product, saleType, schemes) => {
 
 const POSForm = () => {
     const terminalId = "T-1"; // Add a default or fetched terminal ID here
-    const userId = "U-1"; // Add a default or fetched user ID here
+    const userId = 1; // Changed to valid integer user ID for backend validation
 
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [saleType, setSaleType] = useState("Retail");
@@ -655,6 +655,8 @@ const POSForm = () => {
                 setSaleType(sale.saleType || "Retail");
                 setCustomerInfo(sale.customerInfo || { name: "", mobile: "", bill_number: "", userId: "U-1" });
                 setBillNumber(sale.billNumber || "");
+                // Remove recalled sale from heldSales list immediately
+                setHeldSales((prevHeldSales) => prevHeldSales.filter(s => s.hold_id !== holdId));
                 setShowHeldSalesList(false);
                 alert(`Recalled sale with ID: ${holdId}`);
             } else {
@@ -865,22 +867,22 @@ const POSForm = () => {
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                                 {products.length === 0 ? (
-                                    <tr> <td colSpan="8" className="py-6 italic text-center text-gray-500 dark:text-gray-400"> No items added to the bill yet. Start searching above! </td> </tr>
+                                    <tr><td colSpan="8" className="py-6 italic text-center text-gray-500 dark:text-gray-400">No items added to the bill yet. Start searching above!</td></tr>
                                 ) : (
                                     products.map((product, index) => (
                                         <tr key={product.product_id + '-' + index} className="hover:bg-gray-100 dark:hover:bg-gray-700">
-                                            <td className="px-3 py-2 font-medium text-gray-900 border-r dark:text-white dark:border-gray-700"> {product.serialNumber} </td>
-                                            <td className="px-4 py-2 border-r dark:border-gray-700" title={product.product_name}> {product.product_name} </td>
-                                            <td className="px-3 py-2 text-right border-r dark:border-gray-700"> {formatNumberWithCommas(product.mrp)} </td>
+                                            <td className="px-3 py-2 font-medium text-gray-900 border-r dark:text-white dark:border-gray-700">{product.serialNumber}</td>
+                                            <td className="px-4 py-2 border-r dark:border-gray-700" title={product.product_name}>{product.product_name}</td>
+                                            <td className="px-3 py-2 text-right border-r dark:border-gray-700">{formatNumberWithCommas(product.mrp)}</td>
                                             <td className="px-1 py-1 text-center border-r dark:border-gray-700">
                                                 <input type="number" step="1" min="0" className="w-16 py-1 text-sm text-center bg-transparent border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 dark:text-white" value={product.qty} onChange={(e) => updateProductQuantity(index, e.target.value)} onFocus={(e) => e.target.select()} />
                                             </td>
                                             <td className="px-3 py-2 text-right border-r dark:border-gray-700">
                                                 <input type="number" step="0.01" min="0" className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 read-only:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:read-only:bg-gray-600 dark:text-white" value={product.price.toFixed(2)} readOnly />
                                             </td>
-                                            <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700"> {formatNumberWithCommas(product.discount?.toFixed(2) ?? 0.00)} </td>
-                                            <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700"> {formatNumberWithCommas(product.total?.toFixed(2) ?? 0.00)} </td>
-                                            <td className="px-3 py-2 text-center"> <button onClick={() => handleDeleteClick(index)} className="p-1 text-red-600 transition duration-150 ease-in-out rounded-lg hover:bg-red-100 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500" title="Delete Item"> <Trash2 size={16} /> </button> </td>
+                                            <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">{formatNumberWithCommas(product.discount?.toFixed(2) ?? 0.00)}</td>
+                                            <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">{formatNumberWithCommas(product.total?.toFixed(2) ?? 0.00)}</td>
+                                            <td className="px-3 py-2 text-center"><button onClick={() => handleDeleteClick(index)} className="p-1 text-red-600 transition duration-150 ease-in-out rounded-lg hover:bg-red-100 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500" title="Delete Item"><Trash2 size={16} /></button></td>
                                         </tr>
                                     ))
                                 )}
@@ -936,6 +938,15 @@ const POSForm = () => {
             {showBillModal && (<BillPrintModal initialProducts={products} initialBillDiscount={parseFloat(billDiscount || 0)} initialTax={parseFloat(tax || 0)} initialShipping={parseFloat(shipping || 0)} initialTotals={totals} initialCustomerInfo={customerInfo} onClose={closeBillModal} />)}
             {showCalculatorModal && (<CalculatorModal isOpen={showCalculatorModal} onClose={() => setShowCalculatorModal(false)} />)}
             {isCloseRegisterOpen && (<CloseRegisterModal isOpen={isCloseRegisterOpen} onClose={() => setIsCloseRegisterOpen(false)} />)}
+            {showHeldSalesList && (
+                <HeldSalesList
+                    heldSales={heldSales}
+                    loading={loadingHeldSales}
+                    onRecall={recallHeldSale}
+                    onDelete={deleteHeldSale}
+                    onClose={closeHeldSalesList}
+                />
+            )}
         </div>
     );
 };
