@@ -42,6 +42,7 @@ class SalesInvoiceController extends Controller
             'items.*.discountAmount' => 'required|numeric|min:0',
             'items.*.discountPercentage' => 'nullable|numeric|min:0|max:100',
             'status' => 'nullable|string|in:pending,paid,cancelled',
+            'items.*.totalBuyingCost' => 'required|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -89,6 +90,7 @@ class SalesInvoiceController extends Controller
                 'discount_amount' => $itemInput['discountAmount'],
                 'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
                 'total' => $itemTotal,
+                'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0, 
             ];
         }
 
@@ -180,9 +182,17 @@ class SalesInvoiceController extends Controller
             'items.*.discountAmount' => 'required|numeric|min:0',
             'items.*.discountPercentage' => 'nullable|numeric|min:0|max:100',
             'status' => 'nullable|string|in:pending,paid,cancelled',
+            'purchaseDetails.taxPercentage' => 'nullable|numeric|min:0|max:100',
+            'items.*.totalBuyingCost' => 'required|numeric|min:0',
+            
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Validation failed for invoice update:', [
+                'errors' => $validator->errors(),
+                'request_data' => request()->all(),
+                'invoice_id' => $invoice->id,
+            ]);
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
@@ -245,6 +255,7 @@ class SalesInvoiceController extends Controller
                     'discount_amount' => $itemInput['discountAmount'],
                     'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
                     'total' => $itemTotal,
+                    'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0,
                 ];
             }
 
@@ -268,6 +279,7 @@ class SalesInvoiceController extends Controller
                 'total_amount' => $calculatedTotalAmount,
                 'balance' => $calculatedBalance,
                 'status' => $validatedData['status'] ?? $invoice->status,
+                
             ]);
 
             // Update or create items
