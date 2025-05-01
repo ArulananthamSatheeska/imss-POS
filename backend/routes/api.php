@@ -2,8 +2,6 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\HeldSaleController;
-
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\{
     UnitController,
@@ -27,6 +25,7 @@ use App\Http\Controllers\{
     RawMaterialController,
     SalesInvoiceController
 };
+
 
 // Authentication routes (no permission middleware)
 Route::middleware(['api'])->group(function() {
@@ -84,6 +83,7 @@ Route::middleware(['api'])->group(function () {
     // Permission routes
     Route::apiResource('permissions', PermissionController::class)->except(['update']);
 
+    
     // Other resource routes
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('store-locations', StoreLocationController::class);
@@ -98,9 +98,9 @@ Route::middleware(['api'])->group(function () {
     Route::apiResource('sales', SaleController::class);
     Route::get('/stock-reports', [StockReportController::class, 'index']);
     Route::get('/detailed-stock-reports', [StockReportController::class, 'detailedReport']);
-    Route::get('/product/{id}', [ProductController::class, 'barcode']);
+Route::get('/product/{id}', [ProductController::class, 'barcode']);
 
-    Route::get('/dashboard', [DashboardController::class, 'dashboard']);
+Route::get('/dashboard', [DashboardController::class, 'dashboard']);
 });
 
 // Protected routes (requires authentication)
@@ -110,9 +110,10 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::post('/add-default-user', [AuthController::class, 'addDefaultUser']);
     Route::get('/verify-token', [AuthController::class, 'verifyToken']);
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
+
+    
 });
 
-// Discount Schemes
 Route::prefix('discount-schemes')->group(function () {
     Route::get('/', [DiscountSchemeController::class, 'index']);
     Route::post('/', [DiscountSchemeController::class, 'store']);
@@ -121,28 +122,58 @@ Route::prefix('discount-schemes')->group(function () {
     Route::delete('/{scheme}', [DiscountSchemeController::class, 'destroy']);
 });
 
-// Purchase routes
+
+// Route::middleware('auth:sanctum')->group(function () {
+//     Route::get('/purchases', [PurchaseController::class, 'index']);
+//     Route::post('/purchases', [PurchaseController::class, 'store']);
+//     Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
+//     Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
+//     Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
+
+//     // Route::get('/suppliers', [SupplierController::class, 'index']);
+//     // Route::get('/store-locations', [StoreLocationController::class, 'index']);
+//     // Route::get('/products', [ProductController::class, 'index']);
+// });
+
 Route::get('/purchases', [PurchaseController::class, 'index']);
 Route::post('/purchases', [PurchaseController::class, 'store']);
-Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
-Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
-Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
+  
+    Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
+    Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
+    Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
 
-// Production categories and items
+    Route::prefix('companies')->group(function () {
+        Route::get('/', [CompanyController::class, 'index']);          // Get all companies
+        Route::post('/', [CompanyController::class, 'store']);         // Create a new company (Uses POST)
+        Route::get('/{company_name}', [CompanyController::class, 'show']); // Get a specific company by name (Uses GET)
+        Route::put('/{company_name}', [CompanyController::class, 'update']); // Update a company (Uses PUT, handled via _method)
+        Route::delete('/{company_name}', [CompanyController::class, 'destroy']); // Correct: DELETE api/companies/{company_name}
+    });
+    
+Route::apiResource('invoices', SalesInvoiceController::class);
+Route::get('/invoices/check-invoice-no', [SalesInvoiceController::class, 'checkInvoiceNo']);
+
+
+//     Route::get('/suppliers', [SupplierController::class, 'index']);
+//     Route::get('/store-locations', [StoreLocationController::class, 'index']);
+//     Route::get('/products', [ProductController::class, 'index']);
+// });
+
 Route::apiResource('production-categories', ProductionCategoryController::class);
-Route::apiResource('production-items', ProductionItemController::class);
 
-// Raw materials
 Route::apiResource('raw-materials', RawMaterialController::class);
 Route::get('suppliers', [RawMaterialController::class, 'getSuppliers']);
 Route::get('units', [RawMaterialController::class, 'getUnits']);
 
-// Held Sales
-Route::prefix('holds')->group(function () {
-    Route::get('/', [HeldSaleController::class, 'index']);
-    Route::post('/', [HeldSaleController::class, 'store']);
-    Route::get('/{id}', [HeldSaleController::class, 'show']);
-    Route::delete('/{id}', [HeldSaleController::class, 'destroy']);
-    Route::post('/{id}/recall', [HeldSaleController::class, 'recall']);
-    Route::post('/cleanup', [HeldSaleController::class, 'cleanupExpired']);
-});
+
+Route::apiResource('production-items', ProductionItemController::class);
+
+
+Route::post('/purchase-returns', [PurchaseReturnController::class, 'createPurchaseReturn']);
+    Route::get('/purchase-returns', [PurchaseReturnController::class, 'getPurchaseReturns']);
+    // routes/api.php
+Route::get('/purchase-returns/{id}', [PurchaseReturnController::class, 'show']);
+// routes/api.php
+Route::put('/purchase-returns/{id}', [PurchaseReturnController::class, 'update']);
+// routes/api.php
+Route::delete('/purchase-returns/{id}', [PurchaseReturnController::class, 'destroy']);
