@@ -41,24 +41,31 @@ class ProductController extends Controller
 
 
     public function store(Request $request)
-{
-    Log::info('Creating new product:', $request->all());
-    if ($request->has('product_id') || $request->has('id')) {
-        Log::warning('Unexpected product_id or id in store request', [
-            'product_id' => $request->input('product_id'),
-            'id' => $request->input('id'),
-        ]);
+    {
+        Log::info('Creating new product:', $request->all());
+        if ($request->has('product_id') || $request->has('id')) {
+            Log::warning('Unexpected product_id or id in store request', [
+                'product_id' => $request->input('product_id'),
+                'id' => $request->input('id'),
+            ]);
+        }
+        try {
+            $validatedData = $request->validate($this->storeRules());
+
+            // Check if product with same product_name exists
+            $existingProduct = Product::where('product_name', $validatedData['product_name'])->first();
+            if ($existingProduct) {
+                return response()->json(['message' => 'Product with this name already exists', 'data' => $existingProduct], 200);
+            }
+
+            $product = Product::create($validatedData);
+            return response()->json(['message' => 'Product created successfully', 'data' => $product], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation error', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return $this->handleException($e, 'Error creating product');
+        }
     }
-    try {
-        $validatedData = $request->validate($this->storeRules());
-        $product = Product::create($validatedData);
-        return response()->json(['message' => 'Product created successfully', 'data' => $product], 201);
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        return response()->json(['message' => 'Validation error', 'errors' => $e->errors()], 422);
-    } catch (\Exception $e) {
-        return $this->handleException($e, 'Error creating product');
-    }
-}
 
     public function show($id)
     {

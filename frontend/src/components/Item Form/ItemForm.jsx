@@ -107,10 +107,11 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (initialData && !initialData.product_id) {
-      toast.error("Invalid product ID. Cannot update product.");
-      return;
-    }
+    // Remove the check that blocks submission if initialData exists but no product_id
+    // if (initialData && !initialData.product_id) {
+    //   toast.error("Invalid product ID. Cannot update product.");
+    //   return;
+    // }
 
     const itemData = {
       ...formData,
@@ -156,7 +157,7 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       console.error("Error saving product:", error);
       toast.error(
         error.response?.data?.message ||
-          "Failed to save product. Please try again."
+        "Failed to save product. Please try again."
       );
     }
   };
