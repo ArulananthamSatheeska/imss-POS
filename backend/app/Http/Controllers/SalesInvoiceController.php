@@ -25,7 +25,7 @@ class SalesInvoiceController extends Controller
 
         // Validate the incoming request
         $validator = Validator::make(request()->all(), [
-            'invoice.no' => 'required|string|max:255',
+            'invoice.no' => 'nullable|string|max:255|unique:invoices,invoice_no',
             'invoice.date' => 'required|date',
             'invoice.time' => 'required|date_format:H:i',
             'customer.name' => 'required|string|max:255',
@@ -54,7 +54,9 @@ class SalesInvoiceController extends Controller
         $validatedData = $validator->validated();
         Log::info('Validated Store Invoice Data:', $validatedData);
 
-        $taxRate = 0.10;
+        $taxRate = isset($validatedData['purchaseDetails']['tax_percentage'])
+            ? $validatedData['purchaseDetails']['tax_percentage'] / 100
+            : 0;
         $calculatedSubtotal = 0;
         $itemsData = [];
 
@@ -98,7 +100,7 @@ class SalesInvoiceController extends Controller
 
         try {
             $invoice = Invoice::create([
-                'invoice_no' => $validatedData['invoice']['no'],
+                'invoice_no' => $validatedData['invoice']['no'] ?? Invoice::generateInvoiceNumber(),
                 'invoice_date' => $validatedData['invoice']['date'],
                 'invoice_time' => $validatedData['invoice']['time'],
                 'customer_name' => $validatedData['customer']['name'],
@@ -160,7 +162,7 @@ class SalesInvoiceController extends Controller
         Log::info('Update Invoice Request Data:', request()->all());
 
         $validator = Validator::make(request()->all(), [
-            'invoice.no' => 'required|string|max:255|unique:invoices,invoice_no,' . $invoice->id,
+            'invoice.no' => 'nullable|string|max:255|unique:invoices,invoice_no,' . $invoice->id,
             'invoice.date' => 'required|date',
             'invoice.time' => 'required|date_format:H:i',
             'customer.name' => 'required|string|max:255',
@@ -208,7 +210,9 @@ class SalesInvoiceController extends Controller
                 }
             }
 
-            $taxRate = 0.10;
+            $taxRate = isset($validatedData['purchaseDetails']['tax_percentage'])
+                ? $validatedData['purchaseDetails']['tax_percentage'] / 100
+                : 0;
             $calculatedSubtotal = 0;
             $itemsData = [];
 
@@ -250,7 +254,7 @@ class SalesInvoiceController extends Controller
 
             // Update invoice
             $invoice->update([
-                'invoice_no' => $validatedData['invoice']['no'],
+                'invoice_no' => $validatedData['invoice']['no'] ?? $invoice->invoice_no,
                 'invoice_date' => $validatedData['invoice']['date'],
                 'invoice_time' => $validatedData['invoice']['time'],
                 'customer_name' => $validatedData['customer']['name'],
