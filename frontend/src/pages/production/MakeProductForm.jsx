@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import {
   createProductionItem,
   updateProductionItem,
@@ -34,6 +34,7 @@ function MakeProductForm({ onClose, onSubmit, editingProduct }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
   const addButtonRef = useRef(null);
@@ -43,11 +44,42 @@ function MakeProductForm({ onClose, onSubmit, editingProduct }) {
   const wholesalePricePercentageRef = useRef(null);
   const mrpPricePercentageRef = useRef(null);
 
+  useEffect(() => {
+    if (editingProduct) {
+      setProductName(editingProduct.name || "");
+      setCategoryId(editingProduct.category_id || "");
+      setSalesPrice(editingProduct.sales_price || 0);
+      setWholesalePrice(editingProduct.wholesale_price || 0);
+      setMrpPrice(editingProduct.mrp_price || 0);
+      setRawMaterialsList(
+        editingProduct.formulas?.map((formula) => ({
+          raw_material_id: formula.raw_material_id,
+          itemName: formula.rawMaterial?.name || "Unknown",
+          quantity: formula.quantity,
+          price: formula.price,
+          total: formula.quantity * formula.price,
+        })) || []
+      );
+    } else {
+      setProductName("");
+      setCategoryId("");
+      setSalesPrice(0);
+      setWholesalePrice(0);
+      setMrpPrice(0);
+      setRawMaterialsList([]);
+    }
+  }, [editingProduct]);
+
   // Calculate total raw materials cost
   const rawMaterialsTotal = rawMaterialsList.reduce(
     (sum, item) => sum + item.total,
     0
   );
+
+  // Calculate profit margins
+  const salesMargin = salesPrice - rawMaterialsTotal;
+  const wholesaleMargin = wholesalePrice - rawMaterialsTotal;
+  const mrpMargin = mrpPrice - rawMaterialsTotal;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,7 +117,7 @@ function MakeProductForm({ onClose, onSubmit, editingProduct }) {
         console.error("Error fetching data:", error);
         toast.error(
           "Failed to fetch data: " +
-            (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
         );
       }
     };
@@ -133,6 +165,25 @@ function MakeProductForm({ onClose, onSubmit, editingProduct }) {
       setMrpPrice(rawMaterialsTotal * (1 + percentage / 100));
     }
   }, [mrpPricePercentage, rawMaterialsTotal]);
+
+  // Reset form after successful submission
+  const resetForm = () => {
+    setProductName("");
+    setCategoryId("");
+    setSalesPrice(0);
+    setWholesalePrice(0);
+    setMrpPrice(0);
+    setSalesPricePercentage("");
+    setWholesalePricePercentage("");
+    setMrpPricePercentage("");
+    setRawMaterialsList([]);
+    setSelectedRawMaterialId("");
+    setQuantity(1);
+    setPrice(0);
+    setTotal(0);
+    setSearchQuery("");
+    setSuggestions([]);
+  };
 
   // Handle search input and suggestions
   const handleSearchChange = (e) => {
@@ -294,6 +345,8 @@ function MakeProductForm({ onClose, onSubmit, editingProduct }) {
       toast.error("One or more raw material IDs are invalid");
       return;
     }
+
+    setIsSubmitting(true);
     try {
       const productData = {
         name: productName.trim(),
@@ -307,17 +360,22 @@ function MakeProductForm({ onClose, onSubmit, editingProduct }) {
           price: parseFloat(item.price) || 0,
         })),
       };
-      console.log("Submitting payload:", JSON.stringify(productData, null, 2));
+
       let response;
       if (editingProduct) {
         response = await updateProductionItem(editingProduct.id, productData);
       } else {
         response = await createProductionItem(productData);
       }
+
       onSubmit(response.data);
       toast.success(
         `Production item ${editingProduct ? "updated" : "added"} successfully`
       );
+      if (!editingProduct) {
+        resetForm();
+      }
+      window.location.reload();
       onClose();
     } catch (error) {
       console.error("Error saving production item:", {
@@ -328,325 +386,545 @@ function MakeProductForm({ onClose, onSubmit, editingProduct }) {
       });
       const errorMessages = error.response?.data?.errors
         ? Object.entries(error.response.data.errors)
-            .map(([key, messages]) => `${key}: ${messages.join(", ")}`)
-            .join("; ")
+          .map(([key, messages]) => `${key}: ${messages.join(", ")}`)
+          .join("; ")
         : error.response?.data?.message || error.message;
       toast.error(`Failed to save product: ${errorMessages}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 w-full flex items-center justify-center bg-slate-400 bg-opacity-50 z-50 overflow-y-auto">
-      <ToastContainer />
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-6xl relative my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto p-4">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+      <div className="relative w-full max-w-5xl bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition"
+          aria-label="Close form"
         >
           <X className="w-6 h-6" />
         </button>
-        <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
-          {editingProduct ? "Edit Product" : "Make Product"}
+        <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
+          {editingProduct ? "Edit Product" : "Create New Product"}
         </h2>
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg max-w-full mx-auto"
+          className="space-y-6 w-full bg-gray-50 dark:bg-gray-700 p-6 rounded-lg"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Product Name
-              </label>
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Category
-              </label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Select Category</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
-              Add Raw Material
+          {/* Basic Information Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Product Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-              <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Raw Material
+                  Product Name <span className="text-red-500">*</span>
                 </label>
                 <input
-                  ref={searchInputRef}
                   type="text"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Search materials..."
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  required
+                  aria-required="true"
+                  placeholder="Enter product name"
                 />
-                {suggestions.length > 0 && (
-                  <ul
-                    ref={suggestionsRef}
-                    className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md mt-1 max-h-60 overflow-y-auto shadow-lg"
-                  >
-                    {suggestions.map((material, index) => (
-                      <li
-                        key={material.id}
-                        onClick={() => handleSuggestionSelect(material)}
-                        className={`p-2 cursor-pointer text-gray-900 dark:text-white hover:bg-blue-100 dark:hover:bg-blue-600 ${
-                          index === highlightedIndex
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  required
+                  aria-required="true"
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Raw Materials Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Raw Materials
+            </h3>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Search Raw Material
+                  </label>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type to search..."
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    aria-haspopup="listbox"
+                    aria-expanded={suggestions.length > 0}
+                    aria-controls="raw-material-suggestions"
+                  />
+                  {suggestions.length > 0 && (
+                    <ul
+                      ref={suggestionsRef}
+                      id="raw-material-suggestions"
+                      className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                      role="listbox"
+                    >
+                      {suggestions.map((material, index) => (
+                        <li
+                          key={material.id}
+                          onClick={() => handleSuggestionSelect(material)}
+                          onMouseEnter={() => setHighlightedIndex(index)}
+                          className={`p-2 cursor-pointer text-gray-900 dark:text-white hover:bg-blue-100 dark:hover:bg-blue-600 ${index === highlightedIndex
                             ? "bg-blue-100 dark:bg-blue-600"
                             : ""
-                        }`}
-                      >
-                        {material.name} ({material.category?.name || "N/A"})
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Quantity
-                </label>
-                <input
-                  ref={quantityInputRef}
-                  type="number"
-                  value={quantity}
-                  onChange={handleQuantityChange}
-                  onKeyDown={handleQuantityKeyDown}
-                  min="0"
-                  step="1"
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Unit Price
-                </label>
-                <input
-                  type="number"
-                  value={price.toFixed(2)}
-                  readOnly
-                  className="w-full p-2 border rounded-md bg-gray-200 dark:bg-gray-600 dark:border-gray-600 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Total
-                </label>
-                <input
-                  type="number"
-                  value={total.toFixed(2)}
-                  readOnly
-                  className="w-full p-2 border rounded-md bg-gray-200 dark:bg-gray-600 dark:border-gray-600 dark:text-white"
-                />
-              </div>
-              <div className="flex items-end h-full">
-                <button
-                  ref={addButtonRef}
-                  type="button"
-                  onClick={handleAddRawMaterial}
-                  onKeyDown={handleAddKeyDown}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md w-full"
-                  disabled={
-                    !selectedRawMaterialId || quantity <= 0 || price <= 0
-                  }
-                >
-                  Add
-                </button>
+                            }`}
+                          role="option"
+                          aria-selected={index === highlightedIndex}
+                        >
+                          <div className="font-medium">{material.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {material.category?.name || "No category"} | LKR
+                            {typeof material.cost_price === "number" && !isNaN(material.cost_price) ? material.cost_price.toFixed(2) : "0.00"}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Quantity
+                  </label>
+                  <input
+                    ref={quantityInputRef}
+                    type="number"
+                    value={quantity}
+                    onChange={handleQuantityChange}
+                    onKeyDown={handleQuantityKeyDown}
+                    min="0"
+                    step="0.01"
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Unit Price
+                  </label>
+                  <input
+                    type="number"
+                    value={price.toFixed(2)}
+                    readOnly
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Total
+                  </label>
+                  <input
+                    type="number"
+                    value={total.toFixed(2)}
+                    readOnly
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <button
+                    ref={addButtonRef}
+                    type="button"
+                    onClick={handleAddRawMaterial}
+                    onKeyDown={handleAddKeyDown}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition flex items-center justify-center"
+                    disabled={
+                      !selectedRawMaterialId || quantity <= 0 || price <= 0
+                    }
+                  >
+                    Add Item
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-          {rawMaterialsList.length > 0 && (
-            <div className="space-y-4">
-              <div className="overflow-auto max-h-64">
-                <table className="w-full border-collapse border rounded-lg overflow-hidden">
-                  <thead>
-                    <tr className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white">
-                      <th className="p-2 border">#</th>
-                      <th className="p-2 border">Item Name</th>
-                      <th className="p-2 border">Quantity</th>
-                      <th className="p-2 border">Price</th>
-                      <th className="p-2 border">Total</th>
-                      <th className="p-2 border">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rawMaterialsList.map((item, index) => (
-                      <tr
-                        key={index}
-                        className="border text-center dark:text-white"
-                      >
-                        <td className="p-2 border">{index + 1}</td>
-                        <td className="p-2 border">{item.itemName}</td>
-                        <td className="p-2 border">{item.quantity}</td>
-                        <td className="p-2 border">{item.price.toFixed(2)}</td>
-                        <td className="p-2 border">{item.total.toFixed(2)}</td>
-                        <td className="p-2 border">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRawMaterial(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            Remove
-                          </button>
-                        </td>
+
+            {rawMaterialsList.length > 0 && (
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <thead className="bg-gray-100 dark:bg-gray-700">
+                      <tr>
+                        <th className="p-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          #
+                        </th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Item Name
+                        </th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Unit Price
+                        </th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Total
+                        </th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {rawMaterialsList.map((item, index) => (
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
+                            {index + 1}
+                          </td>
+                          <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
+                            {item.itemName}
+                          </td>
+                          <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
+                            {item.quantity}
+                          </td>
+                          <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
+                            LKR {typeof item.price === "number" && !isNaN(item.price) ? item.price.toFixed(2) : "0.00"}
+                          </td>
+                          <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
+                            LKR {typeof item.total === "number" && !isNaN(item.total) ? item.total.toFixed(2) : "0.00"}
+                          </td>
+                          <td className="p-3 text-sm">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRawMaterial(index)}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition"
+                              aria-label="Remove item"
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-end">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-100 dark:border-blue-900">
+                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                      Raw Materials Summary
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Total Items
+                        </div>
+                        <div className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                          {rawMaterialsList.length}
+                        </div>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Total Cost
+                        </div>
+                        <div className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                          LKR {rawMaterialsTotal.toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Avg. Cost per Unit
+                        </div>
+                        <div className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                          LKR {(rawMaterialsTotal / Math.max(1, rawMaterialsList.length)).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-right pr-4">
-                <span className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                  Total Raw Materials Cost: ${rawMaterialsTotal.toFixed(2)}
-                </span>
+            )}
+          </div>
+
+          {/* Pricing Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Pricing
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Sales Price
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    ref={salesPriceInputRef}
+                    type="number"
+                    value={typeof salesPrice === "number" && !isNaN(salesPrice) ? salesPrice.toFixed(2) : "0.00"}
+                    onChange={(e) => {
+                      setSalesPrice(parseFloat(e.target.value) || 0);
+                      setSalesPricePercentage("");
+                    }}
+                    onClick={handleSalesPriceClick}
+                    min="0"
+                    step="0.01"
+                    className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    required
+                  />
+                  <input
+                    ref={salesPricePercentageRef}
+                    type="number"
+                    value={salesPricePercentage}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || "";
+                      setSalesPricePercentage(value);
+                    }}
+                    onKeyDown={handleSalesPricePercentageKeyDown}
+                    placeholder="%"
+                    min="0"
+                    step="0.1"
+                    disabled={rawMaterialsTotal === 0}
+                    className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  />
+                </div>
+                <div className="mt-2 text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">Margin:</span>
+                  <span
+                    className={`ml-2 font-medium ${salesMargin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      }`}
+                  >
+                    LKR {salesMargin.toFixed(2)} (
+                    {rawMaterialsTotal > 0
+                      ? ((salesMargin / rawMaterialsTotal) * 100).toFixed(2)
+                      : "0.00"}
+                    %)
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Sales Price
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  ref={salesPriceInputRef}
-                  type="number"
-                  value={salesPrice.toFixed(2)}
-                  onChange={(e) => {
-                    setSalesPrice(parseFloat(e.target.value) || 0);
-                    setSalesPricePercentage("");
-                  }}
-                  onClick={handleSalesPriceClick}
-                  min="0"
-                  step="0.01"
-                  className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <input
-                  ref={salesPricePercentageRef}
-                  type="number"
-                  value={salesPricePercentage}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || "";
-                    setSalesPricePercentage(value);
-                  }}
-                  onKeyDown={handleSalesPricePercentageKeyDown}
-                  placeholder="%"
-                  min="0"
-                  step="0.1"
-                  disabled={rawMaterialsTotal === 0}
-                  className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 dark:disabled:bg-gray-600"
-                />
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Wholesale Price
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="number"
+                    value={typeof wholesalePrice === "number" && !isNaN(wholesalePrice) ? wholesalePrice.toFixed(2) : "0.00"}
+                    onChange={(e) => {
+                      setWholesalePrice(parseFloat(e.target.value) || 0);
+                      setWholesalePricePercentage("");
+                    }}
+                    min="0"
+                    step="0.01"
+                    className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    required
+                  />
+                  <input
+                    ref={wholesalePricePercentageRef}
+                    type="number"
+                    value={wholesalePricePercentage}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || "";
+                      setWholesalePricePercentage(value);
+                    }}
+                    onKeyDown={handleWholesalePricePercentageKeyDown}
+                    placeholder="%"
+                    min="0"
+                    step="0.1"
+                    disabled={rawMaterialsTotal === 0}
+                    className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  />
+                </div>
+                <div className="mt-2 text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">Margin:</span>
+                  <span
+                    className={`ml-2 font-medium ${wholesaleMargin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      }`}
+                  >
+                    LKR {wholesaleMargin.toFixed(2)} (
+                    {rawMaterialsTotal > 0
+                      ? ((wholesaleMargin / rawMaterialsTotal) * 100).toFixed(2)
+                      : "0.00"}
+                    %)
+                  </span>
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Wholesale Price
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="number"
-                  value={wholesalePrice.toFixed(2)}
-                  onChange={(e) => {
-                    setWholesalePrice(parseFloat(e.target.value) || 0);
-                    setWholesalePricePercentage("");
-                  }}
-                  min="0"
-                  step="0.01"
-                  className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <input
-                  ref={wholesalePricePercentageRef}
-                  type="number"
-                  value={wholesalePricePercentage}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || "";
-                    setWholesalePricePercentage(value);
-                  }}
-                  onKeyDown={handleWholesalePricePercentageKeyDown}
-                  placeholder="%"
-                  min="0"
-                  step="0.1"
-                  disabled={rawMaterialsTotal === 0}
-                  className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 dark:disabled:bg-gray-600"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                MRP Price
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="number"
-                  value={mrpPrice.toFixed(2)}
-                  onChange={(e) => {
-                    setMrpPrice(parseFloat(e.target.value) || 0);
-                    setMrpPricePercentage("");
-                  }}
-                  min="0"
-                  step="0.01"
-                  className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <input
-                  ref={mrpPricePercentageRef}
-                  type="number"
-                  value={mrpPricePercentage}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || "";
-                    setMrpPricePercentage(value);
-                  }}
-                  onKeyDown={handleMrpPricePercentageKeyDown}
-                  placeholder="%"
-                  min="0"
-                  step="0.1"
-                  disabled={rawMaterialsTotal === 0}
-                  className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 dark:disabled:bg-gray-600"
-                />
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  MRP Price
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="number"
+                    value={typeof mrpPrice === "number" && !isNaN(mrpPrice) ? mrpPrice.toFixed(2) : "0.00"}
+                    onChange={(e) => {
+                      setMrpPrice(parseFloat(e.target.value) || 0);
+                      setMrpPricePercentage("");
+                    }}
+                    min="0"
+                    step="0.01"
+                    className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    required
+                  />
+                  <input
+                    ref={mrpPricePercentageRef}
+                    type="number"
+                    value={mrpPricePercentage}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || "";
+                      setMrpPricePercentage(value);
+                    }}
+                    onKeyDown={handleMrpPricePercentageKeyDown}
+                    placeholder="%"
+                    min="0"
+                    step="0.1"
+                    disabled={rawMaterialsTotal === 0}
+                    className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  />
+                </div>
+                <div className="mt-2 text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">Margin:</span>
+                  <span
+                    className={`ml-2 font-medium ${mrpMargin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      }`}
+                  >
+                    LKR {mrpMargin.toFixed(2)} (
+                    {rawMaterialsTotal > 0
+                      ? ((mrpMargin / rawMaterialsTotal) * 100).toFixed(2)
+                      : "0.00"}
+                    %)
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex justify-end space-x-2">
+
+          {/* Summary Section */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+              Cost & Profit Summary
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Total Cost
+                </div>
+                <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                  LKR {rawMaterialsTotal.toFixed(2)}
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Sales Profit
+                </div>
+                <div
+                  className={`text-2xl font-bold ${salesMargin >= 0
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                    }`}
+                >
+                  LKR {salesMargin.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {rawMaterialsTotal > 0
+                    ? ((salesMargin / rawMaterialsTotal) * 100).toFixed(2) + "%"
+                    : "0%"}
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Wholesale Profit
+                </div>
+                <div
+                  className={`text-2xl font-bold ${wholesaleMargin >= 0
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                    }`}
+                >
+                  LKR {wholesaleMargin.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {rawMaterialsTotal > 0
+                    ? ((wholesaleMargin / rawMaterialsTotal) * 100).toFixed(2) + "%"
+                    : "0%"}
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  MRP Profit
+                </div>
+                <div
+                  className={`text-2xl font-bold ${mrpMargin >= 0
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                    }`}
+                >
+                  LKR {mrpMargin.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {rawMaterialsTotal > 0
+                    ? ((mrpMargin / rawMaterialsTotal) * 100).toFixed(2) + "%"
+                    : "0%"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition"
+              disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition flex items-center justify-center min-w-24"
               disabled={
+                isSubmitting ||
                 !productName.trim() ||
                 !categoryId ||
                 rawMaterialsList.length === 0
               }
             >
-              Save Product
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                  Saving...
+                </>
+              ) : (
+                "Save Product"
+              )}
             </button>
+
           </div>
         </form>
       </div>

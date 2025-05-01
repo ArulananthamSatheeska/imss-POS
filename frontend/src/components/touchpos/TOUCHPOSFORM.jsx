@@ -181,17 +181,15 @@ const VirtualKeyboard = ({ value, onChange, onClose, isNumericOnly }) => {
                   ${key === "space" ? "flex-1" : "w-14 h-14"}
                   ${key === "done" ? "bg-green-500 text-white" : ""}
                   ${key === "backspace" ? "bg-red-500 text-white" : ""}
-                  ${
-                    key === "shift"
-                      ? isShift
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-600 text-white"
-                      : ""
+                  ${key === "shift"
+                    ? isShift
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-600 text-white"
+                    : ""
                   }
-                  ${
-                    key !== "done" && key !== "backspace" && key !== "shift"
-                      ? "bg-gray-600 text-white"
-                      : ""
+                  ${key !== "done" && key !== "backspace" && key !== "shift"
+                    ? "bg-gray-600 text-white"
+                    : ""
                   }
                   active:scale-95 transition-all duration-100 text-lg font-semibold
                 `}
@@ -497,10 +495,10 @@ const TOUCHPOSFORM = () => {
       prevProducts.map((p, i) =>
         i === index
           ? {
-              ...p,
-              qty: parsedQty,
-              total: parsedQty * p.price,
-            }
+            ...p,
+            qty: parsedQty,
+            total: parsedQty * p.price,
+          }
           : p
       )
     );
@@ -651,6 +649,7 @@ const TOUCHPOSFORM = () => {
       localStorage.setItem("heldSales", JSON.stringify(heldSales));
       alert(`Sale held with ID: ${saleId}. Use 'View Hold List' to retrieve.`);
       resetPOS(false);
+      loadHeldSales();
     } catch (error) {
       console.error("Error holding sale:", error);
       alert("Failed to hold sale. Check console for details.");
@@ -834,9 +833,8 @@ const TOUCHPOSFORM = () => {
 
   return (
     <div
-      className={`min-h-screen w-full p-2 sm:p-4 flex flex-col ${
-        isFullScreen ? "fullscreen-mode" : ""
-      }`}
+      className={`min-h-screen w-full p-2 sm:p-4 flex flex-col ${isFullScreen ? "fullscreen-mode" : ""
+        }`}
     >
       {/* Main Content */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[40%_60%] gap-2 sm:gap-4">
@@ -846,21 +844,19 @@ const TOUCHPOSFORM = () => {
             <h2 className="text-lg sm:text-xl font-bold">Billing</h2>
             <div className="flex gap-1 sm:gap-2">
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
-                  saleType === "Retail"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Retail"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-800"
+                  }`}
                 onClick={() => setSaleType("Retail")}
               >
                 Retail
               </button>
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
-                  saleType === "Wholesale"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Wholesale"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-800"
+                  }`}
                 onClick={() => setSaleType("Wholesale")}
               >
                 Wholesale
@@ -1189,11 +1185,10 @@ const TOUCHPOSFORM = () => {
               {categories.map((category) => (
                 <button
                   key={category}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
-                    selectedCategory === category
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onClick={() => {
                     setSelectedCategory(category);
                     debouncedSearch(searchQuery, category, selectedBrand);
@@ -1211,11 +1206,10 @@ const TOUCHPOSFORM = () => {
               {brands.map((brand) => (
                 <button
                   key={brand}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
-                    selectedBrand === brand
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200"
-                  }`}
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200"
+                    }`}
                   onClick={() => {
                     setSelectedBrand(brand);
                     debouncedSearch(searchQuery, selectedCategory, brand);
@@ -1240,9 +1234,8 @@ const TOUCHPOSFORM = () => {
                   className={`
                     relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer 
                     border-4 border-purple-600 
-                    ${
-                      categoryColors[item.category] ||
-                      "bg-gradient-to-br from-gray-50 to-gray-100"
+                    ${categoryColors[item.category] ||
+                    "bg-gradient-to-br from-gray-50 to-gray-100"
                     }
                     hover:shadow-xl hover:border-purple-800 
                     active:scale-95 transition-all duration-200
@@ -1319,9 +1312,8 @@ const TOUCHPOSFORM = () => {
       )}
       {showNotification && (
         <Notification
-          message={`Delete item "${
-            products[pendingDeleteIndex]?.product_name ?? "this item"
-          }"?`}
+          message={`Delete item "${products[pendingDeleteIndex]?.product_name ?? "this item"
+            }"?`}
           onClose={cancelDelete}
         >
           <button

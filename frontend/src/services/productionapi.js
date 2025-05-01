@@ -31,13 +31,13 @@ api.interceptors.response.use(
 );
 
 // Production Categories
-export const getProductionCategories = () => api.get("/production-categories");
+export const getProductionCategories = () => api.get("/categories");
 export const createProductionCategory = (data) =>
-  api.post("/production-categories", data);
+  api.post("/categories", data);
 export const updateProductionCategory = (id, data) =>
-  api.put(`/production-categories/${id}`, data);
+  api.put(`/categories/${id}`, data);
 export const deleteProductionCategory = (id) =>
-  api.delete(`/production-categories/${id}`);
+  api.delete(`/categories/${id}`);
 
 // Raw Materials
 export const getRawMaterials = () => api.get("/raw-materials");
