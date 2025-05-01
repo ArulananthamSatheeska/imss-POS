@@ -12,7 +12,10 @@ const PurchaseInvoiceForm = ({
   const { user } = useAuth();
   const [invoice, setInvoice] = useState(
     existingInvoice || {
-      billNumber: "GRN-" + Date.now(),
+      billNumber: `GRN-${new Date()
+        .toISOString()
+        .split("T")[0]
+        .replace(/-/g, "")}-${Date.now().toString().slice(-4)}`,
       invoiceNumber: "PINV-" + Date.now(),
       purchaseDate: new Date().toISOString().split("T")[0],
       paymentMethod: "Cash",
@@ -58,8 +61,13 @@ const PurchaseInvoiceForm = ({
   const buyingCostInputRef = useRef(null);
   const discountPercentageInputRef = useRef(null);
   const discountAmountInputRef = useRef(null);
+  const itemDiscountPercentageInputRef = useRef(null);
+  const itemDiscountAmountInputRef = useRef(null);
   const taxPercentageInputRef = useRef(null);
   const taxInputRef = useRef(null);
+  const supplierSelectRef = useRef(null);
+  const storeSelectRef = useRef(null);
+  const generateInvoiceButtonRef = useRef(null);
 
   const api = getApi();
 
@@ -72,6 +80,18 @@ const PurchaseInvoiceForm = ({
       setErrors({ auth: "User not authenticated" });
     }
   }, [user]);
+
+  // Update billNumber when purchaseDate changes
+  useEffect(() => {
+    if (!existingInvoice) {
+      const datePart = invoice.purchaseDate.replace(/-/g, "");
+      const uniquePart = Date.now().toString().slice(-4);
+      setInvoice((prev) => ({
+        ...prev,
+        billNumber: `GRN-${datePart}-${uniquePart}`,
+      }));
+    }
+  }, [invoice.purchaseDate, existingInvoice]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -332,14 +352,14 @@ const PurchaseInvoiceForm = ({
   const handleBuyingCostKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      discountPercentageInputRef.current?.focus();
+      itemDiscountPercentageInputRef.current?.focus();
     }
   };
 
   const handleDiscountPercentageKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      discountAmountInputRef.current?.focus();
+      itemDiscountAmountInputRef.current?.focus();
     }
   };
 
@@ -358,10 +378,42 @@ const PurchaseInvoiceForm = ({
     }
   };
 
+  const handleInvoiceDiscountAmountKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      taxPercentageInputRef.current?.focus();
+    }
+  };
+
   const handleTaxPercentageKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       taxInputRef.current?.focus();
+    }
+  };
+
+  const handleTaxKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      generateInvoiceButtonRef.current?.focus();
+    }
+  };
+  const handleSupplierKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      storeSelectRef.current?.focus();
+    }
+  };
+  const handleStoreKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    }
+  };
+  const handleGenerateInvoiceKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.target.form?.requestSubmit();
     }
   };
 
@@ -631,7 +683,8 @@ const PurchaseInvoiceForm = ({
                     disabled={loading}
                   />
                 </div>
-                <div>
+                {/* Hide Invoice Number Field */}
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Invoice Number
                   </label>
@@ -645,7 +698,7 @@ const PurchaseInvoiceForm = ({
                     required
                     disabled={loading}
                   />
-                </div>
+                </div> */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Payment Method
@@ -667,9 +720,11 @@ const PurchaseInvoiceForm = ({
                     Supplier
                   </label>
                   <select
+                    ref={supplierSelectRef}
                     name="supplierId"
                     value={invoice.supplierId}
                     onChange={handleInvoiceChange}
+                    onKeyDown={handleSupplierKeyDown}
                     className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     required
                     disabled={loading}
@@ -687,9 +742,11 @@ const PurchaseInvoiceForm = ({
                     Store
                   </label>
                   <select
+                    ref={storeSelectRef}
                     name="storeId"
                     value={invoice.storeId}
                     onChange={handleInvoiceChange}
+                    onKeyDown={handleStoreKeyDown}
                     className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                     required
                     disabled={loading}
@@ -883,7 +940,7 @@ const PurchaseInvoiceForm = ({
                     </label>
                     <div className="flex space-x-2">
                       <input
-                        ref={discountPercentageInputRef}
+                        ref={itemDiscountPercentageInputRef}
                         type="number"
                         name="discountPercentage"
                         value={itemForm.discountPercentage}
@@ -897,7 +954,7 @@ const PurchaseInvoiceForm = ({
                         disabled={loading || !itemForm.itemId}
                       />
                       <input
-                        ref={discountAmountInputRef}
+                        ref={itemDiscountAmountInputRef}
                         type="number"
                         name="discountAmount"
                         value={itemForm.discountAmount}
@@ -913,7 +970,15 @@ const PurchaseInvoiceForm = ({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
+                      tabIndex={0}
                       onClick={addItem}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addItem();
+                          searchInputRef.current?.focus();
+                        }
+                      }}
                       className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md w-full"
                       disabled={
                         loading || !itemForm.itemId || itemForm.quantity <= 0
@@ -1030,6 +1095,7 @@ const PurchaseInvoiceForm = ({
                           name="discountAmount"
                           value={invoice.discountAmount.toFixed(2)}
                           onChange={handleInvoiceChange}
+                          onKeyDown={handleInvoiceDiscountAmountKeyDown}
                           className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                           min="0"
                           step="0.01"
@@ -1061,6 +1127,7 @@ const PurchaseInvoiceForm = ({
                           name="tax"
                           value={invoice.tax.toFixed(2)}
                           onChange={handleInvoiceChange}
+                          onKeyDown={handleTaxKeyDown}
                           className="w-2/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                           min="0"
                           step="0.01"
@@ -1109,7 +1176,9 @@ const PurchaseInvoiceForm = ({
                   Cancel
                 </button>
                 <button
+                  ref={generateInvoiceButtonRef}
                   type="submit"
+                  onKeyDown={handleGenerateInvoiceKeyDown}
                   className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
                   disabled={loading || items.length === 0}
                 >

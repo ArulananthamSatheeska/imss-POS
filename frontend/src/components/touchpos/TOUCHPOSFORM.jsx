@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
@@ -13,17 +19,13 @@ import {
   LayoutDashboard,
   Plus,
   Minus,
-  ArrowLeft,
-  Check,
-  ArrowUp,
-  Edit2,
 } from "lucide-react";
 import BillPrintModal from "../models/BillPrintModel.jsx";
 import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
 
-// --- Helper Function to Apply Discount Schemes ---
+// Helper Function to Apply Discount Schemes
 const applyDiscountScheme = (product, saleType, schemes) => {
   if (!product || !product.id || !Array.isArray(schemes)) {
     const fallbackPrice =
@@ -91,9 +93,9 @@ const applyDiscountScheme = (product, saleType, schemes) => {
   );
   findBestScheme(productSchemes);
 
-  if ((!bestScheme || maxDiscountValue <= 0) && product.category) {
+  if (!bestScheme || maxDiscountValue <= 0) {
     const categorySchemes = schemes.filter(
-      (s) => s.applies_to === "category" && s.target === product.category
+      (s) => s.applies_to === "category" && s.target === product.category_name
     );
     findBestScheme(categorySchemes);
   }
@@ -223,10 +225,10 @@ const TOUCHPOSFORM = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [items, setItems] = useState([]); // All available products
-  const [activeSchemes, setActiveSchemes] = useState([]); // Discount schemes
+  const [activeSchemes, setActiveSchemes] = useState([]);
   const [tax, setTax] = useState(0);
   const [billDiscount, setBillDiscount] = useState(0);
-  const [shipping, setShipping] = useState(0); // Added shipping
+  const [shipping, setShipping] = useState(0);
   const searchInputRef = useRef(null);
   const taxInputRef = useRef(null);
   const discountInputRef = useRef(null);
@@ -245,17 +247,15 @@ const TOUCHPOSFORM = () => {
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingSchemes, setLoadingSchemes] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [filterError, setFilterError] = useState(null); // For filter error messages
 
-  // Virtual keyboard states
-  const [showKeyboard, setShowKeyboard] = useState(false);
-  const [keyboardTarget, setKeyboardTarget] = useState(null);
-  const [keyboardValue, setKeyboardValue] = useState("");
-  const [isNumericKeyboard, setIsNumericKeyboard] = useState(false);
-  const [editingBarcodeIndex, setEditingBarcodeIndex] = useState(null);
-
-  // Category and brand filters
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
-  const [selectedBrand, setSelectedBrand] = useState("All Brands");
+  // Category and brand states
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("All Categories"); // Use name for filtering
+  const [selectedBrand, setSelectedBrand] = useState("All Brands"); // Use name for filtering
 
   // Fetch Next Bill Number
   useEffect(() => {
@@ -279,39 +279,109 @@ const TOUCHPOSFORM = () => {
     fetchNextBillNumber();
   }, []);
 
-  // Fetch Products
+  // Fetch Categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const response = await axios.get(
+          "http://127.0.0.1:8000/api/categories"
+        );
+        const fetchedCategories = Array.isArray(response.data)
+          ? response.data
+          : response.data.data || [];
+        console.log("Fetched Categories:", fetchedCategories);
+        setCategories([
+          { id: 0, name: "All Categories" },
+          ...fetchedCategories,
+        ]);
+        if (fetchedCategories.length === 0) {
+          setFilterError("No categories available.");
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setFilterError("Failed to load categories.");
+        setCategories([{ id: 0, name: "All Categories" }]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Fetch Products and Derive Brands
   useEffect(() => {
     setLoadingItems(true);
+    setLoadingBrands(true);
     axios
       .get("http://127.0.0.1:8000/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => ({
             ...p,
-            id: p.id || p.product_id, // Ensure consistent ID field
-            stock: parseFloat(p.opening_stock_quantity || 0), // Use opening stock
-            category: p.category_name || "Unknown Category",
-            brand: p.brand || "Unknown Brand",
+            id: p.product_id,
+            stock: parseFloat(p.opening_stock_quantity || 0),
+            category_name: p.category || "Unknown Category", // Map category to category_name
+            brand_name: p.supplier || "Unknown Brand", // Use supplier as brand_name
           }));
+          console.log("Fetched Products:", productsWithOpeningStock);
           setItems(productsWithOpeningStock);
-          setSearchResults(productsWithOpeningStock); // Initialize search results
-          console.log(
-            "Fetched Products (using opening_stock_quantity as 'stock'):",
-            productsWithOpeningStock
-          );
+          setSearchResults(productsWithOpeningStock);
+
+          // Derive categories and brands from products
+          const uniqueCategories = [
+            { id: 0, name: "All Categories" },
+            ...[
+              ...new Set(productsWithOpeningStock.map((p) => p.category_name)),
+            ]
+              .filter((name) => name && name !== "Unknown Category")
+              .map((name, index) => ({
+                id: index + 1,
+                name,
+              })),
+          ];
+          const uniqueBrands = [
+            { id: 0, name: "All Brands" },
+            ...[...new Set(productsWithOpeningStock.map((p) => p.brand_name))]
+              .filter((name) => name && name !== "Unknown Brand")
+              .map((name, index) => ({
+                id: index + 1,
+                name,
+              })),
+          ];
+          console.log("Derived Categories:", uniqueCategories);
+          console.log("Derived Brands:", uniqueBrands);
+          setCategories(uniqueCategories);
+          setBrands(uniqueBrands);
+          if (uniqueCategories.length === 1) {
+            setFilterError("No categories available.");
+          }
+          if (uniqueBrands.length === 1) {
+            setFilterError((prev) =>
+              prev ? `${prev} No brands available.` : "No brands available."
+            );
+          }
         } else {
           console.error("Unexpected product data format:", response.data);
+          setFilterError("Invalid product data format.");
           setItems([]);
           setSearchResults([]);
+          setCategories([{ id: 0, name: "All Categories" }]);
+          setBrands([{ id: 0, name: "All Brands" }]);
         }
       })
       .catch((error) => {
         console.error("Error fetching items:", error);
+        setFilterError("Failed to load products.");
         setItems([]);
         setSearchResults([]);
+        setCategories([{ id: 0, name: "All Categories" }]);
+        setBrands([{ id: 0, name: "All Brands" }]);
       })
       .finally(() => {
         setLoadingItems(false);
+        setLoadingBrands(false);
       });
   }, []);
 
@@ -345,37 +415,50 @@ const TOUCHPOSFORM = () => {
       });
   }, []);
 
-  // Debounced Search
-  const debouncedSearch = useCallback(
-    debounce((query, category, brand) => {
-      if (!Array.isArray(items)) {
-        setSearchResults([]);
-        return;
-      }
+  // Debounced Search with Name-based Filtering
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((query, categoryName, brandName) => {
+        console.log("Filtering with:", { query, categoryName, brandName });
+        if (!Array.isArray(items)) {
+          console.warn("Items array is invalid:", items);
+          setSearchResults([]);
+          setFilterError("No products available to filter.");
+          return;
+        }
 
-      let filtered = [...items];
+        let filtered = [...items];
 
-      if (category !== "All Categories") {
-        filtered = filtered.filter((item) => item.category === category);
-      }
+        // Filter by category_name
+        if (categoryName !== "All Categories") {
+          filtered = filtered.filter(
+            (item) => item.category_name === categoryName
+          );
+        }
 
-      if (brand !== "All Brands") {
-        filtered = filtered.filter((item) => item.brand === brand);
-      }
+        // Filter by brand_name
+        if (brandName !== "All Brands") {
+          filtered = filtered.filter((item) => item.brand_name === brandName);
+        }
 
-      if (query.trim() !== "") {
-        const lowerCaseQuery = query.toLowerCase();
-        filtered = filtered.filter(
-          (item) =>
-            (item.product_name &&
-              item.product_name.toLowerCase().includes(lowerCaseQuery)) ||
-            (item.item_code && String(item.item_code).includes(query)) ||
-            (item.barcode && String(item.barcode).includes(query))
+        // Apply search query
+        if (query.trim() !== "") {
+          const lowerCaseQuery = query.toLowerCase();
+          filtered = filtered.filter(
+            (item) =>
+              (item.product_name &&
+                item.product_name.toLowerCase().includes(lowerCaseQuery)) ||
+              (item.item_code && String(item.item_code).includes(query)) ||
+              (item.barcode && String(item.barcode).includes(query))
+          );
+        }
+
+        console.log("Filtered Results:", filtered);
+        setSearchResults(filtered);
+        setFilterError(
+          filtered.length === 0 ? "No products match the filters." : null
         );
-      }
-
-      setSearchResults(filtered);
-    }, 300),
+      }, 300),
     [items]
   );
 
@@ -681,6 +764,9 @@ const TOUCHPOSFORM = () => {
         userId: "U-1",
         receivedAmount: 0,
       });
+      setSelectedCategory("All Categories");
+      setSelectedBrand("All Brands");
+      setFilterError(null);
 
       if (fetchNewBill) {
         const fetchNextBillNumber = async () => {
@@ -733,96 +819,9 @@ const TOUCHPOSFORM = () => {
     [resetPOS]
   );
 
-  // Keyboard Handling
-  const openKeyboard = (
-    target,
-    initialValue,
-    isNumeric = false,
-    index = null
-  ) => {
-    setKeyboardTarget(target);
-    setKeyboardValue(initialValue);
-    setIsNumericKeyboard(isNumeric);
-    setEditingBarcodeIndex(index);
-    setShowKeyboard(true);
-  };
-
-  const closeKeyboard = () => {
-    setShowKeyboard(false);
-    setKeyboardTarget(null);
-    setKeyboardValue("");
-    setIsNumericKeyboard(false);
-    setEditingBarcodeIndex(null);
-  };
-
-  const handleKeyboardChange = (newValue) => {
-    setKeyboardValue(newValue);
-
-    if (keyboardTarget === "search") {
-      handleSearch(newValue);
-    } else if (keyboardTarget === "tax") {
-      setTax(parseFloat(newValue) || 0);
-    } else if (keyboardTarget === "discount") {
-      setBillDiscount(parseFloat(newValue) || 0);
-    } else if (keyboardTarget === "barcode" && editingBarcodeIndex !== null) {
-      const updatedProducts = [...products];
-      updatedProducts[editingBarcodeIndex].barcode = newValue;
-      setProducts(updatedProducts);
-
-      setSearchResults((prevResults) =>
-        prevResults.map((result) =>
-          result.id === updatedProducts[editingBarcodeIndex].id
-            ? { ...result, barcode: newValue }
-            : result
-        )
-      );
-
-      setItems((prevItems) =>
-        prevItems.map((item) =>
-          item.id === updatedProducts[editingBarcodeIndex].id
-            ? { ...item, barcode: newValue }
-            : item
-        )
-      );
-    }
-  };
-
-  // Scroll active input into view
-  useEffect(() => {
-    if (showKeyboard && keyboardTarget) {
-      let activeElement = null;
-      if (keyboardTarget === "search") {
-        activeElement = searchInputRef.current;
-      } else if (keyboardTarget === "tax") {
-        activeElement = taxInputRef.current;
-      } else if (keyboardTarget === "discount") {
-        activeElement = discountInputRef.current;
-      }
-
-      if (activeElement) {
-        setTimeout(() => {
-          activeElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }, 100);
-      }
-    }
-  }, [showKeyboard, keyboardTarget]);
-
-  // Dynamic Categories and Brands
-  const categories = [
-    "All Categories",
-    ...new Set(items.map((item) => item.category).filter(Boolean)),
-  ];
-  const brands = [
-    "All Brands",
-    ...new Set(items.map((item) => item.brand).filter(Boolean)),
-  ];
-
   // Category Colors
   const categoryColors = {
-    "Milk Powder": "bg-gradient-to-br from-blue-50 to-blue-100",
+    Milk: "bg-gradient-to-br from-blue-50 to-blue-100",
     Beverages: "bg-gradient-to-br from-green-50 to-green-100",
     Snacks: "bg-gradient-to-br from-yellow-50 to-yellow-100",
     Chocolates: "bg-gradient-to-br from-pink-50 to-pink-100",
@@ -908,24 +907,9 @@ const TOUCHPOSFORM = () => {
                           <span className="font-semibold text-xs sm:text-sm">
                             {product.product_name}
                           </span>
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <span className="text-xs text-gray-500">
-                              Barcode: {product.barcode}
-                            </span>
-                            <button
-                              onClick={() =>
-                                openKeyboard(
-                                  "barcode",
-                                  product.barcode,
-                                  true,
-                                  index
-                                )
-                              }
-                              className="text-blue-500 hover:text-blue-700"
-                            >
-                              <Edit2 size={12} className="sm:w-4 sm:h-4" />
-                            </button>
-                          </div>
+                          <span className="text-xs text-gray-500">
+                            Barcode: {product.barcode}
+                          </span>
                         </div>
                       </td>
                       <td className="p-1 sm:p-2 text-center">
@@ -976,7 +960,7 @@ const TOUCHPOSFORM = () => {
           </div>
 
           {/* Totals Section */}
-          <div className="mt-2 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-4">
+          <div className="mt-2 sm:mt-4 flex flex-col sm:flex-row gap-4 sm:gap-6">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm sm:text-lg font-semibold">
                 <span>Total Quantity:</span>
@@ -986,35 +970,42 @@ const TOUCHPOSFORM = () => {
               </div>
             </div>
             <div className="flex-1 space-y-2 sm:space-y-3">
-              <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
+              <div className="grid grid-cols-1 gap-4 sm:gap-6 min-w-fit">
+                <div className="flex-shrink-0">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 whitespace-normal">
                     Tax (%):
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
                     <button
                       onClick={() => setTax((prev) => Math.max(prev - 1, 0))}
-                      className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
                     </button>
-                    <span
+                    <input
                       ref={taxInputRef}
-                      onClick={() => openKeyboard("tax", tax.toString(), true)}
-                      className="text-sm sm:text-lg p-1 sm:p-2 border rounded-lg w-16 sm:w-20 text-center cursor-pointer"
-                    >
-                      {tax}
-                    </span>
+                      type="number"
+                      value={tax}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setTax(value === "" ? 0 : parseFloat(value) || 0);
+                      }}
+                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g., 5.0%"
+                      aria-label="Tax percentage"
+                    />
                     <button
                       onClick={() => setTax((prev) => prev + 1)}
-                      className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                <div className="flex-shrink-0">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 whitespace-normal">
                     Discount (Rs.):
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
@@ -1022,22 +1013,29 @@ const TOUCHPOSFORM = () => {
                       onClick={() =>
                         setBillDiscount((prev) => Math.max(prev - 100, 0))
                       }
-                      className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
                     </button>
-                    <span
+                    <input
                       ref={discountInputRef}
-                      onClick={() =>
-                        openKeyboard("discount", billDiscount.toString(), true)
-                      }
-                      className="text-sm sm:text-lg p-1 sm:p-2 border rounded-lg w-16 sm:w-20 text-center cursor-pointer"
-                    >
-                      {billDiscount}
-                    </span>
+                      type="number"
+                      value={billDiscount}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setBillDiscount(
+                          value === "" ? 0 : parseFloat(value) || 0
+                        );
+                      }}
+                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
+                      min="0"
+                      step="1"
+                      placeholder="e.g., 100 Rs."
+                      aria-label="Bill discount amount"
+                    />
                     <button
                       onClick={() => setBillDiscount((prev) => prev + 100)}
-                      className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
                     </button>
@@ -1130,16 +1128,23 @@ const TOUCHPOSFORM = () => {
           <input
             ref={searchInputRef}
             type="text"
-            className="w-full p-2 sm:p-4 border rounded-lg mb-2 sm:mb-4 text-sm sm:text-lg"
+            className="w-full p-2 sm:p-4 border rounded-lg mb-2 sm:mb-4 text-sm sm:text-lg focus:ring-2 focus:ring-blue-500"
             placeholder="Scan/Search by Code/Name"
             value={searchQuery}
-            onFocus={() => openKeyboard("search", searchQuery, false)}
-            readOnly
-            disabled={loadingItems || loadingSchemes}
+            onChange={(e) => handleSearch(e.target.value)}
+            disabled={
+              loadingItems ||
+              loadingSchemes ||
+              loadingCategories ||
+              loadingBrands
+            }
           />
-          {(loadingItems || loadingSchemes) && (
-            <span className="text-xs text-gray-500">Loading...</span>
-          )}
+          {(loadingItems ||
+            loadingSchemes ||
+            loadingCategories ||
+            loadingBrands) && (
+              <span className="text-xs text-gray-500">Loading...</span>
+            )}
 
           {/* Action Buttons */}
           <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4">
@@ -1184,20 +1189,26 @@ const TOUCHPOSFORM = () => {
             <div className="flex gap-1 sm:gap-2 flex-wrap">
               {categories.map((category) => (
                 <button
-                  key={category}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category
+                  key={category.id}
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category.name
                     ? "bg-blue-500 text-white"
                     : "bg-gray-200"
                     }`}
                   onClick={() => {
-                    setSelectedCategory(category);
-                    debouncedSearch(searchQuery, category, selectedBrand);
+                    setSelectedCategory(category.name);
+                    debouncedSearch(searchQuery, category.name, selectedBrand);
                   }}
+                  disabled={loadingCategories}
                 >
-                  {category}
+                  {category.name}
                 </button>
               ))}
             </div>
+            {loadingCategories && (
+              <span className="text-xs text-gray-500">
+                Loading categories...
+              </span>
+            )}
           </div>
 
           {/* Brand Filter */}
@@ -1205,21 +1216,45 @@ const TOUCHPOSFORM = () => {
             <div className="flex gap-1 sm:gap-2 flex-wrap">
               {brands.map((brand) => (
                 <button
-                  key={brand}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand
+                  key={brand.id}
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand.name
                     ? "bg-blue-500 text-white"
                     : "bg-gray-200"
                     }`}
                   onClick={() => {
-                    setSelectedBrand(brand);
-                    debouncedSearch(searchQuery, selectedCategory, brand);
+                    setSelectedBrand(brand.name);
+                    debouncedSearch(searchQuery, selectedCategory, brand.name);
                   }}
+                  disabled={loadingBrands}
                 >
-                  {brand}
+                  {brand.name}
                 </button>
               ))}
             </div>
+            {loadingBrands && (
+              <span className="text-xs text-gray-500">Loading brands...</span>
+            )}
           </div>
+
+          {/* Reset Filters Button */}
+          <div className="mb-2 sm:mb-4">
+            <button
+              className="p-2 sm:p-3 bg-gray-500 text-white rounded-lg text-sm sm:text-lg"
+              onClick={() => {
+                setSelectedCategory("All Categories");
+                setSelectedBrand("All Brands");
+                setSearchQuery("");
+                debouncedSearch("", "All Categories", "All Brands");
+              }}
+            >
+              Reset Filters
+            </button>
+          </div>
+
+          {/* Error Message */}
+          {filterError && (
+            <div className="text-red-500 text-sm mb-2">{filterError}</div>
+          )}
 
           {/* Product Results */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 max-h-[50vh] sm:max-h-[60vh] overflow-auto">
@@ -1233,8 +1268,8 @@ const TOUCHPOSFORM = () => {
                   key={item.id}
                   className={`
                     relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer 
-                    border-4 border-purple-600 
-                    ${categoryColors[item.category] ||
+                    border-4 border-black  
+                    ${categoryColors[item.category_name] ||
                     "bg-gradient-to-br from-gray-50 to-gray-100"
                     }
                     hover:shadow-xl hover:border-purple-800 
@@ -1252,7 +1287,7 @@ const TOUCHPOSFORM = () => {
                         Rs.
                       </div>
                       <div className="text-[10px] sm:text-xs text-gray-600">
-                        {item.category}
+                        {item.category_name}
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
@@ -1266,13 +1301,13 @@ const TOUCHPOSFORM = () => {
                       )}
                     </div>
                   </div>
-                  <div className="flex justify-center mb-1">
+                  {/* <div className="flex justify-center mb-1">
                     <img
                       src={item.image || "https://via.placeholder.com/50"}
                       alt={item.product_name}
                       className="h-10 sm:h-12 rounded-lg shadow-md object-cover"
                     />
-                  </div>
+                  </div> */}
                   <div className="flex flex-col items-center">
                     <h3
                       className="text-center font-bold text-gray-800 text-xs sm:text-sm line-clamp-2 hover:line-clamp-none"
@@ -1301,7 +1336,6 @@ const TOUCHPOSFORM = () => {
           initialTotals={totals}
           initialCustomerInfo={{ ...customerInfo, bill_number: billNumber }}
           onClose={closeBillModal}
-          openKeyboard={openKeyboard}
         />
       )}
       {showCalculatorModal && (
@@ -1329,16 +1363,6 @@ const TOUCHPOSFORM = () => {
             No
           </button>
         </Notification>
-      )}
-
-      {/* Virtual Keyboard */}
-      {showKeyboard && (
-        <VirtualKeyboard
-          value={keyboardValue}
-          onChange={handleKeyboardChange}
-          onClose={closeKeyboard}
-          isNumericOnly={isNumericKeyboard}
-        />
       )}
     </div>
   );
