@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Sale;
 use App\Models\Product;
 use App\Models\SaleItem;
+use App\Models\InvoiceItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -131,7 +132,7 @@ class SalesReturnController extends Controller
 
                 // If status is approved, update sale and stock quantities
                 if ($request->status === 'approved') {
-                    $this->updateSaleOnApproval($item['product_id'], $item['quantity']);
+                    $this->updateSaleOnApproval($item['product_id'], $item['quantity'], $request->invoice_no);
                 }
             }
 
@@ -207,7 +208,7 @@ class SalesReturnController extends Controller
             if ($oldStatus === 'approved' && $request->status !== 'approved') {
                 $oldItems = SalesReturnItem::where('sales_return_id', $id)->get();
                 foreach ($oldItems as $item) {
-                    $this->revertSaleOnApproval($item->product_id, $item->quantity);
+                    $this->revertSaleOnApproval($item->product_id, $item->quantity, $salesReturn->invoice_no);
                 }
             }
 
@@ -239,7 +240,7 @@ class SalesReturnController extends Controller
 
                 // If new status is approved, update sale and stock quantities
                 if ($request->status === 'approved' && $oldStatus !== 'approved') {
-                    $this->updateSaleOnApproval($item['product_id'], $item['quantity']);
+                    $this->updateSaleOnApproval($item['product_id'], $item['quantity'], $request->invoice_no);
                 }
             }
 
@@ -272,7 +273,7 @@ class SalesReturnController extends Controller
             if ($salesReturn->status === 'approved') {
                 $items = SalesReturnItem::where('sales_return_id', $id)->get();
                 foreach ($items as $item) {
-                    $this->revertSaleOnApproval($item->product_id, $item->quantity);
+                    $this->revertSaleOnApproval($item->product_id, $item->quantity, $salesReturn->invoice_no);
                 }
             }
 
@@ -291,13 +292,14 @@ class SalesReturnController extends Controller
     }
 
     /**
-     * Update sale and stock quantities when a sales return is approved.
+     * Update sale, invoice, and stock quantities when a sales return is approved.
      *
      * @param int $productId
      * @param int $quantity
+     * @param string|null $invoiceNo
      * @return void
      */
-    private function updateSaleOnApproval($productId, $quantity)
+    private function updateSaleOnApproval($productId, $quantity, $invoiceNo = null)
     {
         try {
             // Find the product
@@ -319,6 +321,23 @@ class SalesReturnController extends Controller
                 Log::warning("No SaleItem found for product ID {$productId}");
             }
 
+            // Update InvoiceItem quantity if invoice_no is provided
+            if ($invoiceNo) {
+                $invoice = Invoice::where('invoice_no', $invoiceNo)->first();
+                if ($invoice) {
+                    $invoiceItem = InvoiceItem::where('invoice_id', $invoice->id)
+                        ->where('product_id', $productId)
+                        ->first();
+                    if ($invoiceItem) {
+                        $newInvoiceQuantity = max(0, $invoiceItem->quantity - $quantity);
+                        $invoiceItem->update(['quantity' => $newInvoiceQuantity]);
+                        Log::info("Updated InvoiceItem ID {$invoiceItem->id} quantity to {$newInvoiceQuantity} for product ID {$productId}");
+                    } else {
+                        Log::warning("No InvoiceItem found for product ID {$productId} and invoice_no {$invoiceNo}");
+                    }
+                }
+            }
+
             // Update Product stock quantity
             $newStockQuantity = ($product->stock_quantity ?? $product->opening_stock_quantity ?? 0) + $quantity;
             $product->update(['stock_quantity' => $newStockQuantity]);
@@ -330,13 +349,14 @@ class SalesReturnController extends Controller
     }
 
     /**
-     * Revert sale and stock quantity changes when a sales return is unapproved or deleted.
+     * Revert sale, invoice, and stock quantity changes when a sales return is unapproved or deleted.
      *
      * @param int $productId
      * @param int $quantity
+     * @param string|null $invoiceNo
      * @return void
      */
-    private function revertSaleOnApproval($productId, $quantity)
+    private function revertSaleOnApproval($productId, $quantity, $invoiceNo = null)
     {
         try {
             // Find the product
@@ -356,6 +376,23 @@ class SalesReturnController extends Controller
                 Log::info("Reverted SaleItem ID {$saleItem->id} quantity to {$newSaleQuantity} for product ID {$productId}");
             } else {
                 Log::warning("No SaleItem found for product ID {$productId}");
+            }
+
+            // Update InvoiceItem quantity if invoice_no is provided
+            if ($invoiceNo) {
+                $invoice = Invoice::where('invoice_no', $invoiceNo)->first();
+                if ($invoice) {
+                    $invoiceItem = InvoiceItem::where('invoice_id', $invoice->id)
+                        ->where('product_id', $productId)
+                        ->first();
+                    if ($invoiceItem) {
+                        $newInvoiceQuantity = $invoiceItem->quantity + $quantity;
+                        $invoiceItem->update(['quantity' => $newInvoiceQuantity]);
+                        Log::info("Reverted InvoiceItem ID {$invoiceItem->id} quantity to {$newInvoiceQuantity} for product ID {$productId}");
+                    } else {
+                        Log::warning("No InvoiceItem found for product ID {$productId} and invoice_no {$invoiceNo}");
+                    }
+                }
             }
 
             // Update Product stock quantity
