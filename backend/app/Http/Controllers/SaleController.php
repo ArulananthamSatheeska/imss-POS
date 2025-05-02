@@ -12,10 +12,21 @@ use App\Helpers\BillNumberGenerator;
 
 class SaleController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         Log::info('Fetching all sales');
-        $sales = Sale::all();
+        $sales = Sale::with('items')->get();
+        
+        // Apply date filter if provided
+        if ($request->has('from') && $request->has('to')) {
+            $sales = Sale::with('items')
+                ->whereBetween('created_at', [
+                    $request->input('from') . ' 00:00:00',
+                    $request->input('to') . ' 23:59:59'
+                ])
+                ->get();
+        }
+        
         return response()->json($sales);
     }
 
