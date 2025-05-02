@@ -20,10 +20,8 @@ class SalesInvoiceController extends Controller
 
     public function store(): JsonResponse
     {
-        // Log the incoming request for debugging
         Log::info('Store Invoice Request Data:', request()->all());
 
-        // Validate the incoming request
         $validator = Validator::make(request()->all(), [
             'invoice.no' => 'nullable|string|max:255|unique:invoices,invoice_no',
             'invoice.date' => 'required|date',
@@ -59,23 +57,6 @@ class SalesInvoiceController extends Controller
             : 0;
         $calculatedSubtotal = 0;
         $itemsData = [];
-
-        // Validate stock availability
-        foreach ($validatedData['items'] as $itemInput) {
-            if ($itemInput['product_id']) {
-                $product = Product::find($itemInput['product_id']);
-                if (!$product) {
-                    return response()->json([
-                        'message' => "Product ID {$itemInput['product_id']} not found.",
-                    ], 404);
-                }
-                if ($product->opening_stock_quantity < $itemInput['qty']) {
-                    return response()->json([
-                        'message' => "Insufficient stock for product: {$product->product_name}. Available: {$product->opening_stock_quantity}, Requested: {$itemInput['qty']}.",
-                    ], 422);
-                }
-            }
-        }
 
         foreach ($validatedData['items'] as $itemInput) {
             $itemTotal = ($itemInput['qty'] * $itemInput['unitPrice']) - $itemInput['discountAmount'];
@@ -116,16 +97,8 @@ class SalesInvoiceController extends Controller
                 'status' => $validatedData['status'] ?? 'pending',
             ]);
 
-            // Create invoice items and update product stock
             foreach ($itemsData as $itemData) {
                 $invoice->items()->create($itemData);
-                if ($itemData['product_id']) {
-                    $product = Product::lockForUpdate()->find($itemData['product_id']);
-                    if ($product) {
-                        $product->opening_stock_quantity -= $itemData['quantity'];
-                        $product->save();
-                    }
-                }
             }
 
             DB::commit();
@@ -194,45 +167,13 @@ class SalesInvoiceController extends Controller
 
         DB::beginTransaction();
         try {
-            // Restore stock for existing items
-            foreach ($invoice->items as $existingItem) {
-                if ($existingItem->product_id) {
-                    $product = Product::lockForUpdate()->find($existingItem->product_id);
-                    if (!$product) {
-                        DB::rollBack();
-                        Log::error("Product ID {$existingItem->product_id} not found during stock restoration.");
-                        return response()->json([
-                            'message' => "Cannot restore stock: Product ID {$existingItem->product_id} not found.",
-                        ], 404);
-                    }
-                    $product->opening_stock_quantity += $existingItem->quantity;
-                    $product->save();
-                }
-            }
-
             $taxRate = isset($validatedData['purchaseDetails']['tax_percentage'])
                 ? $validatedData['purchaseDetails']['tax_percentage'] / 100
                 : 0;
             $calculatedSubtotal = 0;
             $itemsData = [];
 
-            // Validate stock availability for new items
             foreach ($validatedData['items'] as $itemInput) {
-                if ($itemInput['product_id']) {
-                    $product = Product::find($itemInput['product_id']);
-                    if (!$product) {
-                        DB::rollBack();
-                        return response()->json([
-                            'message' => "Product ID {$itemInput['product_id']} not found.",
-                        ], 404);
-                    }
-                    if ($product->opening_stock_quantity < $itemInput['qty']) {
-                        DB::rollBack();
-                        return response()->json([
-                            'message' => "Insufficient stock for product: {$product->product_name}. Available: {$product->opening_stock_quantity}, Requested: {$itemInput['qty']}.",
-                        ], 422);
-                    }
-                }
                 $itemTotal = ($itemInput['qty'] * $itemInput['unitPrice']) - $itemInput['discountAmount'];
                 $calculatedSubtotal += $itemTotal;
 
@@ -252,7 +193,6 @@ class SalesInvoiceController extends Controller
             $calculatedTotalAmount = $calculatedSubtotal + $calculatedTaxAmount;
             $calculatedBalance = $validatedData['purchaseDetails']['amount'] - $calculatedTotalAmount;
 
-            // Update invoice
             $invoice->update([
                 'invoice_no' => $validatedData['invoice']['no'] ?? $invoice->invoice_no,
                 'invoice_date' => $validatedData['invoice']['date'],
@@ -270,7 +210,6 @@ class SalesInvoiceController extends Controller
                 'status' => $validatedData['status'] ?? $invoice->status,
             ]);
 
-            // Update or create items
             $newItemIds = [];
             foreach ($itemsData as $itemData) {
                 $itemId = $itemData['id'] ?? null;
@@ -281,31 +220,11 @@ class SalesInvoiceController extends Controller
                     $newItem = $invoice->items()->create($itemData);
                     $newItemIds[] = $newItem->id;
                 }
-
-                // Update product stock
-                if ($itemData['product_id']) {
-                    $product = Product::lockForUpdate()->find($itemData['product_id']);
-                    if ($product) {
-                        $product->opening_stock_quantity -= $itemData['quantity'];
-                        $product->save();
-                    }
-                }
             }
 
-            // Delete items that are no longer in the request
             $existingItemIds = $invoice->items->pluck('id')->toArray();
             $itemsToDelete = array_diff($existingItemIds, $newItemIds);
             if ($itemsToDelete) {
-                foreach ($itemsToDelete as $itemId) {
-                    $item = $invoice->items()->find($itemId);
-                    if ($item && $item->product_id) {
-                        $product = Product::lockForUpdate()->find($item->product_id);
-                        if ($product) {
-                            $product->opening_stock_quantity += $item->quantity;
-                            $product->save();
-                        }
-                    }
-                }
                 $invoice->items()->whereIn('id', $itemsToDelete)->delete();
             }
 
@@ -338,16 +257,6 @@ class SalesInvoiceController extends Controller
     {
         DB::beginTransaction();
         try {
-            // Restore stock for all items
-            foreach ($invoice->items as $item) {
-                if ($item->product_id) {
-                    $product = Product::lockForUpdate()->find($item->product_id);
-                    if ($product) {
-                        $product->opening_stock_quantity += $item->quantity;
-                        $product->save();
-                    }
-                }
-            }
             $invoice->delete();
             DB::commit();
             return response()->json(['message' => 'Invoice deleted successfully.'], 200);
@@ -363,5 +272,4 @@ class SalesInvoiceController extends Controller
             ], 500);
         }
     }
-
 }
