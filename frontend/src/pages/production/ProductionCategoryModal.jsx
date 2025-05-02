@@ -79,7 +79,9 @@ const ProductionCategoryModal = ({ onClose, onSubmit, editingCategory, onSuccess
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}
+          className="bg-white dark:bg-gray-900 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Category Name

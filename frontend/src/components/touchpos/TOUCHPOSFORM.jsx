@@ -475,10 +475,10 @@ const TOUCHPOSFORM = () => {
       prevProducts.map((p, i) =>
         i === index
           ? {
-              ...p,
-              qty: parsedQty,
-              total: parsedQty * p.price,
-            }
+            ...p,
+            qty: parsedQty,
+            total: parsedQty * p.price,
+          }
           : p
       )
     );
@@ -629,6 +629,7 @@ const TOUCHPOSFORM = () => {
       localStorage.setItem("heldSales", JSON.stringify(heldSales));
       alert(`Sale held with ID: ${saleId}. Use 'View Hold List' to retrieve.`);
       resetPOS(false);
+      loadHeldSales();
     } catch (error) {
       console.error("Error holding sale:", error);
       alert("Failed to hold sale. Check console for details.");
@@ -728,9 +729,8 @@ const TOUCHPOSFORM = () => {
 
   return (
     <div
-      className={`min-h-screen w-full p-2 sm:p-4 flex flex-col ${
-        isFullScreen ? "fullscreen-mode" : ""
-      }`}
+      className={`min-h-screen w-full p-2 sm:p-4 flex flex-col ${isFullScreen ? "fullscreen-mode" : ""
+        }`}
     >
       {/* Main Content */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[40%_60%] gap-2 sm:gap-4">
@@ -740,21 +740,19 @@ const TOUCHPOSFORM = () => {
             <h2 className="text-lg sm:text-xl font-bold">Billing</h2>
             <div className="flex gap-1 sm:gap-2">
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
-                  saleType === "Retail"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Retail"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-800"
+                  }`}
                 onClick={() => setSaleType("Retail")}
               >
                 Retail
               </button>
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
-                  saleType === "Wholesale"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Wholesale"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-800"
+                  }`}
                 onClick={() => setSaleType("Wholesale")}
               >
                 Wholesale
@@ -1042,8 +1040,8 @@ const TOUCHPOSFORM = () => {
             loadingSchemes ||
             loadingCategories ||
             loadingBrands) && (
-            <span className="text-xs text-gray-500">Loading...</span>
-          )}
+              <span className="text-xs text-gray-500">Loading...</span>
+            )}
 
           {/* Action Buttons */}
           <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4">
@@ -1089,11 +1087,10 @@ const TOUCHPOSFORM = () => {
               {categories.map((category) => (
                 <button
                   key={category.id}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
-                    selectedCategory === category.name
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category.name
                       ? "bg-blue-500 text-white"
                       : "bg-gray-200"
-                  }`}
+                    }`}
                   onClick={() => {
                     setSelectedCategory(category.name);
                     debouncedSearch(searchQuery, category.name, selectedBrand);
@@ -1117,11 +1114,10 @@ const TOUCHPOSFORM = () => {
               {brands.map((brand) => (
                 <button
                   key={brand.id}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
-                    selectedBrand === brand.name
+                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand.name
                       ? "bg-blue-500 text-white"
                       : "bg-gray-200"
-                  }`}
+                    }`}
                   onClick={() => {
                     setSelectedBrand(brand.name);
                     debouncedSearch(searchQuery, selectedCategory, brand.name);
@@ -1170,9 +1166,8 @@ const TOUCHPOSFORM = () => {
                   className={`
                     relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer 
                     border-4 border-black  
-                    ${
-                      categoryColors[item.category_name] ||
-                      "bg-gradient-to-br from-gray-50 to-gray-100"
+                    ${categoryColors[item.category_name] ||
+                    "bg-gradient-to-br from-gray-50 to-gray-100"
                     }
                     hover:shadow-xl hover:border-purple-800 
                     active:scale-95 transition-all duration-200
@@ -1248,9 +1243,8 @@ const TOUCHPOSFORM = () => {
       )}
       {showNotification && (
         <Notification
-          message={`Delete item "${
-            products[pendingDeleteIndex]?.product_name ?? "this item"
-          }"?`}
+          message={`Delete item "${products[pendingDeleteIndex]?.product_name ?? "this item"
+            }"?`}
           onClose={cancelDelete}
         >
           <button

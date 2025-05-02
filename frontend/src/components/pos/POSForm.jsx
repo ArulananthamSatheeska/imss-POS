@@ -5,6 +5,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
 import CloseRegisterModal from "../models/CloseRegisterModal";
+import HeldSalesList from "./HeldSalesList";
 import {
     ClipboardList,
     Trash2,
@@ -28,18 +29,18 @@ const applyDiscountScheme = (product, saleType, schemes) => {
     // Ensure product and schemes are valid
     if (!product || !product.product_id || !Array.isArray(schemes)) {
         const fallbackPrice = saleType === "Wholesale"
-           ? parseFloat(product?.wholesale_price || product?.sales_price || 0)
-           : parseFloat(product?.sales_price || 0);
+            ? parseFloat(product?.wholesale_price || product?.sales_price || 0)
+            : parseFloat(product?.sales_price || 0);
         return Math.max(0, fallbackPrice); // Ensure price is not negative
     }
 
     // Determine the base price based on Sale Type
     const basePrice = saleType === "Wholesale"
-       ? parseFloat(product.wholesale_price || product.sales_price || 0)
-       : parseFloat(product.sales_price || 0);
+        ? parseFloat(product.wholesale_price || product.sales_price || 0)
+        : parseFloat(product.sales_price || 0);
 
     if (isNaN(basePrice) || basePrice <= 0) {
-       return 0;
+        return 0;
     }
 
     const today = new Date();
@@ -49,61 +50,61 @@ const applyDiscountScheme = (product, saleType, schemes) => {
     let maxDiscountValue = -1;
 
     const findBestScheme = (schemeList) => {
-       schemeList.forEach(scheme => {
-           if (!scheme.active || !scheme.type || scheme.value === null || scheme.value === undefined) return;
+        schemeList.forEach(scheme => {
+            if (!scheme.active || !scheme.type || scheme.value === null || scheme.value === undefined) return;
 
-           const startDate = scheme.start_date ? new Date(scheme.start_date) : null;
-           const endDate = scheme.end_date ? new Date(scheme.end_date) : null;
-           if (startDate && startDate > today) return;
-           if (endDate) {
+            const startDate = scheme.start_date ? new Date(scheme.start_date) : null;
+            const endDate = scheme.end_date ? new Date(scheme.end_date) : null;
+            if (startDate && startDate > today) return;
+            if (endDate) {
                 endDate.setHours(23, 59, 59, 999);
                 if (endDate < today) return;
             }
 
-           let currentDiscountValue = 0;
-           const schemeValue = parseFloat(scheme.value || 0);
+            let currentDiscountValue = 0;
+            const schemeValue = parseFloat(scheme.value || 0);
 
-           if (scheme.type === 'percentage' && schemeValue > 0) {
-               currentDiscountValue = (basePrice * schemeValue) / 100;
-           } else if (scheme.type === 'amount' && schemeValue > 0) {
-               currentDiscountValue = schemeValue;
-           } else {
-               return;
-           }
+            if (scheme.type === 'percentage' && schemeValue > 0) {
+                currentDiscountValue = (basePrice * schemeValue) / 100;
+            } else if (scheme.type === 'amount' && schemeValue > 0) {
+                currentDiscountValue = schemeValue;
+            } else {
+                return;
+            }
 
-           currentDiscountValue = Math.min(currentDiscountValue, basePrice);
+            currentDiscountValue = Math.min(currentDiscountValue, basePrice);
 
-           if (currentDiscountValue > maxDiscountValue) {
-               maxDiscountValue = currentDiscountValue;
-               bestScheme = scheme;
-           }
-       });
+            if (currentDiscountValue > maxDiscountValue) {
+                maxDiscountValue = currentDiscountValue;
+                bestScheme = scheme;
+            }
+        });
     };
 
     const productSchemes = schemes.filter(s =>
-       s.applies_to === 'product' &&
-       s.target === product.product_name
+        s.applies_to === 'product' &&
+        s.target === product.product_name
     );
     findBestScheme(productSchemes);
 
     if ((!bestScheme || maxDiscountValue <= 0) && product.category_name) {
-       const categorySchemes = schemes.filter(s =>
-           s.applies_to === 'category' &&
-           s.target === product.category_name
-       );
-       findBestScheme(categorySchemes);
+        const categorySchemes = schemes.filter(s =>
+            s.applies_to === 'category' &&
+            s.target === product.category_name
+        );
+        findBestScheme(categorySchemes);
     }
 
     if (bestScheme && maxDiscountValue > 0) {
-       let discountedPrice = basePrice;
-       const schemeValue = parseFloat(bestScheme.value || 0);
+        let discountedPrice = basePrice;
+        const schemeValue = parseFloat(bestScheme.value || 0);
 
-       if (bestScheme.type === 'percentage') {
-           discountedPrice = basePrice * (1 - schemeValue / 100);
-       } else if (bestScheme.type === 'amount') {
-           discountedPrice = basePrice - schemeValue;
-       }
-       return Math.max(0, discountedPrice);
+        if (bestScheme.type === 'percentage') {
+            discountedPrice = basePrice * (1 - schemeValue / 100);
+        } else if (bestScheme.type === 'amount') {
+            discountedPrice = basePrice - schemeValue;
+        }
+        return Math.max(0, discountedPrice);
     }
 
     return basePrice;
@@ -111,6 +112,9 @@ const applyDiscountScheme = (product, saleType, schemes) => {
 
 
 const POSForm = () => {
+    const terminalId = "T-1"; // Add a default or fetched terminal ID here
+    const userId = 1; // Changed to valid integer user ID for backend validation
+
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [saleType, setSaleType] = useState("Retail");
     const [products, setProducts] = useState([]); // Products in the current bill/table
@@ -130,6 +134,10 @@ const POSForm = () => {
     const [showNotification, setShowNotification] = useState(false);
     const [pendingDeleteIndex, setPendingDeleteIndex] = useState(null);
     const [showBillModal, setShowBillModal] = useState(false);
+    const [showHeldSalesList, setShowHeldSalesList] = useState(false);
+    const [heldSales, setHeldSales] = useState([]);
+    const [loadingHeldSales, setLoadingHeldSales] = useState(false);
+    const [holdingSale, setHoldingSale] = useState(false);
     const navigate = useNavigate();
     const [billNumber, setBillNumber] = useState("");
     const [customerInfo, setCustomerInfo] = useState({
@@ -142,6 +150,7 @@ const POSForm = () => {
     const [isCloseRegisterOpen, setIsCloseRegisterOpen] = useState(false);
     const [loadingItems, setLoadingItems] = useState(false);
     const [loadingSchemes, setLoadingSchemes] = useState(false);
+
 
     // Fetch Next Bill Number
     useEffect(() => {
@@ -359,8 +368,8 @@ const POSForm = () => {
         // Stock Check: Use selectedProduct.stock (which now holds opening_stock_quantity)
         const availableStock = parseFloat(selectedProduct.stock || 0); // Reads opening stock quantity
         if (isNaN(availableStock)) {
-             alert(`Opening Stock information missing or invalid for ${selectedProduct.product_name}. Cannot add.`);
-             return;
+            alert(`Opening Stock information missing or invalid for ${selectedProduct.product_name}. Cannot add.`);
+            return;
         }
 
         const finalUnitPrice = applyDiscountScheme(selectedProduct, saleType, activeSchemes);
@@ -412,7 +421,7 @@ const POSForm = () => {
                 total: finalUnitPrice * currentQuantity,
                 serialNumber: products.length + 1,
             };
-             setProducts([...products, newProduct]);
+            setProducts([...products, newProduct]);
         }
 
         // Reset form fields
@@ -431,7 +440,7 @@ const POSForm = () => {
 
         if (isNaN(newQty) || newQty < 0) {
             console.warn("Invalid quantity input:", newQtyStr);
-             return;
+            return;
         }
 
         setProducts((prevProducts) => {
@@ -500,7 +509,7 @@ const POSForm = () => {
                 return updated.map((p, idx) => ({ ...p, serialNumber: idx + 1 }));
             });
         } else {
-             console.warn("Attempted to delete invalid index:", pendingDeleteIndex);
+            console.warn("Attempted to delete invalid index:", pendingDeleteIndex);
         }
         setShowNotification(false);
         setPendingDeleteIndex(null);
@@ -521,15 +530,15 @@ const POSForm = () => {
         let grandTotalBeforeAdjustments = 0;
 
         products.forEach(p => {
-             const qty = p.qty || 0;
-             const mrp = parseFloat(p.mrp || 0);
-             const unitDiscount = p.discount || 0;
-             const unitPrice = p.price || 0;
+            const qty = p.qty || 0;
+            const mrp = parseFloat(p.mrp || 0);
+            const unitDiscount = p.discount || 0;
+            const unitPrice = p.price || 0;
 
-             totalQty += qty;
-             subTotalMRP += mrp * qty;
-             totalItemDiscounts += unitDiscount * qty;
-             grandTotalBeforeAdjustments += p.total;
+            totalQty += qty;
+            subTotalMRP += mrp * qty;
+            totalItemDiscounts += unitDiscount * qty;
+            grandTotalBeforeAdjustments += p.total;
         });
 
         const currentTaxRate = parseFloat(tax || 0);
@@ -557,7 +566,7 @@ const POSForm = () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
                 console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                 alert(`Could not enter full-screen mode: ${err.message}`);
+                alert(`Could not enter full-screen mode: ${err.message}`);
             });
             setIsFullScreen(true);
         } else {
@@ -569,16 +578,15 @@ const POSForm = () => {
     };
 
     // --- Hold Sale (Example Implementation) ---
-    const holdSale = useCallback(() => {
+    const holdSale = useCallback(async () => {
         if (products.length === 0) {
             alert("Cannot hold an empty sale.");
             return;
         }
+        setHoldingSale(true);
         const currentTotals = calculateTotals();
-        const saleId = `HELD-${Date.now()}`;
         const saleData = {
-            saleId,
-            products, // products will contain the 'stock' property holding opening_stock_quantity
+            products,
             totals: currentTotals,
             tax,
             billDiscount,
@@ -586,19 +594,101 @@ const POSForm = () => {
             saleType,
             customerInfo,
             billNumber,
-            heldAt: new Date().toISOString(),
         };
         try {
-            const heldSales = JSON.parse(localStorage.getItem("heldSales") || "[]");
-            heldSales.push(saleData);
-            localStorage.setItem("heldSales", JSON.stringify(heldSales));
-            alert(`Sale held with ID: ${saleId}. Use 'View Hold List' (Alt+L) to retrieve.`);
-            resetPOS(false);
+            const response = await axios.post("/api/holds", {
+                terminal_id: terminalId,
+                user_id: userId,
+                sale_data: saleData,
+            });
+            if (response.data.status === "success") {
+                alert(`Sale held successfully with ID: ${response.data.data.hold_id}`);
+                resetPOS(false);
+                loadHeldSales();
+            } else {
+                alert("Failed to hold sale: " + (response.data.message || "Unknown error"));
+            }
         } catch (error) {
             console.error("Error holding sale:", error);
             alert("Failed to hold sale. Check console for details.");
+        } finally {
+            setHoldingSale(false);
         }
     }, [products, calculateTotals, tax, billDiscount, shipping, saleType, customerInfo, billNumber]);
+
+    // Load held sales from backend API
+    const loadHeldSales = useCallback(async () => {
+        setLoadingHeldSales(true);
+        try {
+            const response = await axios.get("/api/holds", {
+                params: { terminal_id: terminalId, status: "held" },
+            });
+            if (response.data.status === "success") {
+                setHeldSales(response.data.data);
+            } else {
+                alert("Failed to load held sales: " + (response.data.message || "Unknown error"));
+                setHeldSales([]);
+            }
+        } catch (error) {
+            console.error("Error loading held sales:", error);
+            setHeldSales([]);
+        } finally {
+            setLoadingHeldSales(false);
+        }
+    }, [terminalId]);
+
+    // Show Held Sales List modal
+    const openHeldSalesList = () => {
+        loadHeldSales();
+        setShowHeldSalesList(true);
+    };
+
+    // Close Held Sales List modal
+    const closeHeldSalesList = () => {
+        setShowHeldSalesList(false);
+    };
+
+    // Recall a held sale by hold_id
+    const recallHeldSale = async (holdId) => {
+        try {
+            const response = await axios.post(`/api/holds/${holdId}/recall`);
+            if (response.data.status === "success") {
+                const sale = response.data.data;
+                setProducts(sale.products || []);
+                setTax(sale.tax || 0);
+                setBillDiscount(sale.billDiscount || 0);
+                setShipping(sale.shipping || 0);
+                setSaleType(sale.saleType || "Retail");
+                setCustomerInfo(sale.customerInfo || { name: "", mobile: "", bill_number: "", userId: "U-1" });
+                setBillNumber(sale.billNumber || "");
+                // Remove recalled sale from heldSales list immediately
+                setHeldSales((prevHeldSales) => prevHeldSales.filter(s => s.hold_id !== holdId));
+                setShowHeldSalesList(false);
+                alert(`Recalled sale with ID: ${holdId}`);
+            } else {
+                alert("Failed to recall sale: " + (response.data.message || "Unknown error"));
+            }
+        } catch (error) {
+            console.error("Error recalling sale:", error);
+            alert("Failed to recall sale. Check console for details.");
+        }
+    };
+
+    // Delete a held sale by hold_id
+    const deleteHeldSale = async (holdId) => {
+        try {
+            const response = await axios.delete(`/api/holds/${holdId}`);
+            if (response.data.status === "success") {
+                alert("Held sale deleted successfully");
+                loadHeldSales();
+            } else {
+                alert("Failed to delete held sale: " + (response.data.message || "Unknown error"));
+            }
+        } catch (error) {
+            console.error("Error deleting held sale:", error);
+            alert("Failed to delete held sale. Check console for details.");
+        }
+    };
 
 
     // --- Reset POS State ---
@@ -626,13 +716,25 @@ const POSForm = () => {
             };
             fetchNextBillNumber();
         } else {
-             setCustomerInfo(prev => ({ ...prev, bill_number: "" }));
+            setCustomerInfo(prev => ({ ...prev, bill_number: "" }));
         }
 
         if (searchInputRef.current) {
             searchInputRef.current.focus();
         }
     }, []);
+
+    // Keyboard Shortcut for View Hold List (Alt+L)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.altKey && e.key.toLowerCase() === "l") {
+                e.preventDefault();
+                openHeldSalesList();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [openHeldSalesList]);
 
     // --- Open Bill Print Modal ---
     const handleOpenBill = useCallback(() => {
@@ -654,9 +756,9 @@ const POSForm = () => {
         if (saleSaved) {
             resetPOS(true);
         } else {
-             searchInputRef.current?.focus();
+            searchInputRef.current?.focus();
         }
-         setCustomerInfo((prevState) => ({
+        setCustomerInfo((prevState) => ({
             ...prevState,
             name: "",
             mobile: "",
@@ -710,7 +812,7 @@ const POSForm = () => {
                             <input type="text" className="w-24 px-2 py-2 font-bold text-center text-orange-700 bg-white border border-gray-300 rounded-lg md:w-32 dark:bg-gray-700 dark:text-orange-400 dark:border-gray-600" value={billNumber} readOnly title="Current Bill Number" />
                         </div>
                         {/* Action Buttons */}
-                        <button className="p-2 text-white transition duration-150 ease-in-out bg-blue-500 rounded-lg shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75" title="View Hold List (Alt+L)" onClick={() => alert("Feature: Load Held Sales - Coming Soon")}> <ClipboardList size={24} /> </button>
+                        <button className="p-2 text-white transition duration-150 ease-in-out bg-blue-500 rounded-lg shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75" title="View Hold List (Alt+L)" onClick={openHeldSalesList}> <ClipboardList size={24} /> </button>
                         <button className="p-2 text-white transition duration-150 ease-in-out bg-yellow-500 rounded-lg shadow hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-75" title="Dashboard" onClick={() => navigate("/Dashboard")}> <LayoutDashboard size={24} /> </button>
                         <button className="p-2 text-white transition duration-150 ease-in-out bg-purple-500 rounded-lg shadow hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75" title="Calculator (Alt+C)" onClick={() => setShowCalculatorModal(true)}> <Calculator size={24} /> </button>
                         <button className="p-2 text-white transition duration-150 ease-in-out bg-green-500 rounded-lg shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75" title={isFullScreen ? "Exit Fullscreen (F11)" : "Fullscreen (F11)"} onClick={toggleFullScreen}> {isFullScreen ? <Minimize size={24} /> : <Maximize size={24} />} </button>
@@ -726,7 +828,7 @@ const POSForm = () => {
                     {/* Search and Add Section */}
                     <div className="relative flex flex-col items-stretch gap-2 mb-4 md:flex-row md:items-end">
                         <div className="relative flex-grow">
-                             <label htmlFor="productSearch" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Search Product (Alt+S)</label>
+                            <label htmlFor="productSearch" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Search Product (Alt+S)</label>
                             <input id="productSearch" ref={searchInputRef} type="text" className="w-full px-4 py-2 text-base border border-gray-300 rounded-lg text-slate-800 dark:text-white dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Name, Code, Barcode..." value={searchQuery} onChange={(e) => handleSearch(e.target.value)} onKeyDown={handleKeyDown} disabled={loadingItems || loadingSchemes} autoComplete="off" />
                             {(loadingItems || loadingSchemes) && (<span className="absolute text-xs text-gray-500 top-1 right-2 dark:text-gray-400">Loading...</span>)}
                             {/* Search Results Dropdown */}
@@ -742,12 +844,12 @@ const POSForm = () => {
                             )}
                         </div>
                         {/* Quantity Input */}
-                         <div className="flex-shrink-0 w-full md:w-24">
-                             <label htmlFor="quantityInput" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</label>
+                        <div className="flex-shrink-0 w-full md:w-24">
+                            <label htmlFor="quantityInput" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</label>
                             <input id="quantityInput" ref={quantityInputRef} type="number" step="1" min="0.01" className="w-full px-3 py-2 text-base text-center bg-white border border-gray-300 rounded-lg md:w-24 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white dark:border-gray-600" placeholder="Qty" value={quantity} onChange={handleQuantityChange} onKeyDown={handleKeyDown} disabled={!selectedProduct || loadingItems || loadingSchemes} />
                         </div>
                         {/* Add Button */}
-                         <div className="flex-shrink-0 w-full md:w-auto">
+                        <div className="flex-shrink-0 w-full md:w-auto">
                             <label className="block mb-1 text-sm font-medium text-transparent dark:text-transparent">Add</label>
                             <button className="w-full px-5 py-2 text-base font-semibold text-white transition duration-150 ease-in-out bg-green-600 rounded-lg shadow md:w-auto hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed" onClick={addProductToTable} disabled={!selectedProduct || parseFloat(quantity || 0) <= 0 || loadingItems || loadingSchemes}> Add </button>
                         </div>
@@ -771,22 +873,22 @@ const POSForm = () => {
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                                 {products.length === 0 ? (
-                                    <tr> <td colSpan="8" className="py-6 italic text-center text-gray-500 dark:text-gray-400"> No items added to the bill yet. Start searching above! </td> </tr>
+                                    <tr><td colSpan="8" className="py-6 italic text-center text-gray-500 dark:text-gray-400">No items added to the bill yet. Start searching above!</td></tr>
                                 ) : (
                                     products.map((product, index) => (
                                         <tr key={product.product_id + '-' + index} className="hover:bg-gray-100 dark:hover:bg-gray-700">
-                                            <td className="px-3 py-2 font-medium text-gray-900 border-r dark:text-white dark:border-gray-700"> {product.serialNumber} </td>
-                                            <td className="px-4 py-2 border-r dark:border-gray-700" title={product.product_name}> {product.product_name} </td>
-                                            <td className="px-3 py-2 text-right border-r dark:border-gray-700"> {formatNumberWithCommas(product.mrp)} </td>
+                                            <td className="px-3 py-2 font-medium text-gray-900 border-r dark:text-white dark:border-gray-700">{product.serialNumber}</td>
+                                            <td className="px-4 py-2 border-r dark:border-gray-700" title={product.product_name}>{product.product_name}</td>
+                                            <td className="px-3 py-2 text-right border-r dark:border-gray-700">{formatNumberWithCommas(product.mrp)}</td>
                                             <td className="px-1 py-1 text-center border-r dark:border-gray-700">
                                                 <input type="number" step="1" min="0" className="w-16 py-1 text-sm text-center bg-transparent border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 dark:text-white" value={product.qty} onChange={(e) => updateProductQuantity(index, e.target.value)} onFocus={(e) => e.target.select()} />
                                             </td>
                                             <td className="px-3 py-2 text-right border-r dark:border-gray-700">
                                                 <input type="number" step="0.01" min="0" className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 read-only:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:read-only:bg-gray-600 dark:text-white" value={product.price.toFixed(2)} readOnly />
                                             </td>
-                                            <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700"> {formatNumberWithCommas(product.discount?.toFixed(2) ?? 0.00)} </td>
-                                            <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700"> {formatNumberWithCommas(product.total?.toFixed(2) ?? 0.00)} </td>
-                                            <td className="px-3 py-2 text-center"> <button onClick={() => handleDeleteClick(index)} className="p-1 text-red-600 transition duration-150 ease-in-out rounded-lg hover:bg-red-100 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500" title="Delete Item"> <Trash2 size={16} /> </button> </td>
+                                            <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">{formatNumberWithCommas(product.discount?.toFixed(2) ?? 0.00)}</td>
+                                            <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">{formatNumberWithCommas(product.total?.toFixed(2) ?? 0.00)}</td>
+                                            <td className="px-3 py-2 text-center"><button onClick={() => handleDeleteClick(index)} className="p-1 text-red-600 transition duration-150 ease-in-out rounded-lg hover:bg-red-100 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500" title="Delete Item"><Trash2 size={16} /></button></td>
                                         </tr>
                                     ))
                                 )}
@@ -839,9 +941,18 @@ const POSForm = () => {
             </div>
 
             {/* Modals */}
-            {showBillModal && ( <BillPrintModal initialProducts={products} initialBillDiscount={parseFloat(billDiscount || 0)} initialTax={parseFloat(tax || 0)} initialShipping={parseFloat(shipping || 0)} initialTotals={totals} initialCustomerInfo={customerInfo} onClose={closeBillModal} /> )}
-            {showCalculatorModal && ( <CalculatorModal isOpen={showCalculatorModal} onClose={() => setShowCalculatorModal(false)} /> )}
-            {isCloseRegisterOpen && ( <CloseRegisterModal isOpen={isCloseRegisterOpen} onClose={() => setIsCloseRegisterOpen(false)} /> )}
+            {showBillModal && (<BillPrintModal initialProducts={products} initialBillDiscount={parseFloat(billDiscount || 0)} initialTax={parseFloat(tax || 0)} initialShipping={parseFloat(shipping || 0)} initialTotals={totals} initialCustomerInfo={customerInfo} onClose={closeBillModal} />)}
+            {showCalculatorModal && (<CalculatorModal isOpen={showCalculatorModal} onClose={() => setShowCalculatorModal(false)} />)}
+            {isCloseRegisterOpen && (<CloseRegisterModal isOpen={isCloseRegisterOpen} onClose={() => setIsCloseRegisterOpen(false)} />)}
+            {showHeldSalesList && (
+                <HeldSalesList
+                    heldSales={heldSales}
+                    loading={loadingHeldSales}
+                    onRecall={recallHeldSale}
+                    onDelete={deleteHeldSale}
+                    onClose={closeHeldSalesList}
+                />
+            )}
         </div>
     );
 };

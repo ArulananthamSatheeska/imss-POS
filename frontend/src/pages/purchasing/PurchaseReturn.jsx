@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/NewAuthContext";
 import { getApi } from "../../services/api";
-import { FiSearch } from "react-icons/fi";
+import { FiSearch, FiChevronDown, FiChevronUp } from "react-icons/fi";
 
 const PurchaseReturn = () => {
   const { user } = useAuth();
@@ -16,6 +16,7 @@ const PurchaseReturn = () => {
     items: [],
     refund_method: "cash",
     remarks: "",
+    status: "pending",
   });
   const [itemForm, setItemForm] = useState({
     product_id: "",
@@ -24,6 +25,10 @@ const PurchaseReturn = () => {
     reason: "",
     buying_cost: 0,
   });
+  const [editMode, setEditMode] = useState(false);
+  const [editReturnId, setEditReturnId] = useState(null);
+  const [viewReturn, setViewReturn] = useState(null);
+  const [expandedRows, setExpandedRows] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
@@ -55,13 +60,6 @@ const PurchaseReturn = () => {
         api.get(`/purchase-returns?_t=${timestamp}`),
       ]);
 
-      // Log raw response for debugging
-      console.log(
-        "Raw purchase-returns response:",
-        JSON.stringify(returnsRes.data, null, 2)
-      );
-
-      // Handle suppliers response
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
         : Array.isArray(suppliersRes.data)
@@ -78,28 +76,18 @@ const PurchaseReturn = () => {
         ? returnsRes.data
         : [];
 
-      // Parse buying_cost to ensure it's a number
-      returnsData.forEach((returnItem, index) => {
+      returnsData.forEach((returnItem) => {
         if (returnItem.items) {
-          returnItem.items.forEach((item, itemIndex) => {
-            const rawBuyingCost = item.buying_cost;
-            item.buying_cost = parseFloat(rawBuyingCost);
-            if (isNaN(item.buying_cost)) {
-              console.warn(
-                `Invalid buying_cost at returnItems[${index}].items[${itemIndex}]:`,
-                rawBuyingCost,
-                "Defaulting to 0"
-              );
-              item.buying_cost = 0;
-            } else {
-              console.log(
-                `Parsed buying_cost at returnItems[${index}].items[${itemIndex}]:`,
-                item.buying_cost
-              );
-            }
+          returnItem.items.forEach((item) => {
+            item.buying_cost = parseFloat(item.buying_cost) || 0;
           });
         }
       });
+
+      // Sort returns by invoice_number
+      returnsData.sort((a, b) =>
+        a.invoice_number.localeCompare(b.invoice_number)
+      );
 
       setSuppliers(suppliersData);
       setProducts(productsData);
@@ -305,6 +293,65 @@ const PurchaseReturn = () => {
     });
   };
 
+  const handleEditReturn = async (returnItem) => {
+    try {
+      const response = await api.get(`/purchase-returns/${returnItem.id}`);
+      const data = response.data.data;
+      setNewReturn({
+        supplier_id: data.supplier_id.toString(),
+        items: data.items.map((item) => ({
+          product_id: item.product_id.toString(),
+          product_name: item.product_name,
+          quantity: item.quantity,
+          buying_cost: parseFloat(item.buying_cost),
+          reason: item.reason,
+        })),
+        refund_method: data.refund_method,
+        remarks: data.remarks || "",
+        status: data.status,
+      });
+      setEditMode(true);
+      setEditReturnId(returnItem.id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || "Error fetching return";
+      toast.error(errorMsg);
+    }
+  };
+
+  const handleViewReturn = async (returnItem) => {
+    try {
+      const response = await api.get(`/purchase-returns/${returnItem.id}`);
+      setViewReturn(response.data.data);
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || "Error fetching return";
+      toast.error(errorMsg);
+    }
+  };
+
+  const handleCloseView = () => {
+    setViewReturn(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setEditReturnId(null);
+    setNewReturn({
+      supplier_id: "",
+      items: [],
+      refund_method: "cash",
+      remarks: "",
+      status: "pending",
+    });
+    setItemForm({
+      product_id: "",
+      search_query: "",
+      quantity: 1,
+      reason: "",
+      buying_cost: 0,
+    });
+  };
+
   const handleSubmitReturn = async () => {
     if (!newReturn.supplier_id) {
       toast.error("Please select a supplier");
@@ -315,18 +362,35 @@ const PurchaseReturn = () => {
       return;
     }
 
-    console.log("Submitting newReturn:", JSON.stringify(newReturn, null, 2));
-
     setLoading(true);
     try {
-      const response = await api.post("/purchase-returns", newReturn);
-      console.log("Response:", JSON.stringify(response.data, null, 2));
-      setReturnItems([...returnItems, response.data.data]);
+      let response;
+      if (editMode) {
+        response = await api.put(
+          `/purchase-returns/${editReturnId}`,
+          newReturn
+        );
+        toast.success("Purchase return updated successfully!");
+        const updatedItems = returnItems
+          .map((item) => (item.id === editReturnId ? response.data.data : item))
+          .sort((a, b) => a.invoice_number.localeCompare(b.invoice_number));
+        setReturnItems(updatedItems);
+        handleCancelEdit();
+      } else {
+        response = await api.post("/purchase-returns", newReturn);
+        toast.success("Purchase return submitted successfully!");
+        setReturnItems(
+          [...returnItems, response.data.data].sort((a, b) =>
+            a.invoice_number.localeCompare(b.invoice_number)
+          )
+        );
+      }
       setNewReturn({
         supplier_id: "",
         items: [],
         refund_method: "cash",
         remarks: "",
+        status: "pending",
       });
       setItemForm({
         product_id: "",
@@ -335,9 +399,7 @@ const PurchaseReturn = () => {
         reason: "",
         buying_cost: 0,
       });
-      toast.success("Purchase return submitted successfully!");
     } catch (error) {
-      console.error("Error response:", error.response?.data);
       const errorMsg =
         error.response?.data?.message || "Error submitting purchase return";
       toast.error(errorMsg);
@@ -350,13 +412,37 @@ const PurchaseReturn = () => {
     }
   };
 
-  // Helper function to format buying_cost safely
+  const handleDeleteReturn = async (id) => {
+    if (
+      window.confirm("Are you sure you want to delete this purchase return?")
+    ) {
+      setLoading(true);
+      try {
+        await api.delete(`/purchase-returns/${id}`);
+        setReturnItems(returnItems.filter((item) => item.id !== id));
+        setExpandedRows(expandedRows.filter((rowId) => rowId !== id));
+        toast.success("Purchase return deleted successfully!");
+      } catch (error) {
+        const errorMsg =
+          error.response?.data?.message || "Error deleting purchase return";
+        toast.error(errorMsg);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const toggleRowExpansion = (id) => {
+    setExpandedRows((prev) =>
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+    );
+  };
+
   const formatBuyingCost = (cost) => {
     const parsedCost = parseFloat(cost);
     return isNaN(parsedCost) ? "0.00" : parsedCost.toFixed(2);
   };
 
-  // Calculate total amount for a return (sum of quantity * buying_cost for all items)
   const calculateTotalAmount = (items) => {
     return items
       .reduce((total, item) => {
@@ -400,7 +486,7 @@ const PurchaseReturn = () => {
         {/* Purchase Return Form */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-            Purchase Return Form
+            {editMode ? "Edit Purchase Return" : "Purchase Return Form"}
           </h2>
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
             {loading && (
@@ -555,26 +641,58 @@ const PurchaseReturn = () => {
                       </button>
                     </div>
                   </div>
-                  {newReturn.items.map((item, index) => (
-                    <div
-                      key={item.product_id + index}
-                      className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-2"
-                    >
-                      <div>{item.product_name}</div>
-                      <div>Qty: {item.quantity}</div>
-                      <div>Cost: ${formatBuyingCost(item.buying_cost)}</div>
-                      <div>Reason: {item.reason}</div>
-                      <div>
-                        <button
-                          onClick={() => handleRemoveItem(index)}
-                          className="text-red-500 hover:text-red-700"
-                          disabled={loading}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  {newReturn.items.length > 0 && (
+                    <table className="min-w-full border border-gray-300 rounded-md">
+                      <thead>
+                        <tr className="bg-gray-100 dark:bg-gray-700">
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
+                            Product
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
+                            Quantity
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
+                            Cost
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
+                            Reason
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {newReturn.items.map((item, index) => (
+                          <tr
+                            key={item.product_id + index}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
+                            <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                              {item.product_name}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                              {item.quantity}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                              ${formatBuyingCost(item.buying_cost)}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                              {item.reason}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-red-500 cursor-pointer hover:text-red-700">
+                              <button
+                                onClick={() => handleRemoveItem(index)}
+                                disabled={loading}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
@@ -604,21 +722,157 @@ const PurchaseReturn = () => {
                     disabled={loading}
                   />
                 </div>
-                <button
-                  onClick={handleSubmitReturn}
-                  disabled={
-                    loading ||
-                    !newReturn.supplier_id ||
-                    newReturn.items.length === 0
-                  }
-                  className="mt-4 w-full md:w-auto bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 disabled:bg-gray-400"
-                >
-                  Submit Return
-                </button>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    Status
+                  </label>
+                  <select
+                    name="status"
+                    value={newReturn.status}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    disabled={loading}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+                <div className="mt-4 flex space-x-4">
+                  <button
+                    onClick={handleSubmitReturn}
+                    disabled={
+                      loading ||
+                      !newReturn.supplier_id ||
+                      newReturn.items.length === 0
+                    }
+                    className="w-full md:w-auto bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 disabled:bg-gray-400"
+                  >
+                    {editMode ? "Update Return" : "Submit Return"}
+                  </button>
+                  {editMode && (
+                    <button
+                      onClick={handleCancelEdit}
+                      className="w-full md:w-auto bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-300"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
         </div>
+
+        {/* View Return Modal */}
+        {viewReturn && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-2xl w-full">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                Purchase Return Details
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Invoice Number
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-200">
+                    {viewReturn.invoice_number || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Supplier
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-200">
+                    {viewReturn.supplier?.supplier_name || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Items
+                  </label>
+                  <table className="min-w-full mt-2">
+                    <thead>
+                      <tr>
+                        <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
+                          Product
+                        </th>
+                        <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
+                          Quantity
+                        </th>
+                        <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
+                          Buying Cost
+                        </th>
+                        <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
+                          Reason
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewReturn.items.map((item, index) => (
+                        <tr key={index}>
+                          <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
+                            {item.product_name}
+                          </td>
+                          <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
+                            {item.quantity}
+                          </td>
+                          <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
+                            ${formatBuyingCost(item.buying_cost)}
+                          </td>
+                          <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
+                            {item.reason}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Total Amount
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-200">
+                    ${calculateTotalAmount(viewReturn.items)}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Refund Method
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-200">
+                    {viewReturn.refund_method || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Remarks
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-200">
+                    {viewReturn.remarks || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Status
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-200">
+                    {viewReturn.status || "N/A"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleCloseView}
+                  className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-300"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Purchase Return History */}
         <div>
@@ -635,18 +889,19 @@ const PurchaseReturn = () => {
               <table className="min-w-full">
                 <thead>
                   <tr>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 w-12"></th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Invoice Number
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Supplier Name
                     </th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
+                    {/* <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Item
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Buying Cost
-                    </th>
+                    </th> */}
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Total Amount
                     </th>
@@ -656,42 +911,133 @@ const PurchaseReturn = () => {
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Status
                     </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {returnItems.map((returnItem) => (
-                    <tr
-                      key={returnItem.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-200"
-                    >
-                      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        {returnItem.invoice_number || "N/A"}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        {returnItem.supplier?.supplier_name || "N/A"}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        {returnItem.items
-                          .map((item) => item.product_name)
-                          .join(", ") || "N/A"}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        {returnItem.items
-                          .map(
-                            (item) => `$${formatBuyingCost(item.buying_cost)}`
-                          )
-                          .join(", ") || "N/A"}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        ${calculateTotalAmount(returnItem.items)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        {returnItem.refund_method || "N/A"}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        {returnItem.status || "N/A"}
-                      </td>
-                    </tr>
+                    <React.Fragment key={returnItem.id}>
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-200">
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          <button
+                            onClick={() => toggleRowExpansion(returnItem.id)}
+                            className="focus:outline-none"
+                            disabled={loading}
+                          >
+                            {expandedRows.includes(returnItem.id) ? (
+                              <FiChevronUp className="text-gray-700 dark:text-gray-200" />
+                            ) : (
+                              <FiChevronDown className="text-gray-700 dark:text-gray-200" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          {returnItem.invoice_number || "N/A"}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          {returnItem.supplier?.supplier_name || "N/A"}
+                        </td>
+                        {/* <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          {returnItem.items
+                            .map((item) => item.product_name)
+                            .join(", ") || "N/A"}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          {returnItem.items
+                            .map(
+                              (item) => `$${formatBuyingCost(item.buying_cost)}`
+                            )
+                            .join(", ") || "N/A"}
+                        </td> */}
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          ${calculateTotalAmount(returnItem.items)}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          {returnItem.refund_method || "N/A"}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          {returnItem.status || "N/A"}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                          <button
+                            onClick={() => handleViewReturn(returnItem)}
+                            className="text-green-500 hover:text-green-700 mr-2"
+                            disabled={loading}
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleEditReturn(returnItem)}
+                            className="text-blue-500 hover:text-blue-700 mr-2"
+                            disabled={loading}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReturn(returnItem.id)}
+                            className="text-red-500 hover:text-red-700"
+                            disabled={loading}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedRows.includes(returnItem.id) && (
+                        <tr>
+                          <td
+                            colSpan="9"
+                            className="px-4 py-2 bg-gray-50 dark:bg-gray-700"
+                          >
+                            <div className="p-4 border border-gray-300 rounded">
+                              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                                Item Details
+                              </h4>
+                              <table className="min-w-full border border-gray-300 rounded">
+                                <thead>
+                                  <tr className="bg-gray-100 dark:bg-gray-700 border-b border-gray-300">
+                                    <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-r border-gray-300">
+                                      Product
+                                    </th>
+                                    <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-r border-gray-300">
+                                      Quantity
+                                    </th>
+                                    <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-r border-gray-300">
+                                      Buying Cost
+                                    </th>
+                                    <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
+                                      Reason
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {returnItem.items.map((item, index) => (
+                                    <tr
+                                      key={index}
+                                      className="border-b border-gray-300 last:border-b-0"
+                                    >
+                                      <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200 border-r border-gray-300">
+                                        {item.product_name}
+                                      </td>
+                                      <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200 border-r border-gray-300">
+                                        {item.quantity}
+                                      </td>
+                                      <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200 border-r border-gray-300">
+                                        ${formatBuyingCost(item.buying_cost)}
+                                      </td>
+                                      <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
+                                        {item.reason}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
