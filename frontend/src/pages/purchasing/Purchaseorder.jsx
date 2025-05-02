@@ -2,11 +2,9 @@ import React, { useState } from 'react';
 
 const PurchaseOrder = () => {
     const [supplier, setSupplier] = useState({
-        companyName: '',
         contactName: '',
         address: '',
         phone: '',
-        email: '',
     });
 
     const [items, setItems] = useState([
@@ -44,33 +42,22 @@ const PurchaseOrder = () => {
     };
 
     return (
-        <div className="max-w-full mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg space-y-6">
+        <div className="max-w-full p-8 mx-auto space-y-6 bg-white rounded-lg shadow-lg dark:bg-gray-900">
             {/* Purchase Order Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center justify-between mb-6">
                 <h2 className="text-3xl font-semibold text-gray-800 dark:text-white">Purchase Order</h2>
                 <button
                     onClick={handlePrint}
-                    className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-all duration-300"
+                    className="px-6 py-2 text-white transition-all duration-300 bg-blue-500 rounded-md hover:bg-blue-600"
                 >
                     Print Order
                 </button>
             </div>
 
             {/* Supplier Information */}
-            <div className="supplier-info space-y-6">
+            <div className="space-y-6 supplier-info">
                 <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Supplier Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <label className="block text-gray-600 dark:text-gray-300">Company Name</label>
-                        <input
-                            type="text"
-                            name="companyName"
-                            value={supplier.companyName}
-                            onChange={handleSupplierChange}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
-                            placeholder="Company Name"
-                        />
-                    </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                     <div>
                         <label className="block text-gray-600 dark:text-gray-300">Contact Name</label>
                         <input
@@ -78,7 +65,7 @@ const PurchaseOrder = () => {
                             name="contactName"
                             value={supplier.contactName}
                             onChange={handleSupplierChange}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
+                            className="w-full p-3 border border-gray-300 rounded-md dark:border-gray-700 focus:ring-2 focus:ring-indigo-500"
                             placeholder="Contact Name"
                         />
                     </div>
@@ -89,19 +76,8 @@ const PurchaseOrder = () => {
                             name="phone"
                             value={supplier.phone}
                             onChange={handleSupplierChange}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
+                            className="w-full p-3 border border-gray-300 rounded-md dark:border-gray-700 focus:ring-2 focus:ring-indigo-500"
                             placeholder="Phone Number"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-gray-600 dark:text-gray-300">Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={supplier.email}
-                            onChange={handleSupplierChange}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
-                            placeholder="Email Address"
                         />
                     </div>
                     <div>
@@ -111,7 +87,7 @@ const PurchaseOrder = () => {
                             name="address"
                             value={supplier.address}
                             onChange={handleSupplierChange}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
+                            className="w-full p-3 border border-gray-300 rounded-md dark:border-gray-700 focus:ring-2 focus:ring-indigo-500"
                             placeholder="Supplier Address"
                         />
                     </div>
@@ -119,9 +95,9 @@ const PurchaseOrder = () => {
             </div>
 
             {/* Order Items */}
-            <div className="items-table space-y-6">
+            <div className="space-y-6 items-table">
                 <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Order Items</h3>
-                <table className="w-full table-auto border-collapse">
+                <table className="w-full border-collapse table-auto">
                     <thead>
                         <tr className="text-left bg-gray-200 dark:bg-gray-700">
                             <th className="p-3 border dark:border-gray-700">Description</th>
@@ -140,7 +116,7 @@ const PurchaseOrder = () => {
                                         name="description"
                                         value={item.description}
                                         onChange={(e) => handleItemChange(index, e)}
-                                        className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full p-3 border border-gray-300 rounded-md dark:border-gray-700 focus:ring-2 focus:ring-indigo-500"
                                         placeholder="Item Description"
                                     />
                                 </td>
@@ -150,7 +126,7 @@ const PurchaseOrder = () => {
                                         name="qty"
                                         value={item.qty}
                                         onChange={(e) => handleItemChange(index, e)}
-                                        className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full p-3 border border-gray-300 rounded-md dark:border-gray-700 focus:ring-2 focus:ring-indigo-500"
                                         min="1"
                                     />
                                 </td>
@@ -160,7 +136,7 @@ const PurchaseOrder = () => {
                                         name="unitPrice"
                                         value={item.unitPrice}
                                         onChange={(e) => handleItemChange(index, e)}
-                                        className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full p-3 border border-gray-300 rounded-md dark:border-gray-700 focus:ring-2 focus:ring-indigo-500"
                                         min="0"
                                     />
                                 </td>
@@ -168,7 +144,7 @@ const PurchaseOrder = () => {
                                 <td className="p-3 border dark:border-gray-700">
                                     <button
                                         onClick={() => removeItem(index)}
-                                        className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                        className="px-4 py-2 text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
                                     >
                                         Remove
                                     </button>
@@ -180,7 +156,7 @@ const PurchaseOrder = () => {
                 <div className="flex justify-start mt-4">
                     <button
                         onClick={addItem}
-                        className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-all duration-300"
+                        className="px-6 py-2 text-white transition-all duration-300 bg-green-500 rounded-md hover:bg-green-600"
                     >
                         Add Item
                     </button>
@@ -188,13 +164,13 @@ const PurchaseOrder = () => {
             </div>
 
             {/* Total Calculation */}
-            <div className="total text-right mt-6">
-                <h3 className="font-semibold text-xl">Total: ${calculateTotal().toFixed(2)}</h3>
+            <div className="mt-6 text-right total">
+                <h3 className="text-xl font-semibold">Total: ${calculateTotal().toFixed(2)}</h3>
             </div>
 
             {/* Submit Button */}
-            <div className="text-center mt-6">
-                <button className="px-8 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-all duration-300">
+            <div className="mt-6 text-center">
+                <button className="px-8 py-3 text-white transition-all duration-300 bg-blue-500 rounded-md hover:bg-blue-600">
                     Submit Order
                 </button>
             </div>
