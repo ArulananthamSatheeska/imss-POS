@@ -13,8 +13,9 @@ import { FaFilter, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import SalesInvoice from "./SalesInvoice";
-// import Quotation from './Quotation';
 import PrintableInvoice from "./PrintableInvoice";
+import BillPrintModal from "../../components/models/BillPrintModel";
+import POSForm from "../../components/pos/POSForm";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
@@ -36,17 +37,19 @@ const SalesReport = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [invoiceToEdit, setInvoiceToEdit] = useState(null);
+  const [showBillPrintModal, setShowBillPrintModal] = useState(false);
+  const [billPrintData, setBillPrintData] = useState(null);
+  const [showEditSaleModal, setShowEditSaleModal] = useState(false); // New state for POSForm
+  const [saleToEdit, setSaleToEdit] = useState(null); // New state for sale data
 
   const fetchReportData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch invoices
       const invoiceResponse = await axios.get(`${API_BASE_URL}/invoices`, {
         params: { from: fromDate, to: toDate },
         headers: { Accept: "application/json" },
       });
 
-      // Fetch sales (POS)
       const salesResponse = await axios.get(`${API_BASE_URL}/sales`, {
         params: { from: fromDate, to: toDate },
         headers: { Accept: "application/json" },
@@ -92,7 +95,6 @@ const SalesReport = () => {
         status: invoice.status || "Pending",
       }));
 
-      // Process sales
       let sales = [];
       if (salesResponse.data && Array.isArray(salesResponse.data.data)) {
         sales = salesResponse.data.data;
@@ -114,7 +116,17 @@ const SalesReport = () => {
         customer_phone: sale.customer_phone || "",
         customer_address: sale.customer_address || "",
         customer_email: sale.customer_email || "",
-        items: Array.isArray(sale.items) ? sale.items : [],
+        items: Array.isArray(sale.items)
+          ? sale.items.map((item) => ({
+              ...item,
+              product_name: item.product_name || "Unknown Product",
+              quantity: item.quantity || 0,
+              unit_price: parseFloat(item.unit_price) || 0,
+              discount: parseFloat(item.discount) || 0,
+              total: parseFloat(item.total) || 0,
+              mrp: parseFloat(item.mrp) || 0,
+            }))
+          : [],
         total_amount: parseFloat(sale.total) || 0,
         subtotal: parseFloat(sale.subtotal) || 0,
         tax_amount: parseFloat(sale.tax) || 0,
@@ -126,7 +138,6 @@ const SalesReport = () => {
         status: sale.status || "Completed",
       }));
 
-      // Combine and sort by date
       const combinedData = [...processedInvoices, ...processedSales].sort(
         (a, b) => new Date(b.invoice_date) - new Date(a.invoice_date)
       );
@@ -212,7 +223,9 @@ const SalesReport = () => {
       );
       fetchReportData();
       setShowEditInvoiceModal(false);
+      setShowEditSaleModal(false); // Close POSForm
       setInvoiceToEdit(null);
+      setSaleToEdit(null);
       alert(`${type === "invoice" ? "Invoice" : "Sale"} updated successfully!`);
       return response.data;
     } catch (error) {
@@ -306,144 +319,315 @@ const SalesReport = () => {
   };
 
   const handleViewInvoice = (row) => {
-    console.log("Row data for invoice preview:", row);
+    console.log("Row data for preview:", row);
 
     if (!row.customer_name) {
       row.customer_name =
         row.type === "sale" ? "Walk-in Customer" : "Unknown Customer";
     }
 
-    setInvoiceDataForPreview({
-      customer: {
-        name: row.customer_name,
-        address: row.customer_address || "N/A",
-        phone: row.customer_phone || "N/A",
-        email: row.customer_email || "N/A",
-      },
-      items: (Array.isArray(row.items) ? row.items : []).map((item) => ({
-        id: item.id || null,
-        description:
-          row.type === "sale"
-            ? item.product_name || "N/A"
-            : item.description || "N/A",
-        quantity: item.quantity || item.qty || 0,
-        unit_price: item.unit_price || item.sales_price || 0,
-        discountAmount: item.discount || item.discount_amount || 0,
-        discountPercentage: item.discount_percentage || 0,
-        total:
-          item.total ||
-          item.quantity * (item.unit_price || item.sales_price) ||
-          0,
-        totalBuyingCost: item.total_buying_cost || 0,
-        freeQty: item.free_qty || 0,
-      })),
-      footerDetails: {
-        approvedBy: row.approved_by || "System",
-        nextApprovalTo: row.next_approval_to || "",
-        dateTime: new Date(
-          row.updated_at || row.created_at || Date.now()
-        ).toLocaleString(),
-      },
-      subtotal: Number(row.subtotal) || 0,
-      tax: Number(row.tax_amount) || 0,
-      discount: Number(row.discount) || 0,
-      total: Number(row.total_amount) || 0,
-      amountPaid: Number(row.purchase_amount) || 0,
-      balance: Number(row.balance) || 0,
-      invoice: {
-        no: row.bill_number,
-        date: row.invoice_date
-          ? new Date(row.invoice_date).toLocaleDateString()
-          : new Date(row.created_at || Date.now()).toLocaleDateString(),
-        time:
-          row.invoice_time ||
-          new Date(
-            row.invoice_date || row.created_at || Date.now()
-          ).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-      },
-      paymentMethod: row.payment_method || "Cash",
-      status: row.status || (row.type === "sale" ? "Completed" : "Pending"),
-    });
+    if (row.type === "sale") {
+      const products = (Array.isArray(row.items) ? row.items : []).map(
+        (item, index) => ({
+          product_id: item.product_id || null,
+          product_name: item.product_name || "Unknown Product",
+          item_code: item.item_code || `ITEM-${index + 1}`,
+          barcode: item.barcode || "",
+          category_name: item.category_name || "Unknown Category",
+          sales_price: parseFloat(item.unit_price) || 0,
+          wholesale_price:
+            parseFloat(item.wholesale_price) ||
+            parseFloat(item.unit_price) ||
+            0,
+          mrp: parseFloat(item.mrp) || 0,
+          stock: parseFloat(item.stock) || 0,
+          qty: parseFloat(item.quantity) || 1,
+          price: parseFloat(item.unit_price) || 0,
+          discount: parseFloat(item.discount) || 0,
+          total:
+            parseFloat(item.total) ||
+            (parseFloat(item.unit_price) || 0) *
+              (parseFloat(item.quantity) || 1),
+          serialNumber: index + 1,
+        })
+      );
+
+      const totals = {
+        totalQty: products.reduce((sum, p) => sum + (p.qty || 0), 0),
+        subTotalMRP: products.reduce(
+          (sum, p) => sum + (p.mrp || 0) * (p.qty || 0),
+          0
+        ),
+        totalItemDiscounts: products.reduce(
+          (sum, p) => sum + (p.discount || 0) * (p.qty || 0),
+          0
+        ),
+        totalBillDiscount: parseFloat(row.discount) || 0,
+        finalTotalDiscount:
+          products.reduce(
+            (sum, p) => sum + (p.discount || 0) * (p.qty || 0),
+            0
+          ) + (parseFloat(row.discount) || 0),
+        taxAmount: parseFloat(row.tax_amount) || 0,
+        grandTotalBeforeAdjustments: parseFloat(row.subtotal) || 0,
+        finalTotal: parseFloat(row.total_amount) || 0,
+      };
+
+      const customerInfo = {
+        name: row.customer_name || "Walk-in Customer",
+        mobile: row.customer_phone || "",
+        bill_number: row.bill_number || "",
+        userId: "U-1",
+      };
+
+      setBillPrintData({
+        initialProducts: products,
+        initialBillDiscount: parseFloat(row.discount) || 0,
+        initialTax: parseFloat(row.tax_amount) || 0,
+        initialShipping: 0,
+        initialTotals: totals,
+        initialCustomerInfo: customerInfo,
+      });
+      setShowBillPrintModal(true);
+    } else {
+      setInvoiceDataForPreview({
+        customer: {
+          name: row.customer_name,
+          address: row.customer_address || "N/A",
+          phone: row.customer_phone || "N/A",
+          email: row.customer_email || "N/A",
+        },
+        items: (Array.isArray(row.items) ? row.items : []).map((item) => ({
+          id: item.id || null,
+          description:
+            row.type === "sale"
+              ? item.product_name || "N/A"
+              : item.description || "N/A",
+          quantity: item.quantity || item.qty || 0,
+          unit_price: item.unit_price || item.sales_price || 0,
+          discountAmount: item.discount || item.discount_amount || 0,
+          discountPercentage: item.discount_percentage || 0,
+          total:
+            item.total ||
+            item.quantity * (item.unit_price || item.sales_price) ||
+            0,
+          totalBuyingCost: item.total_buying_cost || 0,
+          freeQty: item.free_qty || 0,
+          mrp: parseFloat(item.mrp || 0),
+        })),
+        footerDetails: {
+          approvedBy: row.approved_by || "System",
+          nextApprovalTo: row.next_approval_to || "",
+          dateTime: new Date(
+            row.updated_at || row.created_at || Date.now()
+          ).toLocaleString(),
+        },
+        subtotal: Number(row.subtotal) || 0,
+        tax: Number(row.tax_amount) || 0,
+        discount: Number(row.discount) || 0,
+        total: Number(row.total_amount) || 0,
+        amountPaid: Number(row.purchase_amount) || 0,
+        balance: Number(row.balance) || 0,
+        invoice: {
+          no: row.bill_number,
+          date: row.invoice_date
+            ? new Date(row.invoice_date).toLocaleDateString()
+            : new Date(row.created_at || Date.now()).toLocaleDateString(),
+          time:
+            row.invoice_time ||
+            new Date(
+              row.invoice_date || row.created_at || Date.now()
+            ).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+        },
+        paymentMethod: row.payment_method || "Cash",
+        status: row.status || (row.type === "sale" ? "Completed" : "Pending"),
+      });
+    }
   };
 
   const closeInvoiceModal = () => {
     setInvoiceDataForPreview(null);
   };
 
-  const handleEditSale = (row) => {
-    const mappedDataForEdit = {
-      id: row.id,
-      type: row.type,
-      invoice: {
-        no: row.bill_number,
-        date:
-          row.invoice_date?.split(" ")[0] ||
-          new Date().toISOString().split("T")[0],
-        time:
-          row.invoice_time ||
-          new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          }),
-      },
-      customer: {
-        id: row.customer_id || null,
-        name:
-          row.customer_name ||
-          (row.type === "sale" ? "Walk-in Customer" : "Unknown Customer"),
-        address: row.customer_address || "",
-        phone: row.customer_phone || "",
-        email: row.customer_email || "",
-      },
-      items: (Array.isArray(row.items) ? row.items : []).map((item) => {
-        const qty = parseFloat(item.quantity || item.qty || 1);
-        const unitPrice = parseFloat(item.unit_price || item.sales_price || 0);
-        return {
-          id: item.id || null,
-          productId: item.product_id || null,
-          description:
-            row.type === "sale"
-              ? item.product_name || ""
-              : item.description || "",
-          qty,
-          unitPrice,
-          salesPrice: unitPrice,
-          buyingCost: parseFloat(
-            item.buying_cost || item.total_buying_cost / qty || 0
-          ),
-          discountAmount: parseFloat(
-            item.discount || item.discount_amount || 0
-          ),
-          discountPercentage: parseFloat(item.discount_percentage || 0),
-          total: parseFloat(item.total || qty * unitPrice) || 0,
-          totalBuyingCost: parseFloat(item.total_buying_cost || 0),
-        };
-      }),
-      purchaseDetails: {
-        method: row.payment_method || "cash",
-        amount: row.purchase_amount || 0,
-        taxPercentage:
-          row.tax_amount && row.subtotal
-            ? (row.tax_amount / row.subtotal) * 100
-            : 0,
-      },
-      status: row.status || (row.type === "sale" ? "Completed" : "Pending"),
-    };
-    console.log(
-      "Mapped Data for Edit:",
-      JSON.stringify(mappedDataForEdit, null, 2)
-    );
-    setInvoiceToEdit(mappedDataForEdit);
-    setShowEditInvoiceModal(true);
+  const closeBillPrintModal = () => {
+    setShowBillPrintModal(false);
+    setBillPrintData(null);
   };
 
-  const handleCancelEditInvoice = () => {
-    setShowEditInvoiceModal(false);
-    setInvoiceToEdit(null);
+  const handleEditSale = (row) => {
+    if (row.type === "sale") {
+      // Prepare data for POSForm
+      const products = (Array.isArray(row.items) ? row.items : []).map(
+        (item, index) => ({
+          product_id: item.product_id || null,
+          product_name: item.product_name || "Unknown Product",
+          item_code: item.item_code || `ITEM-${index + 1}`,
+          barcode: item.barcode || "",
+          category_name: item.category_name || "Unknown Category",
+          sales_price: parseFloat(item.unit_price) || 0,
+          wholesale_price:
+            parseFloat(item.wholesale_price) ||
+            parseFloat(item.unit_price) ||
+            0,
+          mrp: parseFloat(item.mrp) || 0,
+          stock: parseFloat(item.stock) || 0,
+          qty: parseFloat(item.quantity) || 1,
+          price: parseFloat(item.unit_price) || 0,
+          discount: parseFloat(item.discount) || 0,
+          total:
+            parseFloat(item.total) ||
+            (parseFloat(item.unit_price) || 0) *
+              (parseFloat(item.quantity) || 1),
+          serialNumber: index + 1,
+        })
+      );
+
+      const totals = {
+        totalQty: products.reduce((sum, p) => sum + (p.qty || 0), 0),
+        subTotalMRP: products.reduce(
+          (sum, p) => sum + (p.mrp || 0) * (p.qty || 0),
+          0
+        ),
+        totalItemDiscounts: products.reduce(
+          (sum, p) => sum + (p.discount || 0) * (p.qty || 0),
+          0
+        ),
+        totalBillDiscount: parseFloat(row.discount) || 0,
+        finalTotalDiscount:
+          products.reduce(
+            (sum, p) => sum + (p.discount || 0) * (p.qty || 0),
+            0
+          ) + (parseFloat(row.discount) || 0),
+        taxAmount: parseFloat(row.tax_amount) || 0,
+        grandTotalBeforeAdjustments: parseFloat(row.subtotal) || 0,
+        finalTotal: parseFloat(row.total_amount) || 0,
+      };
+
+      const customerInfo = {
+        name: row.customer_name || "Walk-in Customer",
+        mobile: row.customer_phone || "",
+        bill_number: row.bill_number || "",
+        userId: "U-1",
+      };
+
+      setSaleToEdit({
+        id: row.id,
+        initialProducts: products,
+        initialBillDiscount: parseFloat(row.discount) || 0,
+        initialTax: parseFloat(row.tax_amount) || 0,
+        initialShipping: 0,
+        initialTotals: totals,
+        initialCustomerInfo: customerInfo,
+        payment_type: row.payment_method || "Cash",
+        received_amount: parseFloat(row.purchase_amount) || 0,
+        balance_amount: parseFloat(row.balance) || 0,
+      });
+      setShowEditSaleModal(true);
+    } else {
+      // Existing logic for invoices
+      const mappedDataForEdit = {
+        id: row.id,
+        type: row.type,
+        invoice: {
+          no: row.bill_number,
+          date:
+            row.invoice_date?.split(" ")[0] ||
+            new Date().toISOString().split("T")[0],
+          time:
+            row.invoice_time ||
+            new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }),
+        },
+        customer: {
+          id: row.customer_id || null,
+          name:
+            row.customer_name ||
+            (row.type === "sale" ? "Walk-in Customer" : "Unknown Customer"),
+          address: row.customer_address || "",
+          phone: row.customer_phone || "",
+          email: row.customer_email || "",
+        },
+        items: (Array.isArray(row.items) ? row.items : []).map((item) => {
+          const qty = parseFloat(item.quantity || item.qty || 1);
+          const unitPrice = parseFloat(
+            item.unit_price || item.sales_price || 0
+          );
+          return {
+            id: item.id || null,
+            productId: item.product_id || null,
+            description:
+              row.type === "sale"
+                ? item.product_name || ""
+                : item.description || "",
+            qty,
+            unitPrice,
+            salesPrice: unitPrice,
+            buyingCost: parseFloat(
+              item.buying_cost || item.total_buying_cost / qty || 0
+            ),
+            discountAmount: parseFloat(
+              item.discount || item.discount_amount || 0
+            ),
+            discountPercentage: parseFloat(item.discount_percentage || 0),
+            total: parseFloat(item.total || qty * unitPrice) || 0,
+            totalBuyingCost: parseFloat(item.total_buying_cost || 0),
+          };
+        }),
+        purchaseDetails: {
+          method: row.payment_method || "cash",
+          amount: row.purchase_amount || 0,
+          taxPercentage:
+            row.tax_amount && row.subtotal
+              ? (row.tax_amount / row.subtotal) * 100
+              : 0,
+        },
+        status: row.status || (row.type === "sale" ? "Completed" : "Pending"),
+      };
+      console.log(
+        "Mapped Data for Edit (Invoice):",
+        JSON.stringify(mappedDataForEdit, null, 2)
+      );
+      setInvoiceToEdit(mappedDataForEdit);
+      setShowEditInvoiceModal(true);
+    }
+  };
+
+  const handleCancelEditSale = () => {
+    setShowEditSaleModal(false);
+    setSaleToEdit(null);
+  };
+
+  const handleUpdateSale = async (formData) => {
+    // Map POSForm data to SaleController's expected format
+    const updatedSaleData = {
+      customer_name: formData.customerInfo.name || "Walk-in Customer",
+      customer_phone: formData.customerInfo.mobile || "",
+      bill_number: formData.customerInfo.bill_number,
+      subtotal: parseFloat(formData.totals.grandTotalBeforeAdjustments) || 0,
+      discount: parseFloat(formData.totals.totalBillDiscount) || 0,
+      tax: parseFloat(formData.totals.taxAmount) || 0,
+      total: parseFloat(formData.totals.finalTotal) || 0,
+      payment_type: formData.payment_type || "Cash",
+      received_amount: parseFloat(formData.received_amount) || 0,
+      balance_amount: parseFloat(formData.balance_amount) || 0,
+      items: formData.products.map((product) => ({
+        product_name: product.product_name,
+        quantity: parseFloat(product.qty) || 1,
+        mrp: parseFloat(product.mrp) || 0,
+        unit_price: parseFloat(product.price) || 0,
+        discount: parseFloat(product.discount) || 0,
+        total: parseFloat(product.total) || 0,
+      })),
+    };
+
+    // Call the existing update API function
+    await handleUpdateInvoiceApiCall(updatedSaleData, formData.id, "sale");
   };
 
   const handleCancelCreateInvoice = () => {
@@ -553,7 +737,26 @@ const SalesReport = () => {
           onUpdateInvoice={(data, id) =>
             handleUpdateInvoiceApiCall(data, id, invoiceToEdit.type)
           }
-          onCancel={handleCancelEditInvoice}
+          onCancel={() => {
+            setShowEditInvoiceModal(false);
+            setInvoiceToEdit(null);
+          }}
+          isEditMode={true}
+        />
+      )}
+
+      {showEditSaleModal && saleToEdit && (
+        <POSForm
+          initialProducts={saleToEdit.initialProducts}
+          initialBillDiscount={saleToEdit.initialBillDiscount}
+          initialTax={saleToEdit.initialTax}
+          initialShipping={saleToEdit.initialShipping}
+          initialTotals={saleToEdit.initialTotals}
+          initialCustomerInfo={saleToEdit.initialCustomerInfo}
+          onSubmit={(formData) =>
+            handleUpdateSale({ ...formData, id: saleToEdit.id })
+          }
+          onCancel={handleCancelEditSale}
           isEditMode={true}
         />
       )}
@@ -964,7 +1167,8 @@ const SalesReport = () => {
                                           <tr key={item.id || i}>
                                             <td className="px-2 py-1 font-medium text-gray-900 dark:text-white">
                                               {row.type === "sale"
-                                                ? item.product_name || "N/A"
+                                                ? item.product_name ||
+                                                  "Unknown Product"
                                                 : item.description || "N/A"}
                                             </td>
                                             <td className="px-2 py-1 text-center text-gray-600 dark:text-gray-300">
@@ -1014,12 +1218,9 @@ const SalesReport = () => {
       {invoiceDataForPreview && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-sm animate-fade-in">
           <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-lg shadow-xl dark:bg-gray-800 flex flex-col">
-            <div className="flex items-center justify-between flex-shrink-0 p-4 border-b dark:border-gray-700">
+            <div className="flex items-center justify-between flex-shrink-0 p-4 border-bed dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {invoiceDataForPreview?.invoice?.no.includes("INV")
-                  ? "Invoice"
-                  : "Sale"}{" "}
-                Preview (#{invoiceDataForPreview?.invoice?.no})
+                Invoice Preview (#{invoiceDataForPreview?.invoice?.no})
               </h3>
               <button
                 onClick={closeInvoiceModal}
@@ -1060,6 +1261,18 @@ const SalesReport = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showBillPrintModal && billPrintData && (
+        <BillPrintModal
+          initialProducts={billPrintData.initialProducts}
+          initialBillDiscount={billPrintData.initialBillDiscount}
+          initialTax={billPrintData.initialTax}
+          initialShipping={billPrintData.initialShipping}
+          initialTotals={billPrintData.initialTotals}
+          initialCustomerInfo={billPrintData.initialCustomerInfo}
+          onClose={closeBillPrintModal}
+        />
       )}
     </div>
   );

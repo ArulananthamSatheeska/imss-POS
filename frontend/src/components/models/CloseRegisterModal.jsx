@@ -1,3 +1,4 @@
+// models/CloseRegisterModal.jsx
 import React, { useState } from "react";
 import logo from "./LOGO-01.png";
 import { X, Check } from "lucide-react";
@@ -5,13 +6,13 @@ import { X, Check } from "lucide-react";
 const CloseRegisterModal = ({
     isOpen,
     onClose,
-    closingDetails,
+    closingDetails = {},
     onConfirmClose,
     user,
 }) => {
     const closingTime = new Date().toLocaleString();
-    const [inCashierAmount, setInCashierAmount] = useState(closingDetails.inCashierAmount);
-    const [otherAmount, setOtherAmount] = useState(closingDetails.otherAmount);
+    const [inCashierAmount, setInCashierAmount] = useState(closingDetails.inCashierAmount ?? '');
+    const [otherAmount, setOtherAmount] = useState(closingDetails.otherAmount ?? '');
 
     if (!isOpen) return null;
 
