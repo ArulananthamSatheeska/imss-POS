@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use Throwable;
 
+
 class SalesInvoiceController extends Controller
 {
     public function index(): JsonResponse

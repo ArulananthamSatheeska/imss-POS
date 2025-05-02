@@ -23,7 +23,8 @@ use App\Http\Controllers\{
     PurchaseController,
     PurchaseReturnController,
     RawMaterialController,
-    SalesInvoiceController
+    SalesInvoiceController,
+    SalesReturnController
 };
 
 
@@ -184,3 +185,12 @@ Route::get('/purchase-returns/{id}', [PurchaseReturnController::class, 'show']);
 Route::put('/purchase-returns/{id}', [PurchaseReturnController::class, 'update']);
 // routes/api.php
 Route::delete('/purchase-returns/{id}', [PurchaseReturnController::class, 'destroy']);
+
+
+Route::get('/products', [ProductController::class, 'index']);
+
+// Invoices endpoint
+Route::get('/invoices', [SalesInvoiceController::class, 'index']);
+
+// Sales Returns resource routes
+Route::resource('sales-returns', SalesReturnController::class)->except(['create', 'edit']);
