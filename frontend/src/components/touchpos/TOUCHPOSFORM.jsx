@@ -24,6 +24,7 @@ import BillPrintModal from "../models/BillPrintModel.jsx";
 import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
+import HeldSalesList from "../pos/HeldSalesList";  // Import HeldSalesList component
 
 // Helper Function to Apply Discount Schemes
 const applyDiscountScheme = (product, saleType, schemes) => {
@@ -147,6 +148,88 @@ const TOUCHPOSFORM = () => {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [filterError, setFilterError] = useState(null); // For filter error messages
+
+  const terminalId = "T-1"; // Default terminal ID
+  const userId = 1; // Default user ID
+
+  // Load held sales from backend API
+  const loadHeldSales = useCallback(async () => {
+    setLoadingHeldSales(true);
+    try {
+      const response = await axios.get("/api/holds", {
+        params: { terminal_id: terminalId, status: "held" },
+      });
+      if (response.data.status === "success") {
+        setHeldSales(response.data.data);
+      } else {
+        alert("Failed to load held sales: " + (response.data.message || "Unknown error"));
+        setHeldSales([]);
+      }
+    } catch (error) {
+      console.error("Error loading held sales:", error);
+      setHeldSales([]);
+    } finally {
+      setLoadingHeldSales(false);
+    }
+  }, [terminalId]);
+
+  // Open held sales list modal
+  const openHeldSalesList = () => {
+    loadHeldSales();
+    setShowHeldSalesList(true);
+  };
+
+  // Close held sales list modal
+  const closeHeldSalesList = () => {
+    setShowHeldSalesList(false);
+  };
+
+  // Recall a held sale by hold_id
+  const recallHeldSale = async (hold_id) => {
+    try {
+      const response = await axios.post(`/api/holds/${hold_id}/recall`);
+      if (response.data.status === "success") {
+        const sale = response.data.data;
+        setProducts(sale.products || []);
+        setTax(sale.tax || 0);
+        setBillDiscount(sale.billDiscount || 0);
+        setShipping(sale.shipping || 0);
+        setSaleType(sale.saleType || "Retail");
+        setCustomerInfo(sale.customerInfo || { name: "", mobile: "", bill_number: "", userId: "U-1", receivedAmount: 0 });
+        setBillNumber(sale.billNumber || "");
+        // Remove recalled sale from heldSales list immediately
+        setHeldSales((prevHeldSales) => prevHeldSales.filter(s => s.hold_id !== hold_id));
+        setShowHeldSalesList(false);
+        alert(`Recalled sale with ID: ${hold_id}`);
+      } else {
+        alert("Failed to recall sale: " + (response.data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error recalling sale:", error);
+      alert("Failed to recall sale. Check console for details.");
+    }
+  };
+
+  // Delete a held sale by hold_id
+  const deleteHeldSale = async (hold_id) => {
+    try {
+      const response = await axios.delete(`/api/holds/${hold_id}`);
+      if (response.data.status === "success") {
+        alert("Held sale deleted successfully");
+        loadHeldSales();
+      } else {
+        alert("Failed to delete held sale: " + (response.data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error deleting held sale:", error);
+      alert("Failed to delete held sale. Check console for details.");
+    }
+  };
+
+  // New states for held sales
+  const [heldSales, setHeldSales] = useState([]);
+  const [loadingHeldSales, setLoadingHeldSales] = useState(false);
+  const [showHeldSalesList, setShowHeldSalesList] = useState(false);
 
   // Category and brand states
   const [categories, setCategories] = useState([]);
@@ -603,49 +686,7 @@ const TOUCHPOSFORM = () => {
     }
   };
 
-  // Hold Sale
-  const holdSale = useCallback(() => {
-    if (products.length === 0) {
-      alert("Cannot hold an empty sale.");
-      return;
-    }
-    const currentTotals = calculateTotals();
-    const saleId = `HELD-${Date.now()}`;
-    const saleData = {
-      saleId,
-      products,
-      totals: currentTotals,
-      tax,
-      billDiscount,
-      shipping,
-      saleType,
-      customerInfo,
-      billNumber,
-      heldAt: new Date().toISOString(),
-    };
-    try {
-      const heldSales = JSON.parse(localStorage.getItem("heldSales") || "[]");
-      heldSales.push(saleData);
-      localStorage.setItem("heldSales", JSON.stringify(heldSales));
-      alert(`Sale held with ID: ${saleId}. Use 'View Hold List' to retrieve.`);
-      resetPOS(false);
-      loadHeldSales();
-    } catch (error) {
-      console.error("Error holding sale:", error);
-      alert("Failed to hold sale. Check console for details.");
-    }
-  }, [
-    products,
-    calculateTotals,
-    tax,
-    billDiscount,
-    shipping,
-    saleType,
-    customerInfo,
-    billNumber,
-  ]);
-
-  // Reset POS
+  // First declare resetPOS before holdSale
   const resetPOS = useCallback(
     (fetchNewBill = true) => {
       setProducts([]);
@@ -684,6 +725,40 @@ const TOUCHPOSFORM = () => {
     },
     [items]
   );
+  const holdSale = useCallback(async () => {
+    if (products.length === 0) {
+      alert("Cannot hold an empty sale.");
+      return;
+    }
+    const currentTotals = calculateTotals();
+    const saleData = {
+      products,
+      totals: currentTotals,
+      tax,
+      billDiscount,
+      shipping,
+      saleType,
+      customerInfo,
+      billNumber,
+    };
+    try {
+      const response = await axios.post("/api/holds", {
+        terminal_id: "T-1",
+        user_id: 1,
+        sale_data: saleData,
+      });
+      if (response.data.status === "success") {
+        alert(`Sale held successfully with ID: ${response.data.data.hold_id}`);
+        resetPOS(false);
+        loadHeldSales();
+      } else {
+        alert("Failed to hold sale: " + (response.data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error holding sale:", error);
+      alert("Failed to hold sale. Check console for details.");
+    }
+  }, [products, calculateTotals, tax, billDiscount, shipping, saleType, customerInfo, billNumber, resetPOS, loadHeldSales]);
 
   // Open Bill Modal
   const handleOpenBill = useCallback(() => {
@@ -758,6 +833,16 @@ const TOUCHPOSFORM = () => {
                 Wholesale
               </button>
             </div>
+            {/* Add HeldSalesList modal here */}
+            {showHeldSalesList && (
+              <HeldSalesList
+                heldSales={heldSales}
+                loading={loadingHeldSales}
+                onRecall={recallHeldSale}
+                onDelete={deleteHeldSale}
+                onClose={closeHeldSalesList}
+              />
+            )}
           </div>
 
           {/* Bill Table */}
@@ -1047,7 +1132,7 @@ const TOUCHPOSFORM = () => {
           <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4">
             <button
               className="p-2 sm:p-3 bg-blue-500 text-white rounded-lg"
-              onClick={() => alert("Feature Coming Soon")}
+              onClick={openHeldSalesList}
             >
               <ClipboardList size={20} className="sm:w-7 sm:h-7" />
             </button>
@@ -1088,8 +1173,8 @@ const TOUCHPOSFORM = () => {
                 <button
                   key={category.id}
                   className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category.name
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onClick={() => {
                     setSelectedCategory(category.name);
@@ -1115,8 +1200,8 @@ const TOUCHPOSFORM = () => {
                 <button
                   key={brand.id}
                   className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand.name
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200"
                     }`}
                   onClick={() => {
                     setSelectedBrand(brand.name);
@@ -1164,12 +1249,12 @@ const TOUCHPOSFORM = () => {
                 <div
                   key={item.id}
                   className={`
-                    relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer 
-                    border-4 border-black  
+                    relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer
+                    border-4 border-black
                     ${categoryColors[item.category_name] ||
                     "bg-gradient-to-br from-gray-50 to-gray-100"
                     }
-                    hover:shadow-xl hover:border-purple-800 
+                    hover:shadow-xl hover:border-purple-800
                     active:scale-95 transition-all duration-200
                     flex flex-col justify-between min-h-[140px] sm:min-h-[160px]
                   `}

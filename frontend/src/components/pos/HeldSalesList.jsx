@@ -97,7 +97,7 @@ const HeldSalesList = ({ heldSales, onRecall, onDelete, onClose, loading }) => {
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                             {heldSales.map((sale) => (
                                                 <tr
-                                                    key={sale.hold_id}
+                                                    key={`${sale.hold_id}-${sale.heldAt || sale.created_at || sale.createdAt}`}
                                                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150"
                                                 >
                                                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
