@@ -300,17 +300,23 @@ const POSForm = () => {
             }
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (numSearchResults > 0 && selectedSearchIndex >= 0) {
-                handleItemSelection(searchResults[selectedSearchIndex]);
-            } else if (selectedProduct && quantityInputRef.current && document.activeElement === quantityInputRef.current) {
+            if (document.activeElement === searchInputRef.current) {
+                if (numSearchResults > 0 && selectedSearchIndex >= 0) {
+                    handleItemSelection(searchResults[selectedSearchIndex]);
+                } else if (selectedProduct) {
+                    // Move focus to quantity input if product selected
+                    quantityInputRef.current?.focus();
+                    quantityInputRef.current?.select();
+                } else {
+                    console.log("Product not found or not selected.");
+                }
+            } else if (document.activeElement === quantityInputRef.current) {
                 const currentQuantity = parseFloat(quantity || 0);
-                 if (currentQuantity > 0) {
+                if (currentQuantity > 0) {
                     addProductToTable();
-                 } else {
+                } else {
                     alert("Please enter a valid quantity.");
-                 }
-            } else if (searchInputRef.current && document.activeElement === searchInputRef.current && !selectedProduct && numSearchResults === 0 && searchQuery.trim() !== "") {
-                 console.log("Product not found or not selected.");
+                }
             }
         }
     };
