@@ -25,6 +25,8 @@ import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
 import HeldSalesList from "../pos/HeldSalesList";  // Import HeldSalesList component
+import { useRegister } from "../../hooks/useRegister";
+import RegisterModal from "../models/registerModel.jsx";
 
 // Helper Function to Apply Discount Schemes
 const applyDiscountScheme = (product, saleType, schemes) => {
@@ -148,9 +150,29 @@ const TOUCHPOSFORM = () => {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [filterError, setFilterError] = useState(null); // For filter error messages
-
+  const [user, setUser] = useState(null); // User state for authentication
   const terminalId = "T-1"; // Default terminal ID
   const userId = 1; // Default user ID
+
+  const {
+    isRegisterOpen,
+    showRegisterModal,
+    isClosingRegister,
+    setShowRegisterModal,
+    openRegister,
+    closeRegister,
+    handleLogoutClick,
+    cashOnHand,
+    setCashOnHand
+  } = useRegister(user);
+
+  const handleLogout = () => {
+    const canLogout = handleLogoutClick();
+    if (canLogout) {
+      // Perform actual logout
+      navigate("/login");
+    }
+  };
 
   // Load held sales from backend API
   const loadHeldSales = useCallback(async () => {
@@ -364,6 +386,17 @@ const TOUCHPOSFORM = () => {
         setLoadingBrands(false);
       });
   }, []);
+
+  const calculateClosingDetails = () => {
+    const totals = calculateTotals();
+    return {
+      salesAmount: totals.finalTotal,
+      totalSalesQty: totals.totalQty,
+      cashOnHand: cashOnHand,
+      inCashierAmount: 0, // Will be filled by user
+      otherAmount: 0 // Will be filled by user
+    };
+  };
 
   // Fetch Active Discount Schemes
   useEffect(() => {
@@ -1346,6 +1379,21 @@ const TOUCHPOSFORM = () => {
           </button>
         </Notification>
       )}
+
+    // Fix the register modal rendering
+      {showRegisterModal && (
+        <RegisterModal
+          isOpen={showRegisterModal}
+          onClose={() => setShowRegisterModal(false)}
+          onConfirm={isClosingRegister ? closeRegister : openRegister}
+          cashOnHand={cashOnHand}
+          setCashOnHand={setCashOnHand}
+          user={user}
+          isClosing={isClosingRegister}
+          closingDetails={calculateClosingDetails()} // Add this function
+        />
+      )}
+
     </div>
   );
 };
