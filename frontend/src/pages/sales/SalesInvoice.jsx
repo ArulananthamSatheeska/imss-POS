@@ -9,7 +9,20 @@ import Select from "react-select";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-// ErrorBoundary remains unchanged
+// Helper function to check if invoice date is within discount scheme period
+const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
+  try {
+    const invDate = new Date(invoiceDate);
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    return (!start || invDate >= start) && (!end || invDate <= end);
+  } catch (e) {
+    console.error('Error checking date within scheme:', e);
+    return false;
+  }
+};
+
+// ErrorBoundary
 class ErrorBoundary extends React.Component {
   state = { hasError: false };
   static getDerivedStateFromError() {
@@ -72,23 +85,23 @@ const SalesInvoice = ({
           hour12: false,
         }),
       },
-      customer: { id: null, name: "", address: "", phone: "", email: "" },
-      items: [
-        {
-          id: Date.now(),
-          description: "",
-          qty: 1,
-          unitPrice: 0,
-          salesPrice: 0,
-          discountAmount: 0,
-          discountPercentage: 0,
-          total: 0,
-          totalBuyingCost: 0,
-          productId: null,
-        },
-      ],
-      purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
-      status: "pending",
+      customer: { id: null, name: '', address: '', phone: '', email: '' },
+      items: [{
+        id: Date.now(),
+        description: '',
+        qty: 1,
+        unitPrice: 0,
+        salesPrice: 0,
+        discountAmount: 0,
+        discountPercentage: 0,
+        specialDiscount: 0,
+        total: 0,
+        totalBuyingCost: 0,
+        productId: null,
+        categoryId: null,
+      }],
+      purchaseDetails: { method: 'cash', amount: 0, taxPercentage: 0 },
+      status: 'pending',
       id: null,
     };
 
@@ -122,22 +135,14 @@ const SalesInvoice = ({
             ...item,
             id: item.id || Date.now() + idx,
             productId: item.productId || item.product_id || null,
+            categoryId: item.categoryId || null,
             qty,
             unitPrice,
             salesPrice,
             buyingCost,
-            discountAmount: parseFloat(
-              item.discountAmount ||
-                item.discount_amount ||
-                unitPrice * qty - salesPrice * qty
-            ),
-            discountPercentage: parseFloat(
-              item.discountPercentage ||
-                item.discount_percentage ||
-                (unitPrice > 0
-                  ? ((unitPrice - salesPrice) / unitPrice) * 100
-                  : 0)
-            ),
+            discountAmount: parseFloat(item.discountAmount || item.discount_amount || 0),
+            discountPercentage: parseFloat(item.discountPercentage || item.discount_percentage || 0),
+            specialDiscount: parseFloat(item.specialDiscount || 0),
             total: parseFloat(item.total || qty * salesPrice),
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
@@ -177,19 +182,14 @@ const SalesInvoice = ({
             ...item,
             id: item.id || Date.now() + idx,
             productId: item.productId || null,
+            categoryId: item.categoryId || null,
             qty,
             unitPrice,
             salesPrice,
             buyingCost,
-            discountAmount: parseFloat(
-              item.discountAmount || unitPrice * qty - salesPrice * qty
-            ),
-            discountPercentage: parseFloat(
-              item.discountPercentage ||
-                (unitPrice > 0
-                  ? ((unitPrice - salesPrice) / unitPrice) * 100
-                  : 0)
-            ),
+            discountAmount: parseFloat(item.discountAmount || 0),
+            discountPercentage: parseFloat(item.discountPercentage || 0),
+            specialDiscount: parseFloat(item.specialDiscount || 0),
             total: parseFloat(item.total || qty * salesPrice),
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
@@ -212,34 +212,45 @@ const SalesInvoice = ({
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [discountSchemes, setDiscountSchemes] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(false);
 
+  // Fetch data
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/api/products");
-        setProducts(response.data.data || []);
-      } catch {
-        toast.error("Failed to load products.");
-      }
-    };
-    fetchProducts();
-  }, []);
+        const [productsResponse, customersResponse, categoriesResponse, schemesResponse] = await Promise.all([
+          axios.get('http://127.0.0.1:8000/api/products'),
+          axios.get('http://127.0.0.1:8000/api/customers'),
+          axios.get('http://127.0.0.1:8000/api/categories'),
+          axios.get('http://127.0.0.1:8000/api/discount-schemes'),
+        ]);
 
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      setCustomersLoading(true);
-      try {
-        const response = await axios.get("http://127.0.0.1:8000/api/customers");
-        setCustomers(response.data.data || []);
-      } catch {
-        toast.error("Failed to load customers.");
+        console.log('Raw Discount Schemes Response:', schemesResponse.data);
+        setProducts(productsResponse.data.data || []);
+        setCustomers(customersResponse.data.data || []);
+        setCategories(categoriesResponse.data || []);
+        setDiscountSchemes(schemesResponse.data.data || schemesResponse.data || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load data. Check console for details.');
       } finally {
         setCustomersLoading(false);
       }
     };
-    fetchCustomers();
+    fetchData();
   }, []);
+
+  // Recalculate special discounts when discountSchemes change
+  useEffect(() => {
+    if (discountSchemes.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        items: prev.items.map((item) => updateItemTotal(item, prev.invoice.date)),
+      }));
+    }
+  }, [discountSchemes, products, categories]);
 
   useEffect(() => {
     itemRefs.current = formData.items.map((_, index) => ({
@@ -247,6 +258,7 @@ const SalesInvoice = ({
       qty: { current: null },
       discountAmount: { current: null },
       discountPercentage: { current: null },
+      specialDiscount: { current: null },
     }));
   }, [formData.items.length]);
 
@@ -261,45 +273,114 @@ const SalesInvoice = ({
     }
   }, [formData, isEditMode]);
 
-  const updateItemTotal = (item) => {
+  // Calculate special discount based on product description or category
+  const calculateSpecialDiscount = useCallback((item, invoiceDate) => {
+    if (!item.productId) {
+      console.log('No productId for item:', item);
+      return 0;
+    }
+
+    const product = products.find((p) => p.product_id === item.productId);
+    if (!product) {
+      console.log('Product not found for productId:', item.productId);
+      return 0;
+    }
+
+    const category = categories.find((c) => c.id === product.category_id);
+    const categoryName = category ? category.name : null;
+    const qty = parseFloat(item.qty) || 1;
+    const salesPrice = parseFloat(item.salesPrice) || 0;
+    const totalAmount = qty * salesPrice;
+
+    console.log('Calculating special discount for:', {
+      productId: product.product_id,
+      productName: product.product_name,
+      productDescription: product.description,
+      categoryName,
+      qty,
+      salesPrice,
+      totalAmount,
+      discountSchemesCount: discountSchemes.length,
+    });
+
+    const applicableScheme = discountSchemes.find((scheme) => {
+      if (!scheme.active || !isDateWithinScheme(invoiceDate, scheme.start_date, scheme.end_date)) {
+        console.log('Scheme not active or out of date range:', scheme);
+        return false;
+      }
+      const target = scheme.target?.trim().toLowerCase();
+      // For product, match target with product.description or product_name as fallback
+      const productMatch = scheme.applies_to === 'product' &&
+        target === (product.description?.trim().toLowerCase() || product.product_name?.trim().toLowerCase());
+      // For category, match target with category.name
+      const categoryMatch = scheme.applies_to === 'category' && categoryName &&
+        target === categoryName?.trim().toLowerCase();
+      console.log('Checking scheme:', {
+        schemeId: scheme.id,
+        appliesTo: scheme.applies_to,
+        target,
+        productDescription: product.description,
+        productName: product.product_name,
+        categoryName,
+        productMatch,
+        categoryMatch,
+      });
+      return productMatch || categoryMatch;
+    });
+
+    if (!applicableScheme) {
+      console.log('No applicable discount scheme found for item:', item);
+      return 0;
+    }
+
+    let discount = 0;
+    if (applicableScheme.type === 'percentage') {
+      discount = (totalAmount * parseFloat(applicableScheme.value)) / 100;
+    } else if (applicableScheme.type === 'amount') {
+      discount = parseFloat(applicableScheme.value) * qty;
+    }
+
+    console.log('Applied discount:', { scheme: applicableScheme, discount });
+    return discount >= 0 ? discount : 0;
+  }, [products, categories, discountSchemes]);
+
+  // Update item totals including special discount
+  const updateItemTotal = useCallback((item, invoiceDate) => {
     const qty = parseFloat(item.qty) || 0;
     const unitPrice = parseFloat(item.unitPrice) || 0;
     const buyingCost = parseFloat(item.buyingCost) || 0;
-    let salesPrice = parseFloat(item.salesPrice) || 0;
+    let salesPrice = parseFloat(item.salesPrice) || unitPrice;
     let discountAmount = parseFloat(item.discountAmount) || 0;
     let discountPercentage = parseFloat(item.discountPercentage) || 0;
 
-    // If discountPercentage is provided, calculate discountAmount and salesPrice
-    if (
-      item.discountPercentage !== undefined &&
-      item.discountPercentage !== ""
-    ) {
-      discountPercentage =
-        discountPercentage >= 0 && discountPercentage <= 100
-          ? discountPercentage
-          : 0;
+    // Calculate discount from percentage or amount
+    if (item.discountPercentage !== undefined && item.discountPercentage !== '') {
+      discountPercentage = discountPercentage >= 0 && discountPercentage <= 100 ? discountPercentage : 0;
       discountAmount = (unitPrice * qty * discountPercentage) / 100;
-      salesPrice = unitPrice - discountAmount / qty;
-    }
-    // If discountAmount is provided, calculate discountPercentage and salesPrice
-    else if (item.discountAmount !== undefined && item.discountAmount !== "") {
+      salesPrice = unitPrice - (discountAmount / qty);
+    } else if (item.discountAmount !== undefined && item.discountAmount !== '') {
       discountAmount = discountAmount >= 0 ? discountAmount : 0;
       discountPercentage =
         unitPrice > 0 ? (discountAmount / (unitPrice * qty)) * 100 : 0;
       salesPrice = unitPrice - discountAmount / qty;
     }
+
+    // Calculate special discount
+    const specialDiscount = calculateSpecialDiscount(item, invoiceDate);
+
+    // Calculate total after applying discounts
+    const total = qty * (salesPrice >= 0 ? salesPrice : 0) - specialDiscount;
+
     return {
       ...item,
       salesPrice: salesPrice >= 0 ? salesPrice : 0,
       discountAmount: discountAmount >= 0 ? discountAmount : 0,
-      discountPercentage:
-        discountPercentage >= 0 && discountPercentage <= 100
-          ? discountPercentage
-          : 0,
-      total: qty * (salesPrice >= 0 ? salesPrice : 0),
+      discountPercentage: discountPercentage >= 0 && discountPercentage <= 100 ? discountPercentage : 0,
+      specialDiscount,
+      total: total >= 0 ? total : 0,
       totalBuyingCost: qty * buyingCost,
     };
-  };
+  }, [calculateSpecialDiscount]);
 
   const handleInputChange = (e, section, field, index = null) => {
     const { name, value } = e.target;
@@ -310,13 +391,10 @@ const SalesInvoice = ({
       const newData = { ...prev };
       if (index !== null && section === "items") {
         const newItems = [...newData.items];
-        if (targetName === "qty" || targetName === "salesPrice") {
-          processedValue = value === "" ? "" : parseFloat(value) || 0;
-          newItems[index] = {
-            ...newItems[index],
-            [targetName]: processedValue,
-          };
-          newItems[index] = updateItemTotal(newItems[index]); // Update total, totalBuyingCost, discountAmount, and discountPercentage
+        if (targetName === 'qty' || targetName === 'discountAmount' || targetName === 'discountPercentage') {
+          processedValue = value === '' ? '' : parseFloat(value) || 0;
+          newItems[index] = { ...newItems[index], [targetName]: processedValue };
+          newItems[index] = updateItemTotal(newItems[index], newData.invoice.date);
         } else {
           newItems[index] = {
             ...newItems[index],
@@ -331,10 +409,10 @@ const SalesInvoice = ({
         ) {
           processedValue = value === "" ? "" : parseFloat(value) || 0;
         }
-        newData[section] = {
-          ...newData[section],
-          [targetName]: processedValue,
-        };
+        newData[section] = { ...newData[section], [targetName]: processedValue };
+        if (section === 'invoice' && targetName === 'date') {
+          newData.items = newData.items.map((item) => updateItemTotal(item, processedValue));
+        }
       }
       return newData;
     });
@@ -384,25 +462,27 @@ const SalesInvoice = ({
       const newItems = [...prev.items];
       const qty = parseFloat(newItems[index].qty) || 1;
       const unitPrice = product ? parseFloat(product.mrp) || 0 : 0;
-      const salesPrice = product ? parseFloat(product.sales_price) || 0 : 0;
+      const salesPrice = product ? parseFloat(product.sales_price) || unitPrice : 0;
       const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
-      const discountAmount = qty * (unitPrice - salesPrice); // Discount = (MRP - Selling Price) * Quantity
-      const discountPercentage =
-        unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0;
+
       newItems[index] = {
         ...newItems[index],
         productId: product ? product.product_id : null,
-        description: product ? product.product_name : "",
+        categoryId: product ? product.category_id : null,
+        description: product ? product.product_name : '',
         unitPrice,
         salesPrice,
         buyingCost,
-        discountAmount: discountAmount >= 0 ? discountAmount : 0,
-        discountPercentage: discountPercentage >= 0 ? discountPercentage : 0,
+        discountAmount: 0,
+        discountPercentage: 0,
         totalBuyingCost: qty * buyingCost,
       };
-      newItems[index] = updateItemTotal(newItems[index]); // Update total, totalBuyingCost, discountAmount, and discountPercentage
+
+      // Update with special discount
+      newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
       return { ...prev, items: newItems };
     });
+
     setErrors((prev) => ({ ...prev, [`itemDescription${index}`]: undefined }));
     setTimeout(() => itemRefs.current[index]?.qty?.current?.focus(), 0);
   };
@@ -410,22 +490,21 @@ const SalesInvoice = ({
   const addItem = () => {
     setFormData((prev) => ({
       ...prev,
-      items: [
-        ...prev.items,
-        {
-          id: Date.now(),
-          description: "",
-          qty: 1,
-          unitPrice: 0,
-          salesPrice: 0,
-          discountAmount: 0,
-          discountPercentage: 0,
-          total: 0,
-          totalBuyingCost: 0,
-          productId: null,
-          buyingCost: 0,
-        },
-      ],
+      items: [...prev.items, {
+        id: Date.now(),
+        description: '',
+        qty: 1,
+        unitPrice: 0,
+        salesPrice: 0,
+        discountAmount: 0,
+        discountPercentage: 0,
+        specialDiscount: 0,
+        total: 0,
+        totalBuyingCost: 0,
+        productId: null,
+        buyingCost: 0,
+        categoryId: null,
+      }],
     }));
     setTimeout(
       () =>
@@ -504,6 +583,7 @@ const SalesInvoice = ({
         newErrors[`itemDiscountPercentage${idx}`] =
           "Discount percentage must be between 0 and 100";
       }
+      if (item.specialDiscount < 0) newErrors[`itemSpecialDiscount${idx}`] = 'Special discount cannot be negative';
       const product = products.find((p) => p.product_id === item.productId);
       if (
         product &&
@@ -549,6 +629,7 @@ const SalesInvoice = ({
           salesPrice: parseFloat(item.salesPrice) || 0,
           discountAmount: parseFloat(item.discountAmount) || 0,
           discountPercentage: parseFloat(item.discountPercentage) || 0,
+          specialDiscount: parseFloat(item.specialDiscount) || 0,
           total: parseFloat(item.total) || 0,
           totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
         })),
@@ -570,33 +651,25 @@ const SalesInvoice = ({
           toast.success("Invoice created!");
           localStorage.removeItem(draftKey);
           setFormData({
-            invoice: {
-              no: "",
-              date: new Date().toISOString().split("T")[0],
-              time: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              }),
-            },
-            customer: { id: null, name: "", address: "", phone: "", email: "" },
-            items: [
-              {
-                id: Date.now(),
-                description: "",
-                qty: 1,
-                unitPrice: 0,
-                salesPrice: 0,
-                discountAmount: 0,
-                discountPercentage: 0,
-                total: 0,
-                totalBuyingCost: 0,
-                productId: null,
-                buyingCost: 0,
-              },
-            ],
-            purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
-            status: "pending",
+            invoice: { no: '', date: new Date().toISOString().split('T')[0], time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) },
+            customer: { id: null, name: '', address: '', phone: '', email: '' },
+            items: [{
+              id: Date.now(),
+              description: '',
+              qty: 1,
+              unitPrice: 0,
+              salesPrice: 0,
+              discountAmount: 0,
+              discountPercentage: 0,
+              specialDiscount: 0,
+              total: 0,
+              totalBuyingCost: 0,
+              productId: null,
+              buyingCost: 0,
+              categoryId: null,
+            }],
+            purchaseDetails: { method: 'cash', amount: 0, taxPercentage: 0 },
+            status: 'pending',
             id: null,
           });
           setErrors({});
@@ -607,14 +680,10 @@ const SalesInvoice = ({
           error.response?.data?.message || "Failed to save invoice.";
         const details = error.response?.data?.errors
           ? Object.entries(error.response.data.errors)
-              .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-              .join("\n")
-          : "No detailed errors provided.";
-        console.error("API Error Details:", {
-          message,
-          details,
-          response: error.response?.data,
-        });
+              .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+              .join('\n')
+          : 'No detailed errors provided.';
+        console.error('API Error Details:', { message, details, response: error.response?.data });
         toast.error(`${message}\n${details}`);
       } finally {
         setLoading(false);
@@ -649,30 +718,11 @@ const SalesInvoice = ({
     ];
     formData.items.forEach((_, index) => {
       fields.push(
-        {
-          ref: itemRefs.current[index]?.description,
-          name: `itemDescription${index}`,
-          type: "select",
-          index,
-        },
-        {
-          ref: itemRefs.current[index]?.qty,
-          name: `itemQty${index}`,
-          type: "input",
-          index,
-        },
-        {
-          ref: itemRefs.current[index]?.discountAmount,
-          name: `itemDiscountAmount${index}`,
-          type: "input",
-          index,
-        },
-        {
-          ref: itemRefs.current[index]?.discountPercentage,
-          name: `itemDiscountPercentage${index}`,
-          type: "input",
-          index,
-        }
+        { ref: itemRefs.current[index]?.description, name: `itemDescription${index}`, type: 'select', index },
+        { ref: itemRefs.current[index]?.qty, name: `itemQty${index}`, type: 'input', index },
+        { ref: itemRefs.current[index]?.discountAmount, name: `itemDiscountAmount${index}`, type: 'input', index },
+        { ref: itemRefs.current[index]?.discountPercentage, name: `itemDiscountPercentage${index}`, type: 'input', index },
+        { ref: itemRefs.current[index]?.specialDiscount, name: `itemSpecialDiscount${index}`, type: 'input', index }
       );
     });
     fields.push(
@@ -1024,7 +1074,7 @@ const SalesInvoice = ({
                         </svg>
                       </button>
                     )}
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-14">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-16">
                       <div className="md:col-span-4">
                         <label
                           htmlFor={`itemDescription${index}`}
@@ -1207,20 +1257,24 @@ const SalesInvoice = ({
                         )}
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block mb-1 text-sm font-medium">
-                          Total Buying Cost (LKR)
-                        </label>
-                        <span className="w-full p-2.5 text-right font-medium">
-                          {(parseFloat(item.totalBuyingCost) || 0).toFixed(2)}
-                        </span>
+                        <label htmlFor={`itemSpecialDiscount${index}`} className="block mb-1 text-sm font-medium">Special Disc. (LKR)</label>
+                        <input
+                          id={`itemSpecialDiscount${index}`}
+                          ref={(el) => assignRef(index, 'specialDiscount', el)}
+                          type="number"
+                          value={item.specialDiscount}
+                          className={`w-full p-2.5 border rounded-md focus:outline-none ${errors[`itemSpecialDiscount${index}`] ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'}`}
+                          readOnly
+                        />
+                        {errors[`itemSpecialDiscount${index}`] && <p className="mt-1 text-xs text-red-600">{errors[`itemSpecialDiscount${index}`]}</p>}
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block mb-1 text-sm font-medium">
-                          Total (LKR)
-                        </label>
-                        <span className="w-full p-2.5 text-right font-medium">
-                          {(parseFloat(item.total) || 0).toFixed(2)}
-                        </span>
+                        <label className="block mb-1 text-sm font-medium">Total Buying Cost (LKR)</label>
+                        <span className="w-full p-2.5 text-right font-medium">{(parseFloat(item.totalBuyingCost) || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block mb-1 text-sm font-medium">Total (LKR)</label>
+                        <span className="w-full p-2.5 text-right font-medium">{(parseFloat(item.total) || 0).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -1252,6 +1306,10 @@ const SalesInvoice = ({
                       className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
                     >
                       <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="online">Online</option>
+                      <option value="cheque">Cheque</option>
+                      <option value="credit">Credit</option>
                       <option value="card">Card</option>
                       <option value="online">Online</option>
                       <option value="cheque">Cheque</option>
