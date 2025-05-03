@@ -5,7 +5,7 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 // Set axios base URL (should be in environment variable)
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+axios.defaults.baseURL = 'http://localhost:8000';
 
 const RegisterContext = createContext();
 
