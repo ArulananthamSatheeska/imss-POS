@@ -88,7 +88,7 @@ class PurchaseReturnController extends Controller
             'items.*.product_id' => 'required|exists:products,product_id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.buying_cost' => 'required|numeric|min:0',
-            'items.*.reason' => 'required|string|max:255',
+            'items.*.reason' => 'nullable|string|max:255',
             'refund_method' => 'required|in:cash,bank,credit',
             'remarks' => 'nullable|string|max:1000',
             'status' => 'required|in:pending,approved,rejected',
@@ -123,7 +123,7 @@ class PurchaseReturnController extends Controller
                     'product_name' => $product->product_name,
                     'quantity' => $item['quantity'],
                     'buying_cost' => $item['buying_cost'],
-                    'reason' => $item['reason'],
+                    'reason' => $item['reason'] ?: null,
                 ]);
 
                 // If status is approved, update purchase quantity
@@ -161,7 +161,7 @@ class PurchaseReturnController extends Controller
             'items.*.product_id' => 'required|exists:products,product_id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.buying_cost' => 'required|numeric|min:0',
-            'items.*.reason' => 'required|string|max:255',
+            'items.*.reason' => 'nullable|string|max:255',
             'refund_method' => 'required|in:cash,bank,credit',
             'remarks' => 'nullable|string|max:1000',
             'status' => 'required|in:pending,approved,rejected',
@@ -208,7 +208,7 @@ class PurchaseReturnController extends Controller
                     'product_name' => $product->product_name,
                     'quantity' => $item['quantity'],
                     'buying_cost' => $item['buying_cost'],
-                    'reason' => $item['reason'],
+                    'reason' => $item['reason'] ?: null,
                 ]);
 
                 // If new status is approved, update purchase quantity

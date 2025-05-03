@@ -25,7 +25,7 @@ const SalesReturn = () => {
   const [itemForm, setItemForm] = useState({
     product_id: "",
     search_query: "",
-    quantity: 1,
+    quantity: 0, // Changed initial quantity to 0
     buying_cost: 0,
     reason: "",
   });
@@ -49,16 +49,18 @@ const SalesReturn = () => {
   const buyingCostInputRef = useRef(null);
   const reasonInputRef = useRef(null);
 
-  // Auto-generate sales return number based on date and time
+  // Function to generate sales return number
+  const generateSalesReturnNumber = () => {
+    const now = new Date();
+    const dateStr = now
+      .toISOString()
+      .replace(/[-:T.]/g, "")
+      .slice(0, 14);
+    return `SR${dateStr}`;
+  };
+
+  // Set initial sales return number when not in edit mode
   useEffect(() => {
-    const generateSalesReturnNumber = () => {
-      const now = new Date();
-      const dateStr = now
-        .toISOString()
-        .replace(/[-:T.]/g, "")
-        .slice(0, 14);
-      return `SR${dateStr}`;
-    };
     if (!editMode) {
       setNewReturn((prev) => ({
         ...prev,
@@ -321,7 +323,9 @@ const SalesReturn = () => {
       ...prev,
       [name]:
         name === "quantity"
-          ? parseInt(value) || 1
+          ? parseInt(value) >= 0
+            ? parseInt(value)
+            : 0 // Ensure quantity is non-negative
           : name === "buying_cost"
           ? parseFloat(value) || 0
           : value,
@@ -431,10 +435,6 @@ const SalesReturn = () => {
       toast.error("Quantity must be greater than 0");
       return;
     }
-    if (!itemForm.reason.trim()) {
-      toast.error("Reason is required");
-      return;
-    }
     if (itemForm.buying_cost < 0) {
       toast.error("Buying cost cannot be negative");
       return;
@@ -445,7 +445,7 @@ const SalesReturn = () => {
       product_name: selectedProduct.product_name,
       quantity: itemForm.quantity,
       buying_cost: itemForm.buying_cost,
-      reason: itemForm.reason,
+      reason: itemForm.reason || null,
     };
 
     setNewReturn({
@@ -456,7 +456,7 @@ const SalesReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 1,
+      quantity: 0, // Reset quantity to 0
       buying_cost: 0,
       reason: "",
     });
@@ -485,7 +485,7 @@ const SalesReturn = () => {
           product_name: item.product_name,
           quantity: item.quantity,
           buying_cost: parseFloat(item.buying_cost),
-          reason: item.reason,
+          reason: item.reason || "",
         })),
         refundMethod: data.refund_method,
         remarks: data.remarks || "",
@@ -519,7 +519,7 @@ const SalesReturn = () => {
     setEditMode(false);
     setEditReturnId(null);
     setNewReturn({
-      salesReturnNumber: "",
+      salesReturnNumber: generateSalesReturnNumber(),
       invoiceOrBillNumber: "",
       customerName: "",
       type: "",
@@ -531,7 +531,7 @@ const SalesReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 1,
+      quantity: 0, // Reset quantity to 0
       buying_cost: 0,
       reason: "",
     });
@@ -585,32 +585,39 @@ const SalesReturn = () => {
       } else {
         response = await api.post("/sales-returns", returnData);
         toast.success("Sales return submitted successfully!");
+        // Normalize response data to match returnItems structure
+        const newReturnItem = {
+          ...response.data.data,
+          items: response.data.data.items.map((item) => ({
+            ...item,
+            buying_cost: parseFloat(item.buying_cost) || 0,
+          })),
+        };
         setReturnItems(
-          [...returnItems, response.data.data].sort((a, b) =>
+          [...returnItems, newReturnItem].sort((a, b) =>
             a.sales_return_number.localeCompare(b.sales_return_number)
           )
         );
+        // Reset form with new sales return number
+        setNewReturn({
+          salesReturnNumber: generateSalesReturnNumber(),
+          invoiceOrBillNumber: "",
+          customerName: "",
+          type: "",
+          items: [],
+          refundMethod: "cash",
+          remarks: "",
+          status: "pending",
+        });
+        setItemForm({
+          product_id: "",
+          search_query: "",
+          quantity: 0, // Reset quantity to 0
+          buying_cost: 0,
+          reason: "",
+        });
+        setInvoiceSearch("");
       }
-
-      // Reset form
-      setNewReturn({
-        salesReturnNumber: "",
-        invoiceOrBillNumber: "",
-        customerName: "",
-        type: "",
-        items: [],
-        refundMethod: "cash",
-        remarks: "",
-        status: "pending",
-      });
-      setItemForm({
-        product_id: "",
-        search_query: "",
-        quantity: 1,
-        buying_cost: 0,
-        reason: "",
-      });
-      setInvoiceSearch("");
     } catch (error) {
       const errorMsg =
         error.response?.data?.message ||
@@ -669,33 +676,6 @@ const SalesReturn = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-6 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto">
-        {/* Sales Return Dashboard */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">
-            Sales Return Dashboard
-          </h1>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns Today
-              </h2>
-              <p className="text-2xl font-bold text-blue-500">8</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns This Month
-              </h2>
-              <p className="text-2xl font-bold text-green-500">35</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns This Year
-              </h2>
-              <p className="text-2xl font-bold text-purple-500">150</p>
-            </div>
-          </div>
-        </div>
-
         {/* Sales Return Form */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
@@ -855,7 +835,8 @@ const SalesReturn = () => {
                         onKeyDown={handleQuantityKeyDown}
                         placeholder="Quantity"
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        min="1"
+                        min="0"
+                        step="1"
                         disabled={loading}
                       />
                     </div>
@@ -879,7 +860,7 @@ const SalesReturn = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                        Reason
+                        Reason (Optional)
                       </label>
                       <input
                         ref={reasonInputRef}
@@ -888,7 +869,7 @@ const SalesReturn = () => {
                         value={itemForm.reason}
                         onChange={handleItemFormChange}
                         onKeyDown={handleReasonKeyDown}
-                        placeholder="Reason"
+                        placeholder="Reason (Optional)"
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         disabled={loading}
                       />
@@ -900,8 +881,7 @@ const SalesReturn = () => {
                         disabled={
                           loading ||
                           !itemForm.product_id ||
-                          itemForm.quantity <= 0 ||
-                          !itemForm.reason.trim()
+                          itemForm.quantity <= 0
                         }
                       >
                         Add Item
@@ -942,10 +922,10 @@ const SalesReturn = () => {
                               {item.quantity}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              LKR {item.buying_cost.toFixed(2)}
+                              LKR {formatBuyingCost(item.buying_cost)}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              {item.reason}
+                              {item.reason || "N/A"}
                             </td>
                             <td className="px-4 py-2 text-sm text-red-500 cursor-pointer hover:text-red-700">
                               <button
@@ -1099,7 +1079,7 @@ const SalesReturn = () => {
                             LKR {formatBuyingCost(item.buying_cost)}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                            {item.reason}
+                            {item.reason || "N/A"}
                           </td>
                         </tr>
                       ))}
@@ -1294,7 +1274,7 @@ const SalesReturn = () => {
                                         LKR {formatBuyingCost(item.buying_cost)}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                                        {item.reason}
+                                        {item.reason || "N/A"}
                                       </td>
                                     </tr>
                                   ))}

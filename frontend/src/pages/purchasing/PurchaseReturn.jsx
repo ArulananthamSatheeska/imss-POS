@@ -21,7 +21,7 @@ const PurchaseReturn = () => {
   const [itemForm, setItemForm] = useState({
     product_id: "",
     search_query: "",
-    quantity: 1,
+    quantity: 0, // Changed initial quantity to 0
     reason: "",
     buying_cost: 0,
   });
@@ -182,7 +182,9 @@ const PurchaseReturn = () => {
       ...prev,
       [name]:
         name === "quantity"
-          ? parseInt(value) || 1
+          ? parseInt(value) >= 0
+            ? parseInt(value)
+            : 0 // Ensure quantity is non-negative
           : name === "buying_cost"
           ? parseFloat(value) || 0
           : value,
@@ -253,10 +255,6 @@ const PurchaseReturn = () => {
       toast.error("Quantity must be greater than 0");
       return;
     }
-    if (!itemForm.reason.trim()) {
-      toast.error("Reason is required");
-      return;
-    }
     if (itemForm.buying_cost < 0) {
       toast.error("Buying cost cannot be negative");
       return;
@@ -267,7 +265,7 @@ const PurchaseReturn = () => {
       product_name: selectedProduct.product_name,
       quantity: itemForm.quantity,
       buying_cost: itemForm.buying_cost,
-      reason: itemForm.reason,
+      reason: itemForm.reason || null,
     };
 
     setNewReturn({
@@ -278,7 +276,7 @@ const PurchaseReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 1,
+      quantity: 0, // Reset quantity to 0
       reason: "",
       buying_cost: 0,
     });
@@ -304,7 +302,7 @@ const PurchaseReturn = () => {
           product_name: item.product_name,
           quantity: item.quantity,
           buying_cost: parseFloat(item.buying_cost),
-          reason: item.reason,
+          reason: item.reason || "",
         })),
         refund_method: data.refund_method,
         remarks: data.remarks || "",
@@ -346,7 +344,7 @@ const PurchaseReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 1,
+      quantity: 0, // Reset quantity to 0
       reason: "",
       buying_cost: 0,
     });
@@ -395,7 +393,7 @@ const PurchaseReturn = () => {
       setItemForm({
         product_id: "",
         search_query: "",
-        quantity: 1,
+        quantity: 0, // Reset quantity to 0
         reason: "",
         buying_cost: 0,
       });
@@ -456,33 +454,6 @@ const PurchaseReturn = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-6 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto">
-        {/* Purchase Return Dashboard */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">
-            Purchase Return Dashboard
-          </h1>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns Today
-              </h2>
-              <p className="text-2xl font-bold text-blue-500">5</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns This Month
-              </h2>
-              <p className="text-2xl font-bold text-green-500">25</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns This Year
-              </h2>
-              <p className="text-2xl font-bold text-purple-500">120</p>
-            </div>
-          </div>
-        </div>
-
         {/* Purchase Return Form */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
@@ -586,7 +557,7 @@ const PurchaseReturn = () => {
                         onKeyDown={handleQuantityKeyDown}
                         placeholder="Quantity"
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        min="1"
+                        min="0"
                         step="1"
                         disabled={loading}
                       />
@@ -611,7 +582,7 @@ const PurchaseReturn = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                        Reason
+                        Reason (Optional)
                       </label>
                       <input
                         ref={reasonInputRef}
@@ -620,7 +591,7 @@ const PurchaseReturn = () => {
                         value={itemForm.reason}
                         onChange={handleItemFormChange}
                         onKeyDown={handleReasonKeyDown}
-                        placeholder="Reason"
+                        placeholder="Reason (Optional)"
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         disabled={loading}
                       />
@@ -633,7 +604,6 @@ const PurchaseReturn = () => {
                           loading ||
                           !itemForm.product_id ||
                           itemForm.quantity <= 0 ||
-                          !itemForm.reason.trim() ||
                           itemForm.buying_cost < 0
                         }
                       >
@@ -675,10 +645,10 @@ const PurchaseReturn = () => {
                               {item.quantity}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              ${formatBuyingCost(item.buying_cost)}
+                              LKR {formatBuyingCost(item.buying_cost)}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              {item.reason}
+                              {item.reason || "N/A"}
                             </td>
                             <td className="px-4 py-2 text-sm text-red-500 cursor-pointer hover:text-red-700">
                               <button
@@ -819,10 +789,10 @@ const PurchaseReturn = () => {
                             {item.quantity}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                            ${formatBuyingCost(item.buying_cost)}
+                            LKR {formatBuyingCost(item.buying_cost)}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                            {item.reason}
+                            {item.reason || "N/A"}
                           </td>
                         </tr>
                       ))}
@@ -834,7 +804,7 @@ const PurchaseReturn = () => {
                     Total Amount
                   </label>
                   <p className="text-gray-900 dark:text-gray-200">
-                    ${calculateTotalAmount(viewReturn.items)}
+                    LKR {calculateTotalAmount(viewReturn.items)}
                   </p>
                 </div>
                 <div>
@@ -896,12 +866,6 @@ const PurchaseReturn = () => {
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Supplier Name
                     </th>
-                    {/* <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                      Item
-                    </th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                      Buying Cost
-                    </th> */}
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                       Total Amount
                     </th>
@@ -939,20 +903,8 @@ const PurchaseReturn = () => {
                         <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                           {returnItem.supplier?.supplier_name || "N/A"}
                         </td>
-                        {/* <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                          {returnItem.items
-                            .map((item) => item.product_name)
-                            .join(", ") || "N/A"}
-                        </td>
                         <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                          {returnItem.items
-                            .map(
-                              (item) => `$${formatBuyingCost(item.buying_cost)}`
-                            )
-                            .join(", ") || "N/A"}
-                        </td> */}
-                        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                          ${calculateTotalAmount(returnItem.items)}
+                          LKR {calculateTotalAmount(returnItem.items)}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                           {returnItem.refund_method || "N/A"}
@@ -987,7 +939,7 @@ const PurchaseReturn = () => {
                       {expandedRows.includes(returnItem.id) && (
                         <tr>
                           <td
-                            colSpan="9"
+                            colSpan="7"
                             className="px-4 py-2 bg-gray-50 dark:bg-gray-700"
                           >
                             <div className="p-4 border border-gray-300 rounded">
@@ -1024,10 +976,10 @@ const PurchaseReturn = () => {
                                         {item.quantity}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200 border-r border-gray-300">
-                                        ${formatBuyingCost(item.buying_cost)}
+                                        LKR {formatBuyingCost(item.buying_cost)}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                                        {item.reason}
+                                        {item.reason || "N/A"}
                                       </td>
                                     </tr>
                                   ))}
