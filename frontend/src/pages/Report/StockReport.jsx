@@ -151,7 +151,6 @@ const StockReport = () => {
     const matchesCategory = categoryFilter
       ? item.category === categoryFilter
       : true;
-    // Supplier filter not applied since backend doesn't return supplier in response
     const matchesLocation = locationFilter
       ? (item.location.type + " " + item.location.identifier)
           .toLowerCase()
@@ -212,7 +211,7 @@ const StockReport = () => {
         "Product Name": item.itemName ?? "N/A",
         Category: item.category ?? "N/A",
         Unit: item.unit ?? "N/A",
-        "Opening Stock": item.openingStock ?? 0,
+        "Opening Stock": item.initialOpeningStock ?? 0, // Use initialOpeningStock
         Purchased: item.purchased ?? 0,
         Sold: item.sold ?? 0,
         "Closing Stock": item.closingStock ?? 0,
@@ -486,7 +485,8 @@ const StockReport = () => {
                       {item.unit ?? "N/A"}
                     </td>
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
-                      {item.openingStock ?? 0}
+                      {item.initialOpeningStock ?? 0}{" "}
+                      {/* Use initialOpeningStock */}
                     </td>
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {item.purchased ?? 0}
