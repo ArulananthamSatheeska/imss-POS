@@ -25,8 +25,9 @@ import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
 import HeldSalesList from "../pos/HeldSalesList";  // Import HeldSalesList component
-import { useRegister } from "../../hooks/useRegister";
+import { useRegister } from '../../context/RegisterContext';
 import RegisterModal from "../models/registerModel.jsx";
+import { useAuth } from '../../context/NewAuthContext.jsx'; // Import auth context
 
 // Helper Function to Apply Discount Schemes
 const applyDiscountScheme = (product, saleType, schemes) => {
@@ -150,21 +151,21 @@ const TOUCHPOSFORM = () => {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [filterError, setFilterError] = useState(null); // For filter error messages
+
   const [user, setUser] = useState(null); // User state for authentication
+
+  const auth = useAuth();
+
+  useEffect(() => {
+    if (auth && auth.user) {
+      setUser(auth.user);
+    }
+  }, [auth]);
   const terminalId = "T-1"; // Default terminal ID
   const userId = 1; // Default user ID
-
-  const {
-    isRegisterOpen,
-    showRegisterModal,
-    isClosingRegister,
-    setShowRegisterModal,
-    openRegister,
-    closeRegister,
-    handleLogoutClick,
-    cashOnHand,
-    setCashOnHand
-  } = useRegister(user);
+  const { registerStatus, openRegister, closeRegister, isRegisterOpen, handleLogoutClick, cashOnHand, setCashOnHand } = useRegister();
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [isClosingRegister, setIsClosingRegister] = useState(false);
 
   const handleLogout = () => {
     const canLogout = handleLogoutClick();
@@ -194,6 +195,28 @@ const TOUCHPOSFORM = () => {
       setLoadingHeldSales(false);
     }
   }, [terminalId]);
+
+  useEffect(() => {
+    // Check register status when component mounts
+    if (!registerStatus.isOpen) {
+      setShowRegisterModal(true);
+    }
+  }, [registerStatus.isOpen]);
+
+  const handleCloseRegister = () => {
+    setIsClosingRegister(true);
+    setShowRegisterModal(true);
+  };
+
+  const handleRegisterConfirm = (amount) => {
+    if (isClosingRegister) {
+      const closingDetails = calculateClosingDetails(); // Implement this function
+      closeRegister({ ...closingDetails, inCashierAmount: amount });
+      setIsClosingRegister(false);
+    } else {
+      openRegister(amount, user.id);
+    }
+  };
 
   // Open held sales list modal
   const openHeldSalesList = () => {
@@ -795,17 +818,20 @@ const TOUCHPOSFORM = () => {
 
   // Open Bill Modal
   const handleOpenBill = useCallback(() => {
+    if (!registerStatus.isOpen) {
+      alert("Please open the register before processing sales");
+      setShowRegisterModal(true);
+      return;
+    }
+
     if (products.length === 0) {
       alert("Cannot proceed to payment with an empty bill.");
       return;
     }
-    setCustomerInfo((prevState) => ({
-      ...prevState,
-      bill_number: billNumber,
-    }));
-    setShowBillModal(true);
-  }, [products, billNumber]);
 
+    setCustomerInfo(prev => ({ ...prev, bill_number: billNumber }));
+    setShowBillModal(true);
+  }, [products, billNumber, registerStatus.isOpen]);
   // Close Bill Modal
   const closeBillModal = useCallback(
     (saleSaved = false) => {
@@ -842,8 +868,10 @@ const TOUCHPOSFORM = () => {
     >
       {/* Main Content */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[40%_60%] gap-2 sm:gap-4">
+
+
         {/* Left Side: Billing System */}
-        <div className="p-2 sm:p-4 bg-white rounded-lg shadow-lg flex flex-col relative">
+        <div className="p-2 sm:p-4 bg-white dark:bg-slate-900 dark:text-white rounded-lg shadow-lg flex flex-col relative">
           <div className="flex items-center justify-between mb-2 sm:mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Billing</h2>
             <div className="flex gap-1 sm:gap-2">
@@ -881,7 +909,7 @@ const TOUCHPOSFORM = () => {
           {/* Bill Table */}
           <div className="overflow-x-auto">
             <table className="w-full border">
-              <thead className="bg-gray-200">
+              <thead className="bg-gray-200 dark:bg-slate-700">
                 <tr>
                   <th className="p-1 sm:p-2 text-left text-xs sm:text-sm">
                     S.No
@@ -907,7 +935,7 @@ const TOUCHPOSFORM = () => {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="p-4 text-center text-gray-500">
+                    <td colSpan="7" className="p-4 text-center text-gray-500 dark:text-white">
                       No items added to the bill yet.
                     </td>
                   </tr>
@@ -922,7 +950,7 @@ const TOUCHPOSFORM = () => {
                           <span className="font-semibold text-xs sm:text-sm">
                             {product.product_name}
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-white">
                             Barcode: {product.barcode}
                           </span>
                         </div>
@@ -931,7 +959,7 @@ const TOUCHPOSFORM = () => {
                         <div className="flex items-center justify-center gap-1 sm:gap-2">
                           <button
                             onClick={() => decrementQuantity(index)}
-                            className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                            className="p-1 sm:p-2 bg-gray-300 dark:bg-slate-800 rounded-lg"
                           >
                             <Minus size={16} className="sm:w-5 sm:h-5" />
                           </button>
@@ -940,7 +968,7 @@ const TOUCHPOSFORM = () => {
                           </span>
                           <button
                             onClick={() => incrementQuantity(index)}
-                            className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                            className="p-1 sm:p-2 bg-gray-300  dark:bg-slate-800  rounded-lg"
                           >
                             <Plus size={16} className="sm:w-5 sm:h-5" />
                           </button>
@@ -962,7 +990,7 @@ const TOUCHPOSFORM = () => {
                       <td className="p-1 sm:p-2 text-center">
                         <button
                           onClick={() => handleDeleteClick(index)}
-                          className="p-1 sm:p-2 bg-red-500 text-white rounded-lg"
+                          className="p-1 sm:p-2 bg-red-500 text-white dark:text-slate-900 rounded-lg"
                         >
                           <Trash2 size={16} className="sm:w-5 sm:h-5" />
                         </button>
@@ -975,7 +1003,7 @@ const TOUCHPOSFORM = () => {
           </div>
 
           {/* Totals Section */}
-          <div className="mt-2 sm:mt-4 flex flex-col sm:flex-row gap-4 sm:gap-6">
+          <div className="mt-2 sm:mt-4  dark:bg-slate-800  flex flex-col sm:flex-row gap-4 sm:gap-6">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm sm:text-lg font-semibold">
                 <span>Total Quantity:</span>
@@ -987,13 +1015,13 @@ const TOUCHPOSFORM = () => {
             <div className="flex-1 space-y-2 sm:space-y-3">
               <div className="grid grid-cols-1 gap-4 sm:gap-6 min-w-fit">
                 <div className="flex-shrink-0">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 whitespace-normal">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-white whitespace-normal">
                     Tax (%):
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
                     <button
                       onClick={() => setTax((prev) => Math.max(prev - 1, 0))}
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
                     </button>
@@ -1005,7 +1033,7 @@ const TOUCHPOSFORM = () => {
                         const value = e.target.value;
                         setTax(value === "" ? 0 : parseFloat(value) || 0);
                       }}
-                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
+                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white  dark:bg-slate-800  w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
                       min="0"
                       step="0.01"
                       placeholder="e.g., 5.0%"
@@ -1013,14 +1041,14 @@ const TOUCHPOSFORM = () => {
                     />
                     <button
                       onClick={() => setTax((prev) => prev + 1)}
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
                 <div className="flex-shrink-0">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 whitespace-normal">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700  dark:bg-slate-800  whitespace-normal">
                     Discount (Rs.):
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
@@ -1028,7 +1056,7 @@ const TOUCHPOSFORM = () => {
                       onClick={() =>
                         setBillDiscount((prev) => Math.max(prev - 100, 0))
                       }
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
                     </button>
@@ -1042,7 +1070,7 @@ const TOUCHPOSFORM = () => {
                           value === "" ? 0 : parseFloat(value) || 0
                         );
                       }}
-                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
+                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg  dark:bg-slate-800  bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-300 placeholder-opacity-75 placeholder-italic"
                       min="0"
                       step="1"
                       placeholder="e.g., 100 Rs."
@@ -1050,14 +1078,14 @@ const TOUCHPOSFORM = () => {
                     />
                     <button
                       onClick={() => setBillDiscount((prev) => prev + 100)}
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
               </div>
-              <div className="p-2 sm:p-4 bg-gray-100 rounded-lg border border-gray-200">
+              <div className="p-2 sm:p-4 bg-gray-100 dark:bg-slate-800  rounded-lg border border-gray-200">
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span>Sub Total (MRP):</span>
@@ -1111,23 +1139,23 @@ const TOUCHPOSFORM = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="sticky bottom-0 bg-white pt-2 sm:pt-4">
+          <div className="sticky bottom-0 bg-white  dark:bg-slate-800  pt-2 sm:pt-4">
             <div className="flex gap-1 sm:gap-2">
               <button
-                className="flex-1 p-2 sm:p-4 bg-pink-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
+                className="flex-1 p-2 sm:p-4 bg-pink-500 text-white dark:text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
                 onClick={holdSale}
                 disabled={products.length === 0}
               >
                 <FaPause /> Hold
               </button>
               <button
-                className="flex-1 p-2 sm:p-4 bg-red-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
+                className="flex-1 p-2 sm:p-4 bg-red-500 text-white  dark:text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
                 onClick={() => resetPOS(false)}
               >
                 <FaRedo /> Reset
               </button>
               <button
-                className="flex-1 p-2 sm:p-4 bg-green-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
+                className="flex-1 p-2 sm:p-4 bg-green-500 text-white  dark:text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
                 onClick={handleOpenBill}
                 disabled={products.length === 0}
               >
@@ -1138,7 +1166,8 @@ const TOUCHPOSFORM = () => {
         </div>
 
         {/* Right Side: Product Selection */}
-        <div className="p-2 sm:p-4 bg-white rounded-lg shadow-lg flex flex-col">
+        <div className="p-2 sm:p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg flex flex-col">
+
           {/* Search Bar */}
           <input
             ref={searchInputRef}
@@ -1158,25 +1187,26 @@ const TOUCHPOSFORM = () => {
             loadingSchemes ||
             loadingCategories ||
             loadingBrands) && (
-              <span className="text-xs text-gray-500">Loading...</span>
+              <span className="text-xs text-gray-500  dark:text-white">Loading...</span>
             )}
 
           {/* Action Buttons */}
           <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4">
             <button
-              className="p-2 sm:p-3 bg-blue-500 text-white rounded-lg"
+              className="p-2 sm:p-3 bg-blue-500 text-white dark:text-slate-800 rounded-lg"
               onClick={openHeldSalesList}
             >
               <ClipboardList size={20} className="sm:w-7 sm:h-7" />
             </button>
             <button
-              className="p-2 sm:p-3 bg-red-500 text-white rounded-lg"
-              onClick={() => navigate("/pos")}
+              className="p-2 text-white dark:text-slate-800 bg-red-500 rounded-lg shadow hover:bg-red-600"
+              title="Close Register"
+              onClick={handleCloseRegister}
             >
-              <LogOut size={20} className="sm:w-7 sm:h-7" />
+              <LogOut size={24} />
             </button>
             <button
-              className="p-2 sm:p-3 bg-green-500 text-white rounded-lg"
+              className="p-2 sm:p-3 bg-green-500 text-white dark:text-slate-800 rounded-lg"
               onClick={toggleFullScreen}
             >
               {isFullScreen ? (
@@ -1186,13 +1216,13 @@ const TOUCHPOSFORM = () => {
               )}
             </button>
             <button
-              className="p-2 sm:p-3 bg-purple-500 text-white rounded-lg"
+              className="p-2 sm:p-3 bg-purple-500 text-white dark:text-slate-800 rounded-lg"
               onClick={() => setShowCalculatorModal(true)}
             >
               <Calculator size={20} className="sm:w-7 sm:h-7" />
             </button>
             <button
-              className="p-2 sm:p-3 bg-yellow-500 text-white rounded-lg"
+              className="p-2 sm:p-3 bg-yellow-500 text-white dark:text-slate-800 rounded-lg"
               onClick={() => navigate("/Dashboard")}
             >
               <LayoutDashboard size={20} className="sm:w-7 sm:h-7" />
@@ -1206,8 +1236,8 @@ const TOUCHPOSFORM = () => {
                 <button
                   key={category.id}
                   className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category.name
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200"
+                    ? "bg-blue-500 text-white dark:text-slate-800"
+                    : "bg-gray-200 dark:bg-slate-700 dark:text-white"
                     }`}
                   onClick={() => {
                     setSelectedCategory(category.name);
@@ -1220,7 +1250,7 @@ const TOUCHPOSFORM = () => {
               ))}
             </div>
             {loadingCategories && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-white">
                 Loading categories...
               </span>
             )}
@@ -1233,8 +1263,8 @@ const TOUCHPOSFORM = () => {
                 <button
                   key={brand.id}
                   className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand.name
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200"
+                    ? "bg-blue-500 text-white dark:text-slate-800"
+                    : "bg-gray-200 dark:bg-slate-700 dark:text-white"
                     }`}
                   onClick={() => {
                     setSelectedBrand(brand.name);
@@ -1247,14 +1277,14 @@ const TOUCHPOSFORM = () => {
               ))}
             </div>
             {loadingBrands && (
-              <span className="text-xs text-gray-500">Loading brands...</span>
+              <span className="text-xs text-gray-500 dark:text-white">Loading brands...</span>
             )}
           </div>
 
           {/* Reset Filters Button */}
           <div className="mb-2 sm:mb-4">
             <button
-              className="p-2 sm:p-3 bg-gray-500 text-white rounded-lg text-sm sm:text-lg"
+              className="p-2 sm:p-3 bg-gray-500 text-white dark:text-slate-800 rounded-lg text-sm sm:text-lg"
               onClick={() => {
                 setSelectedCategory("All Categories");
                 setSelectedBrand("All Brands");
@@ -1272,9 +1302,9 @@ const TOUCHPOSFORM = () => {
           )}
 
           {/* Product Results */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 max-h-[50vh] sm:max-h-[60vh] overflow-auto">
+          <div className="grid grid-cols-2 dark:bg-slate-600 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 max-h-[50vh] sm:max-h-[60vh] overflow-auto">
             {searchResults.length === 0 ? (
-              <div className="col-span-full text-center text-gray-500">
+              <div className="col-span-full text-center dark:bg-slate-600 text-gray-500 dark:text-white">
                 No products found.
               </div>
             ) : (
@@ -1285,7 +1315,7 @@ const TOUCHPOSFORM = () => {
                     relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer
                     border-4 border-black
                     ${categoryColors[item.category_name] ||
-                    "bg-gradient-to-br from-gray-50 to-gray-100"
+                    "bg-gradient-to-br from-gray-50 to-gray-100  dark:bg-slate-700 dark:text-white"
                     }
                     hover:shadow-xl hover:border-purple-800
                     active:scale-95 transition-all duration-200
@@ -1293,7 +1323,7 @@ const TOUCHPOSFORM = () => {
                   `}
                   onClick={() => addProductToTable(item)}
                 >
-                  <div className="flex justify-between items-start mb-1">
+                  <div className="flex justify-between items-start mb-1 dark:bg-slate-200">
                     <div className="flex flex-col">
                       <div className="text-xs sm:text-sm font-semibold text-green-700">
                         {formatNumberWithCommas(
@@ -1325,12 +1355,12 @@ const TOUCHPOSFORM = () => {
                   </div> */}
                   <div className="flex flex-col items-center">
                     <h3
-                      className="text-center font-bold text-gray-800 text-xs sm:text-sm line-clamp-2 hover:line-clamp-none"
+                      className="text-center font-bold text-gray-800 dark:text-white text-xs sm:text-sm line-clamp-2 hover:line-clamp-none"
                       title={item.product_name}
                     >
                       {item.product_name}
                     </h3>
-                    <div className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
+                    <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-200 mt-0.5">
                       Barcode: {item.barcode}
                     </div>
                   </div>
@@ -1380,17 +1410,22 @@ const TOUCHPOSFORM = () => {
         </Notification>
       )}
 
-    // Fix the register modal rendering
       {showRegisterModal && (
         <RegisterModal
           isOpen={showRegisterModal}
-          onClose={() => setShowRegisterModal(false)}
-          onConfirm={isClosingRegister ? closeRegister : openRegister}
-          cashOnHand={cashOnHand}
-          setCashOnHand={setCashOnHand}
+          onClose={() => {
+            if (!registerStatus.isOpen) {
+              navigate('/dashboard'); // Redirect if they cancel opening register
+            }
+            setShowRegisterModal(false);
+            setIsClosingRegister(false);
+          }}
+          onConfirm={handleRegisterConfirm}
+          cashOnHand={registerStatus.cashOnHand}
+          setCashOnHand={(amount) => setCashOnHand(amount)}
           user={user}
           isClosing={isClosingRegister}
-          closingDetails={calculateClosingDetails()} // Add this function
+          closingDetails={calculateClosingDetails()}
         />
       )}
 

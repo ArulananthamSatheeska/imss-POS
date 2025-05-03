@@ -62,7 +62,17 @@ class SaleController extends Controller
         DB::beginTransaction();
         try {
             // Generate the next bill number
-            $billNumber = BillNumberGenerator::generateNextBillNumber();
+            $user = $request->user();
+            \Log::info('Authenticated user object:', ['user' => $user]);
+            if (!$user) {
+                \Log::error('User not authenticated in SaleController@store');
+                return response()->json(['message' => 'Unauthorized: User not authenticated'], 401);
+            }
+            $userId = $user->id;
+            $userName = $user->username;
+            \Log::info("Generating bill number for userId: {$userId}, userName: {$userName}");
+
+            $billNumber = BillNumberGenerator::generateNextBillNumber($userId, $userName);
 
             // Fetch active discount schemes
             $activeSchemes = \App\Models\DiscountScheme::where('active', true)
@@ -342,9 +352,13 @@ class SaleController extends Controller
         }
     }
 
-    public function getLastBillNumber()
+    public function getLastBillNumber(Request $request)
     {
-        $nextBillNumber = BillNumberGenerator::generateNextBillNumber();
+        $user = $request->user();
+        $userId = $user ? $user->id : ($request->input('user_id', 'U0'));
+        $userName = $user ? $user->username : ($request->input('user_name', 'NON'));
+
+        $nextBillNumber = BillNumberGenerator::generateNextBillNumber($userId, $userName);
         return response()->json(['next_bill_number' => $nextBillNumber]);
     }
 
