@@ -31,7 +31,7 @@ const Dashboard = () => {
     const fetchDailyProfitSummary = async () => {
       try {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const response = await axios.get('http://127.0.0.1:8000/api/sales/daily-profit-report', {
+        const response = await axios.get('/api/sales/daily-profit-report', {
           params: { date: today }
         });
         setDailyProfitSummary(response.data.summary || {});
@@ -45,7 +45,7 @@ const Dashboard = () => {
     // Fetch bill wise profit summary (total profit)
     const fetchBillWiseProfitSummary = async () => {
       try {
-        const response = await axios.get('http://127.0.0.1:8000/api/sales/bill-wise-profit-report');
+        const response = await axios.get('/api/sales/bill-wise-profit-report');
         setBillWiseProfitSummary(response.data.summary || {});
       } catch (error) {
         console.error('Error fetching bill wise profit summary:', error);

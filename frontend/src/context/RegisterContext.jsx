@@ -113,14 +113,14 @@ export const RegisterProvider = ({ children }) => {
         }
     }, [getAuthHeaders, terminalId]);
 
-    const openRegister = async (amount, userId) => {
+    const openRegister = async ({ user_id, terminal_id, opening_cash }) => {
         setLoading(true);
         setError(null);
         try {
             const response = await axios.post('/api/register/open', {
-                user_id: userId,
-                terminal_id: terminalId,
-                opening_cash: amount,
+                user_id: user_id,
+                terminal_id: terminal_id,
+                opening_cash: opening_cash,
             }, getAuthHeaders());
 
             if (response.status === 201) {
@@ -170,8 +170,8 @@ export const RegisterProvider = ({ children }) => {
 
             const response = await axios.post('/api/register/close', {
                 register_id: registerStatus.registerId,
-                closing_cash: closingDetails.inCashierAmount,
-                closing_details: closingDetails
+                closing_balance: closingDetails.inCashierAmount,
+                actual_cash: closingDetails.inCashierAmount,
             }, getAuthHeaders());
 
             if (response.status === 200) {
@@ -222,7 +222,8 @@ export const RegisterProvider = ({ children }) => {
             loading,
             error,
             refreshRegisterStatus,
-            terminalId
+            terminalId,
+            getAuthHeaders
         }}>
             {children}
         </RegisterContext.Provider>

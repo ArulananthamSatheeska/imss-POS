@@ -69,7 +69,7 @@ class SaleController extends Controller
                 return response()->json(['message' => 'Unauthorized: User not authenticated'], 401);
             }
             $userId = $user->id;
-            $userName = $user->username;
+            $userName = $user->username ?? $user->name;
             \Log::info("Generating bill number for userId: {$userId}, userName: {$userName}");
 
             $billNumber = BillNumberGenerator::generateNextBillNumber($userId, $userName);
@@ -335,7 +335,7 @@ class SaleController extends Controller
     {
         $user = $request->user();
         $userId = $user ? $user->id : ($request->input('user_id', 'U0'));
-        $userName = $user ? $user->username : ($request->input('user_name', 'NON'));
+        $userName = $user ? ($user->username ?: $user->name) : ($request->input('user_name', 'NON'));
 
         $nextBillNumber = BillNumberGenerator::generateNextBillNumber($userId, $userName);
         return response()->json(['next_bill_number' => $nextBillNumber]);

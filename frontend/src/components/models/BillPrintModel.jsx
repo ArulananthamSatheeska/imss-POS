@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import axios from "axios";
+import { useRegister } from "../../context/RegisterContext";
 
 const BillPrintModal = ({
     initialProducts = [],
@@ -7,6 +8,7 @@ const BillPrintModal = ({
     initialCustomerInfo = { name: '', mobile: '', bill_number: '', userId: '' },
     onClose,
 }) => {
+    const { getAuthHeaders } = useRegister();
     const [billNumber, setBillNumber] = useState(initialCustomerInfo.bill_number); // Use the bill number from props
     const printRef = useRef(null);
     const [receivedAmount, setReceivedAmount] = useState(0);
@@ -22,7 +24,7 @@ const BillPrintModal = ({
     useEffect(() => {
         const fetchNextBillNumber = async () => {
             try {
-                const response = await axios.get('http://127.0.0.1:8000/api/next-bill-number');
+                const response = await axios.get('/api/next-bill-number', getAuthHeaders());
                 setBillNumber(response.data.next_bill_number);
             } catch (error) {
                 console.error("Error fetching next bill number:", error);
@@ -30,7 +32,7 @@ const BillPrintModal = ({
         };
 
         fetchNextBillNumber();
-    }, []);
+    }, [getAuthHeaders]);
 
     // Generate a unique bill number if not provided
     const totalItemDiscount = initialProducts.reduce((sum, product) => sum + (product.discount * product.qty), 0);
@@ -60,7 +62,7 @@ const BillPrintModal = ({
         console.log("Sending bill data:", billData); // Log the data being sent
 
         try {
-            const response = await axios.post('http://127.0.0.1:8000/api/sales', billData);
+            const response = await axios.post('/api/sales', billData, getAuthHeaders());
             console.log('Bill saved successfully:', response.data);
 
             // Increment the bill number after successful save and reset relevant states
