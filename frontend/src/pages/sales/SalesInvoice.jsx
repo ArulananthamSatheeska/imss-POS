@@ -824,6 +824,7 @@ const SalesInvoice = ({
           <h3 className="text-2xl font-bold text-blue-600 p-6 border-b border-gray-200">
             {isEditMode ? "Edit Invoice" : "Create New Invoice"}
           </h3>
+
           <form
             id="invoiceForm"
             onSubmit={handleSubmit}
