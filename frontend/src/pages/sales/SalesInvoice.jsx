@@ -280,14 +280,13 @@ const SalesInvoice = ({
             return {
               ...product,
               product_id: product.product_id,
-              category_name: product.category || "Unknown", // Map category field to category_name
+              category_name: product.category || "Unknown",
               opening_stock_quantity: stockItem
                 ? parseFloat(stockItem.closingStock || 0)
                 : parseFloat(product.opening_stock_quantity || 0),
             };
           });
           setProducts(productsWithStock);
-          // Validate category_name
           productsWithStock.forEach((p) => {
             if (!p.category_name || p.category_name === "Unknown") {
               console.warn(
@@ -312,14 +311,13 @@ const SalesInvoice = ({
         }
 
         setCustomers(customersResponse.data.data || []);
-        setCategories(categoriesResponse.data || []); // Keep categories fetch for potential future use
+        setCategories(categoriesResponse.data || []);
         setDiscountSchemes(
           schemesResponse.data.data || schemesResponse.data || []
         );
       } catch (error) {
         console.error("Error fetching data:", error);
         toast.error("Failed to load data. Check console for details.");
-        // Fallback for products
         try {
           const fallbackResponse = await axios.get(
             "http://127.0.0.1:8000/api/products"
@@ -579,6 +577,7 @@ const SalesInvoice = ({
             }`
       }`]: undefined,
       items: undefined,
+      purchaseAmount: undefined, // Clear purchaseAmount error on input change
     }));
   };
 
@@ -633,7 +632,6 @@ const SalesInvoice = ({
         totalBuyingCost: qty * buyingCost,
       };
 
-      // Update with special discount
       newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
       return { ...prev, items: newItems };
     });
@@ -716,6 +714,8 @@ const SalesInvoice = ({
   const validateForm = () => {
     const newErrors = {};
     const { invoice, customer, items, purchaseDetails } = formData;
+    const total = calculateTotal();
+    const amountPaid = parseFloat(purchaseDetails.amount) || 0;
 
     if (!invoice.date) newErrors.invoiceDate = "Invoice date is required";
     if (!invoice.time || !/^\d{2}:\d{2}$/.test(invoice.time))
@@ -730,6 +730,29 @@ const SalesInvoice = ({
       parseFloat(purchaseDetails.taxPercentage) < 0
     ) {
       newErrors.purchaseTaxPercentage = "Tax percentage cannot be negative";
+    }
+    if (purchaseDetails.amount !== "" && amountPaid < 0)
+      newErrors.purchaseAmount = "Amount paid cannot be negative";
+
+    // Validate amount paid based on payment method
+    const fullPaymentMethods = ["cash", "card", "online", "cheque"];
+    if (
+      fullPaymentMethods.includes(purchaseDetails.method) &&
+      purchaseDetails.amount !== "" &&
+      amountPaid < total
+    ) {
+      newErrors.purchaseAmount = `Amount paid must be at least LKR ${total.toFixed(
+        2
+      )} for ${purchaseDetails.method} payments`;
+    }
+    if (
+      purchaseDetails.method === "credit" &&
+      purchaseDetails.amount !== "" &&
+      amountPaid >= total
+    ) {
+      newErrors.purchaseAmount = `Amount paid must be less than LKR ${total.toFixed(
+        2
+      )} for credit payments`;
     }
 
     items.forEach((item, idx) => {
@@ -758,9 +781,6 @@ const SalesInvoice = ({
         ] = `Quantity exceeds stock (${product.opening_stock_quantity})`;
       }
     });
-
-    if (purchaseDetails.amount !== "" && parseFloat(purchaseDetails.amount) < 0)
-      newErrors.purchaseAmount = "Amount paid cannot be negative";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
