@@ -12,7 +12,7 @@ class BillNumberGenerator
         if (is_numeric($userId)) {
             $userId = 'U' . $userId;
         } elseif (!$userId) {
-            $userId = 'U0';
+            $userId = 'U';
         }
 
         // Ensure username is at least 3 characters, uppercase

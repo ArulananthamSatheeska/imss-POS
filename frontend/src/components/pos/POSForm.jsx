@@ -773,6 +773,8 @@ const POSForm = ({
     return {
       totalSales,
       cashInRegister,
+      inCashierAmount: 0, // to be filled by user input
+      otherAmount: 0, // to be filled by user input
     };
   };
 
@@ -783,13 +785,25 @@ const POSForm = ({
 
   const handleRegisterConfirm = (amount) => {
     if (isClosingRegister) {
-      const closingDetails = calculateClosingDetails(); // Implement this function
-      closeRegister({ ...closingDetails, inCashierAmount: amount });
+      const closingDetails = calculateClosingDetails();
+      const { inCashierAmount, otherAmount } = amount;
+      closingDetails.inCashierAmount = inCashierAmount;
+      closingDetails.otherAmount = otherAmount;
+      closeRegister(closingDetails);
       setIsClosingRegister(false);
     } else {
-      openRegister(amount, user.id);
+      // Only open register if not already open
+      if (!registerStatus.isOpen) {
+        openRegister(amount, user.id);
+      }
     }
   };
+
+  useEffect(() => {
+    if (user && !registerStatus.isOpen && !isClosingRegister) {
+      setShowRegisterModal(true);
+    }
+  }, [user, registerStatus.isOpen, isClosingRegister]);
 
   return (
     <div className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""}`}>

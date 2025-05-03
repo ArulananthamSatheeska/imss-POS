@@ -10,19 +10,36 @@ const RegisterModal = ({
     setCashOnHand,
     user,
     isClosing = false,
-    closingDetails = {}
+    closingDetails = {},
+    registerStatus = 'closed' // New prop for register status
 }) => {
     const [inputAmount, setInputAmount] = useState(isClosing ? '' : cashOnHand);
     const [otherAmount, setOtherAmount] = useState(closingDetails.otherAmount || '');
+    const [localIsOpen, setLocalIsOpen] = useState(isOpen);
     const inputRef = useRef(null);
 
+    // Sync modal state with register status
     useEffect(() => {
-        if (isOpen) {
+        if (registerStatus === 'open' && localIsOpen) {
+            setLocalIsOpen(false);
+            onClose();
+        } else if (registerStatus === 'closed' && !localIsOpen && !isClosing) {
+            setLocalIsOpen(true);
+        }
+    }, [registerStatus, localIsOpen, onClose, isClosing]);
+
+    // Handle external isOpen changes
+    useEffect(() => {
+        setLocalIsOpen(isOpen);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (localIsOpen) {
             setTimeout(() => {
                 inputRef.current?.focus();
             }, 300);
         }
-    }, [isOpen]);
+    }, [localIsOpen]);
 
     useEffect(() => {
         if (isClosing && closingDetails) {
@@ -41,6 +58,8 @@ const RegisterModal = ({
         const amount = parseFloat(inputAmount);
         const other = parseFloat(otherAmount || 0);
 
+        console.log("RegisterModal handleConfirm - amount:", amount, "other:", other);
+
         if (isNaN(amount) || amount < 0) {
             alert("Please enter a valid non-negative amount");
             return;
@@ -51,7 +70,6 @@ const RegisterModal = ({
             return;
         }
 
-        // Pass amounts in an object for clarity
         if (isClosing) {
             onConfirm({ inCashierAmount: amount, otherAmount: other });
         } else {
@@ -60,9 +78,14 @@ const RegisterModal = ({
         onClose();
     };
 
+    // Don't render if register is open and we're not closing
+    if (registerStatus === 'open' && !isClosing) {
+        return null;
+    }
+
     return (
         <AnimatePresence>
-            {isOpen && (
+            {localIsOpen && (
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -249,7 +272,6 @@ const RegisterModal = ({
                                                 className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:focus:ring-blue-400 transition-all bg-white dark:bg-gray-800 dark:text-white"
                                                 placeholder="Enter opening cash amount"
                                             />
-
                                         </motion.div>
                                     </>
                                 )}
