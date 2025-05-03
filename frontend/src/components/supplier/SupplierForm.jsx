@@ -54,9 +54,9 @@ const SupplierForm = ({ supplier, onSuccess }) => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg transition-transform transform hover:scale-105 duration-300 ease-in-out mb-6"
+      className="max-w-md p-6 mx-auto mb-6 transition-transform duration-300 ease-in-out transform bg-white rounded-lg shadow-lg hover:scale-105"
     >
-      <h2 className="text-2xl font-bold text-center mb-4 text-amber-600">
+      <h2 className="mb-4 text-2xl font-bold text-center text-amber-600">
         {supplier ? "Update" : "Add"} Supplier
       </h2>
 
@@ -95,7 +95,7 @@ const SupplierForm = ({ supplier, onSuccess }) => {
 
       <button
         type="submit"
-        className="w-full py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out transform hover:scale-105"
+        className="w-full py-2 font-semibold text-white transition duration-200 ease-in-out transform bg-blue-600 rounded-lg hover:bg-blue-700 hover:scale-105"
       >
         {supplier ? "Update" : "Add"} Supplier
       </button>
@@ -203,7 +203,7 @@ const SupplierManagement = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container p-4 mx-auto">
       {notification.visible && (
         <Notification
           message={notification.message}
@@ -217,13 +217,13 @@ const SupplierManagement = () => {
                   notification.onConfirm();
                   setNotification({ ...notification, visible: false });
                 }}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                className="px-4 py-2 text-white bg-red-600 rounded-lg"
               >
                 Yes, Delete
               </button>
               <button
                 onClick={() => setNotification({ ...notification, visible: false })}
-                className="px-4 py-2 bg-gray-400 text-white rounded-lg"
+                className="px-4 py-2 text-white bg-gray-400 rounded-lg"
               >
                 Cancel
               </button>
