@@ -865,7 +865,7 @@ export const BarcodePage = () => {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          කු. අං/ Batch No: ${product.batch_number}
+                          කු. අං/ Batch No: {product.batch_number}
                         </div>
                         <canvas
                           id={`barcode-${index}`}
@@ -889,7 +889,7 @@ export const BarcodePage = () => {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          MRP: ${product.mrp}
+                          MRP: {product.mrp}
                         </div>
                         <div
                           className="seller"
@@ -904,7 +904,7 @@ export const BarcodePage = () => {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          Import&Distributed by: ${product.supplier}
+                          Import&Distributed by: {product.supplier}
                         </div>
                       </div>
                     );
