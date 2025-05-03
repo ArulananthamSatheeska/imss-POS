@@ -7,47 +7,39 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
-use Throwable;
+use Illuminate\Support\Facades\Log;
 
 class RegisterController extends Controller
 {
     public function getStatus(Request $request): JsonResponse
     {
-        // Log full request input for debugging
-        \Log::info('Register status full request input', $request->all());
-        \Log::info('Register status full request query', $request->query());
+        try {
+            $userId = $request->input('user_id') ?? $request->query('user_id') ?? $request->header('user_id');
+            
+            if (empty($userId)) {
+                return response()->json([
+                    'status' => 'closed',
+                    'register' => null,
+                ]);
+            }
 
-        // Accept user_id and terminal_id from any request input (query, body, headers)
-        $userId = $request->input('user_id') ?? $request->query('user_id') ?? $request->header('user_id');
-        $terminalId = $request->input('terminal_id') ?? $request->query('terminal_id') ?? $request->header('terminal_id');
+            $openRegister = Register::where('user_id', $userId)
+                ->where('status', 'open')
+                ->whereNull('closed_at')
+                ->latest('opened_at')
+                ->first();
 
-        // Log received parameters for debugging
-        \Log::info('Register status request received', ['user_id' => $userId, 'terminal_id' => $terminalId]);
-
-        if (empty($userId) || empty($terminalId)) {
-            // Instead of returning error, treat as no open register and return closed status
             return response()->json([
-                'status' => 'closed',
-                'register' => null,
-            ]);
-        }
-
-        $openRegister = Register::where('user_id', $userId)
-            ->where('terminal_id', $terminalId)
-            ->where('status', 'open')
-            ->latest('opened_at')
-            ->first();
-
-        if ($openRegister) {
-            return response()->json([
-                'status' => 'open',
+                'status' => $openRegister ? 'open' : 'closed',
                 'register' => $openRegister,
             ]);
-        } else {
+            
+        } catch (\Exception $e) {
+            Log::error('Register status check failed: ' . $e->getMessage());
             return response()->json([
-                'status' => 'closed',
-                'register' => null,
-            ]);
+                'status' => 'error',
+                'message' => 'Unable to check register status'
+            ], 500);
         }
     }
 
@@ -55,32 +47,38 @@ class RegisterController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'user_id' => 'required|integer|exists:users,id',
-            'terminal_id' => 'required|string',
+            'terminal_id' => 'required|string|max:255',
             'opening_cash' => 'required|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
+            \Log::error('Register open validation failed', ['errors' => $validator->errors()->toArray(), 'input' => $request->all()]);
             return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
             ], 422);
         }
 
-        $userId = $request->input('user_id');
-        $terminalId = $request->input('terminal_id');
-
-        $existingOpen = Register::where('user_id', $userId)
-            ->where('terminal_id', $terminalId)
-            ->where('status', 'open')
-            ->first();
-
-        if ($existingOpen) {
-            return response()->json([
-                'message' => 'A register session is already open for this user and terminal.',
-            ], 409);
-        }
-
         try {
+            DB::beginTransaction();
+
+            $userId = $request->input('user_id');
+            $terminalId = $request->input('terminal_id');
+
+            // Check for existing open register
+            $existingOpen = Register::where('user_id', $userId)
+                ->where('status', 'open')
+                ->whereNull('closed_at')
+                ->first();
+
+            if ($existingOpen) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'User already has an open register session',
+                    'register' => $existingOpen
+                ], 409);
+            }
+
             $register = Register::create([
                 'user_id' => $userId,
                 'terminal_id' => $terminalId,
@@ -89,13 +87,19 @@ class RegisterController extends Controller
                 'opened_at' => now(),
             ]);
 
+            DB::commit();
+
             return response()->json([
-                'message' => 'Register opened successfully.',
+                'message' => 'Register opened successfully',
                 'register' => $register,
             ], 201);
-        } catch (Throwable $e) {
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Register open failed: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Failed to open register: ' . $e->getMessage(),
+                'message' => 'Failed to open register',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -110,33 +114,43 @@ class RegisterController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
             ], 422);
         }
 
-        $register = Register::find($request->input('register_id'));
-
-        if (!$register || $register->status !== 'open') {
-            return response()->json([
-                'message' => 'No open register session found with the given ID.',
-            ], 404);
-        }
-
         try {
-            $register->status = 'closed';
-            $register->closed_at = now();
-            $register->closing_details = $request->input('closing_details', []);
-            $register->closing_cash = $request->input('closing_cash');
-            $register->save();
+            DB::beginTransaction();
+
+            $register = Register::find($request->input('register_id'));
+
+            if (!$register || $register->status !== 'open') {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'No open register session found'
+                ], 404);
+            }
+
+            $register->update([
+                'status' => 'closed',
+                'closed_at' => now(),
+                'closing_cash' => $request->input('closing_cash'),
+                'closing_details' => $request->input('closing_details', []),
+            ]);
+
+            DB::commit();
 
             return response()->json([
-                'message' => 'Register closed successfully.',
-                'register' => $register,
+                'message' => 'Register closed successfully',
+                'register' => $register
             ]);
-        } catch (Throwable $e) {
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Register close failed: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Failed to close register: ' . $e->getMessage(),
+                'message' => 'Failed to close register',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

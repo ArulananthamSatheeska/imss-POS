@@ -773,6 +773,8 @@ const POSForm = ({
     return {
       totalSales,
       cashInRegister,
+      inCashierAmount: 0, // to be filled by user input
+      otherAmount: 0, // to be filled by user input
     };
   };
 
@@ -780,16 +782,45 @@ const POSForm = ({
     setIsClosingRegister(true);
     setShowRegisterModal(true);
   };
+  useEffect(() => {
+    // Check register status on mount and when user changes
+    if (user && !registerStatus.isOpen) {
+      setShowRegisterModal(true);
+    }
+  }, [user, registerStatus.isOpen]);
 
-  const handleRegisterConfirm = (amount) => {
+  const handleRegisterConfirm = async (amount) => {
     if (isClosingRegister) {
-      const closingDetails = calculateClosingDetails(); // Implement this function
-      closeRegister({ ...closingDetails, inCashierAmount: amount });
-      setIsClosingRegister(false);
+      const closingDetails = calculateClosingDetails();
+      try {
+        await closeRegister({
+          ...closingDetails,
+          inCashierAmount: amount.inCashierAmount,
+          otherAmount: amount.otherAmount
+        });
+        setIsClosingRegister(false);
+        setShowRegisterModal(false);
+      } catch (error) {
+        console.error('Failed to close register:', error);
+      }
     } else {
-      openRegister(amount, user.id);
+      try {
+        if (!user || !user.id) {
+          alert("User information is missing. Cannot open register.");
+          return;
+        }
+        await openRegister(amount, user.id);
+        setShowRegisterModal(false);
+      } catch (error) {
+        console.error('Failed to open register:', error);
+      }
     }
   };
+  useEffect(() => {
+    if (user && !registerStatus.isOpen && !isClosingRegister) {
+      setShowRegisterModal(true);
+    }
+  }, [user, registerStatus.isOpen, isClosingRegister]);
 
   return (
     <div className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""}`}>
@@ -856,7 +887,7 @@ const POSForm = ({
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={loadingItems || loadingSchemes}
+                disabled={loadingItems || loadingSchemes || !registerStatus.isOpen}
                 autoComplete="off"
               />
               {(loadingItems || loadingSchemes) && (
@@ -890,7 +921,7 @@ const POSForm = ({
                 value={quantity}
                 onChange={handleQuantityChange}
                 onKeyDown={handleKeyDown}
-                disabled={!selectedProduct || loadingItems || loadingSchemes}
+                disabled={!selectedProduct || loadingItems || loadingSchemes || !registerStatus.isOpen}
               />
             </div>
             <div className="flex-shrink-0 w-full md:w-auto">
@@ -898,7 +929,7 @@ const POSForm = ({
               <button
                 className="w-full px-5 py-2 text-base font-semibold text-white bg-green-600 rounded-lg shadow md:w-auto hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={addProductToTable}
-                disabled={!selectedProduct || parseFloat(quantity || 0) <= 0 || loadingItems || loadingSchemes}
+                disabled={!selectedProduct || parseFloat(quantity || 0) <= 0 || loadingItems || loadingSchemes || !registerStatus.isOpen}
               >
                 Add
               </button>

@@ -11,6 +11,7 @@ class Register extends Model
         'terminal_id',
         'status',
         'cash_on_hand',
+        'closing_cash',
         'opened_at',
         'closed_at',
         'closing_details',
@@ -19,6 +20,7 @@ class Register extends Model
     protected $casts = [
         'opened_at' => 'datetime',
         'closed_at' => 'datetime',
+        'closing_cash' => 'float',
         'closing_details' => 'array',
     ];
 }

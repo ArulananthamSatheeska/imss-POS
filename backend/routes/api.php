@@ -27,6 +27,7 @@ use App\Http\Controllers\{
     SalesInvoiceController,
     SalesReturnController
 };
+use App\Http\Controllers\RegisterController;
 
 
 // Authentication routes (no permission middleware)
@@ -105,6 +106,7 @@ Route::get('/product/{id}', [ProductController::class, 'barcode']);
 Route::get('/dashboard', [DashboardController::class, 'dashboard']);
 });
 
+
 // Protected routes (requires authentication)
 Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddleware::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -113,7 +115,13 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::get('/verify-token', [AuthController::class, 'verifyToken']);
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
 
+    // Register routes
+    
     });
+
+    Route::get('/register/status', [RegisterController::class, 'getStatus']);
+    Route::post('/register/open', [RegisterController::class, 'openRegister']);
+    Route::post('/register/close', [RegisterController::class, 'closeRegister']);
 
 Route::prefix('discount-schemes')->group(function () {
     Route::get('/', [DiscountSchemeController::class, 'index']);

@@ -11,6 +11,7 @@ const SalesReturn = () => {
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
+  const [filteredInvoices, setFilteredInvoices] = useState([]);
   const [newReturn, setNewReturn] = useState({
     salesReturnNumber: "",
     invoiceOrBillNumber: "",
@@ -24,35 +25,42 @@ const SalesReturn = () => {
   const [itemForm, setItemForm] = useState({
     product_id: "",
     search_query: "",
-    quantity: 1,
+    quantity: 0, // Changed initial quantity to 0
     buying_cost: 0,
     reason: "",
   });
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editReturnId, setEditReturnId] = useState(null);
   const [viewReturn, setViewReturn] = useState(null);
   const [expandedRows, setExpandedRows] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const [showInvoiceSuggestions, setShowInvoiceSuggestions] = useState(false);
+  const [productHighlightedIndex, setProductHighlightedIndex] = useState(-1);
+  const [invoiceHighlightedIndex, setInvoiceHighlightedIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const searchRef = useRef(null);
-  const searchInputRef = useRef(null);
+  const productSearchRef = useRef(null);
+  const invoiceSearchRef = useRef(null);
+  const productSearchInputRef = useRef(null);
+  const invoiceSearchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
   const buyingCostInputRef = useRef(null);
   const reasonInputRef = useRef(null);
 
-  // Auto-generate sales return number based on date and time
+  // Function to generate sales return number
+  const generateSalesReturnNumber = () => {
+    const now = new Date();
+    const dateStr = now
+      .toISOString()
+      .replace(/[-:T.]/g, "")
+      .slice(0, 14);
+    return `SR${dateStr}`;
+  };
+
+  // Set initial sales return number when not in edit mode
   useEffect(() => {
-    const generateSalesReturnNumber = () => {
-      const now = new Date();
-      const dateStr = now
-        .toISOString()
-        .replace(/[-:T.]/g, "")
-        .slice(0, 14);
-      return `SR${dateStr}`;
-    };
     if (!editMode) {
       setNewReturn((prev) => ({
         ...prev,
@@ -240,14 +248,31 @@ const SalesReturn = () => {
         p.product_name.toLowerCase().includes(query)
       );
       setFilteredProducts(filtered);
-      setShowSuggestions(true);
-      setHighlightedIndex(-1);
+      setShowProductSuggestions(true);
+      setProductHighlightedIndex(-1);
     } else {
       setFilteredProducts([]);
-      setShowSuggestions(false);
-      setHighlightedIndex(-1);
+      setShowProductSuggestions(false);
+      setProductHighlightedIndex(-1);
     }
   }, [itemForm.search_query, products]);
+
+  // Filter invoices based on search query
+  useEffect(() => {
+    if (invoiceSearch.trim()) {
+      const query = invoiceSearch.toLowerCase();
+      const filtered = invoices.filter((inv) =>
+        inv.invoiceNumber.toLowerCase().includes(query)
+      );
+      setFilteredInvoices(filtered);
+      setShowInvoiceSuggestions(true);
+      setInvoiceHighlightedIndex(-1);
+    } else {
+      setFilteredInvoices([]);
+      setShowInvoiceSuggestions(false);
+      setInvoiceHighlightedIndex(-1);
+    }
+  }, [invoiceSearch, invoices]);
 
   // Prefill buying cost when selecting a product
   useEffect(() => {
@@ -268,9 +293,19 @@ const SalesReturn = () => {
   // Handle clicks outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-        setHighlightedIndex(-1);
+      if (
+        productSearchRef.current &&
+        !productSearchRef.current.contains(event.target)
+      ) {
+        setShowProductSuggestions(false);
+        setProductHighlightedIndex(-1);
+      }
+      if (
+        invoiceSearchRef.current &&
+        !invoiceSearchRef.current.contains(event.target)
+      ) {
+        setShowInvoiceSuggestions(false);
+        setInvoiceHighlightedIndex(-1);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -288,7 +323,9 @@ const SalesReturn = () => {
       ...prev,
       [name]:
         name === "quantity"
-          ? parseInt(value) || 1
+          ? parseInt(value) >= 0
+            ? parseInt(value)
+            : 0 // Ensure quantity is non-negative
           : name === "buying_cost"
           ? parseFloat(value) || 0
           : value,
@@ -302,26 +339,65 @@ const SalesReturn = () => {
       search_query: product.product_name,
       buying_cost: parseFloat(product.buying_cost) || 0,
     });
-    setShowSuggestions(false);
-    setHighlightedIndex(-1);
+    setShowProductSuggestions(false);
+    setProductHighlightedIndex(-1);
     quantityInputRef.current?.focus();
   };
 
-  const handleSearchKeyDown = (e) => {
+  const handleSelectInvoice = (invoice) => {
+    setNewReturn((prev) => ({
+      ...prev,
+      invoiceOrBillNumber: invoice.invoiceNumber,
+      customerName: invoice.customerName,
+      type: invoice.type,
+    }));
+    setInvoiceSearch(invoice.invoiceNumber);
+    setShowInvoiceSuggestions(false);
+    setInvoiceHighlightedIndex(-1);
+    productSearchInputRef.current?.focus();
+  };
+
+  const handleProductSearchKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex((prev) =>
+      setProductHighlightedIndex((prev) =>
         prev < filteredProducts.length - 1 ? prev + 1 : prev
       );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
-    } else if (e.key === "Enter" && highlightedIndex >= 0) {
+      setProductHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === "Enter" && productHighlightedIndex >= 0) {
       e.preventDefault();
-      handleSelectProduct(filteredProducts[highlightedIndex]);
-    } else if (e.key === "Enter" && !showSuggestions && itemForm.product_id) {
+      handleSelectProduct(filteredProducts[productHighlightedIndex]);
+    } else if (
+      e.key === "Enter" &&
+      !showProductSuggestions &&
+      itemForm.product_id
+    ) {
       e.preventDefault();
       quantityInputRef.current?.focus();
+    }
+  };
+
+  const handleInvoiceSearchKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setInvoiceHighlightedIndex((prev) =>
+        prev < filteredInvoices.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setInvoiceHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === "Enter" && invoiceHighlightedIndex >= 0) {
+      e.preventDefault();
+      handleSelectInvoice(filteredInvoices[invoiceHighlightedIndex]);
+    } else if (
+      e.key === "Enter" &&
+      !showInvoiceSuggestions &&
+      newReturn.invoiceOrBillNumber
+    ) {
+      e.preventDefault();
+      productSearchInputRef.current?.focus();
     }
   };
 
@@ -343,7 +419,7 @@ const SalesReturn = () => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddItem();
-      searchInputRef.current?.focus();
+      productSearchInputRef.current?.focus();
     }
   };
 
@@ -359,10 +435,6 @@ const SalesReturn = () => {
       toast.error("Quantity must be greater than 0");
       return;
     }
-    if (!itemForm.reason.trim()) {
-      toast.error("Reason is required");
-      return;
-    }
     if (itemForm.buying_cost < 0) {
       toast.error("Buying cost cannot be negative");
       return;
@@ -373,7 +445,7 @@ const SalesReturn = () => {
       product_name: selectedProduct.product_name,
       quantity: itemForm.quantity,
       buying_cost: itemForm.buying_cost,
-      reason: itemForm.reason,
+      reason: itemForm.reason || null,
     };
 
     setNewReturn({
@@ -384,12 +456,12 @@ const SalesReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 1,
+      quantity: 0, // Reset quantity to 0
       buying_cost: 0,
       reason: "",
     });
-    setShowSuggestions(false);
-    searchInputRef.current?.focus();
+    setShowProductSuggestions(false);
+    productSearchInputRef.current?.focus();
   };
 
   const handleRemoveItem = (index) => {
@@ -413,12 +485,13 @@ const SalesReturn = () => {
           product_name: item.product_name,
           quantity: item.quantity,
           buying_cost: parseFloat(item.buying_cost),
-          reason: item.reason,
+          reason: item.reason || "",
         })),
         refundMethod: data.refund_method,
         remarks: data.remarks || "",
         status: data.status,
       });
+      setInvoiceSearch(data.invoice_no || data.bill_number);
       setEditMode(true);
       setEditReturnId(returnItem.id);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -446,7 +519,7 @@ const SalesReturn = () => {
     setEditMode(false);
     setEditReturnId(null);
     setNewReturn({
-      salesReturnNumber: "",
+      salesReturnNumber: generateSalesReturnNumber(),
       invoiceOrBillNumber: "",
       customerName: "",
       type: "",
@@ -458,10 +531,11 @@ const SalesReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 1,
+      quantity: 0, // Reset quantity to 0
       buying_cost: 0,
       reason: "",
     });
+    setInvoiceSearch("");
   };
 
   const handleSubmitReturn = async () => {
@@ -511,31 +585,39 @@ const SalesReturn = () => {
       } else {
         response = await api.post("/sales-returns", returnData);
         toast.success("Sales return submitted successfully!");
+        // Normalize response data to match returnItems structure
+        const newReturnItem = {
+          ...response.data.data,
+          items: response.data.data.items.map((item) => ({
+            ...item,
+            buying_cost: parseFloat(item.buying_cost) || 0,
+          })),
+        };
         setReturnItems(
-          [...returnItems, response.data.data].sort((a, b) =>
+          [...returnItems, newReturnItem].sort((a, b) =>
             a.sales_return_number.localeCompare(b.sales_return_number)
           )
         );
+        // Reset form with new sales return number
+        setNewReturn({
+          salesReturnNumber: generateSalesReturnNumber(),
+          invoiceOrBillNumber: "",
+          customerName: "",
+          type: "",
+          items: [],
+          refundMethod: "cash",
+          remarks: "",
+          status: "pending",
+        });
+        setItemForm({
+          product_id: "",
+          search_query: "",
+          quantity: 0, // Reset quantity to 0
+          buying_cost: 0,
+          reason: "",
+        });
+        setInvoiceSearch("");
       }
-
-      // Reset form
-      setNewReturn({
-        salesReturnNumber: "",
-        invoiceOrBillNumber: "",
-        customerName: "",
-        type: "",
-        items: [],
-        refundMethod: "cash",
-        remarks: "",
-        status: "pending",
-      });
-      setItemForm({
-        product_id: "",
-        search_query: "",
-        quantity: 1,
-        buying_cost: 0,
-        reason: "",
-      });
     } catch (error) {
       const errorMsg =
         error.response?.data?.message ||
@@ -594,33 +676,6 @@ const SalesReturn = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-6 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto">
-        {/* Sales Return Dashboard */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">
-            Sales Return Dashboard
-          </h1>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns Today
-              </h2>
-              <p className="text-2xl font-bold text-blue-500">8</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns This Month
-              </h2>
-              <p className="text-2xl font-bold text-green-500">35</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                Total Returns This Year
-              </h2>
-              <p className="text-2xl font-bold text-purple-500">150</p>
-            </div>
-          </div>
-        </div>
-
         {/* Sales Return Form */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
@@ -653,28 +708,51 @@ const SalesReturn = () => {
                       disabled
                     />
                   </div>
-                  <div>
+                  <div ref={invoiceSearchRef} className="relative">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                       Invoice/Bill Number
                     </label>
-                    <select
-                      name="invoiceOrBillNumber"
-                      value={newReturn.invoiceOrBillNumber}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      disabled={loading}
-                    >
-                      <option value="">Select Invoice/Bill Number</option>
-                      {invoices.map((inv) => (
-                        <option
-                          key={`${inv.type}-${inv.id}`}
-                          value={inv.invoiceNumber}
-                        >
-                          {inv.invoiceNumber} (
-                          {inv.type === "invoice" ? "Invoice" : "Sale"})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        ref={invoiceSearchInputRef}
+                        type="text"
+                        value={invoiceSearch}
+                        onChange={(e) => setInvoiceSearch(e.target.value)}
+                        onFocus={() =>
+                          invoiceSearch && setShowInvoiceSuggestions(true)
+                        }
+                        onKeyDown={handleInvoiceSearchKeyDown}
+                        placeholder="Search Invoice/Bill Number..."
+                        className="w-full p-2 pl-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        disabled={loading}
+                      />
+                      <FiSearch className="absolute left-2 top-3 text-gray-400" />
+                    </div>
+                    {showInvoiceSuggestions && filteredInvoices.length > 0 && (
+                      <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {filteredInvoices.map((invoice, index) => (
+                          <li
+                            key={`${invoice.type}-${invoice.id}`}
+                            onClick={() => handleSelectInvoice(invoice)}
+                            className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white ${
+                              invoiceHighlightedIndex === index
+                                ? "bg-gray-100 dark:bg-gray-600"
+                                : ""
+                            }`}
+                          >
+                            {invoice.invoiceNumber} (
+                            {invoice.type === "invoice" ? "Invoice" : "Sale"})
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {showInvoiceSuggestions &&
+                      invoiceSearch &&
+                      filteredInvoices.length === 0 && (
+                        <div className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg p-4 text-gray-500 dark:text-gray-300">
+                          No invoices or bills found
+                        </div>
+                      )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
@@ -696,45 +774,47 @@ const SalesReturn = () => {
                     Items to Return
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-                    <div ref={searchRef} className="relative">
+                    <div ref={productSearchRef} className="relative">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Search Product
                       </label>
                       <div className="relative">
                         <input
-                          ref={searchInputRef}
+                          ref={productSearchInputRef}
                           type="text"
                           name="search_query"
                           value={itemForm.search_query}
                           onChange={handleItemFormChange}
                           onFocus={() =>
-                            itemForm.search_query && setShowSuggestions(true)
+                            itemForm.search_query &&
+                            setShowProductSuggestions(true)
                           }
-                          onKeyDown={handleSearchKeyDown}
+                          onKeyDown={handleProductSearchKeyDown}
                           placeholder="Search Product..."
                           className="w-full p-2 pl-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                           disabled={loading}
                         />
                         <FiSearch className="absolute left-2 top-3 text-gray-400" />
                       </div>
-                      {showSuggestions && filteredProducts.length > 0 && (
-                        <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
-                          {filteredProducts.map((product, index) => (
-                            <li
-                              key={product.product_id ?? index}
-                              onClick={() => handleSelectProduct(product)}
-                              className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white ${
-                                highlightedIndex === index
-                                  ? "bg-gray-100 dark:bg-gray-600"
-                                  : ""
-                              }`}
-                            >
-                              {product.product_name}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {showSuggestions &&
+                      {showProductSuggestions &&
+                        filteredProducts.length > 0 && (
+                          <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                            {filteredProducts.map((product, index) => (
+                              <li
+                                key={product.product_id ?? index}
+                                onClick={() => handleSelectProduct(product)}
+                                className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white ${
+                                  productHighlightedIndex === index
+                                    ? "bg-gray-100 dark:bg-gray-600"
+                                    : ""
+                                }`}
+                              >
+                                {product.product_name}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      {showProductSuggestions &&
                         itemForm.search_query &&
                         filteredProducts.length === 0 && (
                           <div className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg p-4 text-gray-500 dark:text-gray-300">
@@ -755,7 +835,8 @@ const SalesReturn = () => {
                         onKeyDown={handleQuantityKeyDown}
                         placeholder="Quantity"
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        min="1"
+                        min="0"
+                        step="1"
                         disabled={loading}
                       />
                     </div>
@@ -779,7 +860,7 @@ const SalesReturn = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                        Reason
+                        Reason (Optional)
                       </label>
                       <input
                         ref={reasonInputRef}
@@ -788,7 +869,7 @@ const SalesReturn = () => {
                         value={itemForm.reason}
                         onChange={handleItemFormChange}
                         onKeyDown={handleReasonKeyDown}
-                        placeholder="Reason"
+                        placeholder="Reason (Optional)"
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         disabled={loading}
                       />
@@ -800,8 +881,7 @@ const SalesReturn = () => {
                         disabled={
                           loading ||
                           !itemForm.product_id ||
-                          itemForm.quantity <= 0 ||
-                          !itemForm.reason.trim()
+                          itemForm.quantity <= 0
                         }
                       >
                         Add Item
@@ -842,10 +922,10 @@ const SalesReturn = () => {
                               {item.quantity}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              LKR {item.buying_cost.toFixed(2)}
+                              LKR {formatBuyingCost(item.buying_cost)}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              {item.reason}
+                              {item.reason || "N/A"}
                             </td>
                             <td className="px-4 py-2 text-sm text-red-500 cursor-pointer hover:text-red-700">
                               <button
@@ -999,7 +1079,7 @@ const SalesReturn = () => {
                             LKR {formatBuyingCost(item.buying_cost)}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                            {item.reason}
+                            {item.reason || "N/A"}
                           </td>
                         </tr>
                       ))}
@@ -1194,7 +1274,7 @@ const SalesReturn = () => {
                                         LKR {formatBuyingCost(item.buying_cost)}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                                        {item.reason}
+                                        {item.reason || "N/A"}
                                       </td>
                                     </tr>
                                   ))}

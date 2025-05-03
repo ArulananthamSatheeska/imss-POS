@@ -121,8 +121,7 @@ const StockReport = () => {
   const calculateStockDetails = (data) => {
     return data.map((item) => {
       const closingStock = item.closingStock ?? 0;
-      const totalPurchaseValue =
-        (item.openingStock + item.purchased) * (item.costPrice ?? 0);
+      const totalPurchaseValue = closingStock * (item.costPrice ?? 0); // Changed to closingStock * costPrice
       const totalSalesValue = (item.sold ?? 0) * (item.sellingPrice ?? 0);
       const totalAvailableValue = closingStock * (item.sellingPrice ?? 0);
 
@@ -151,7 +150,6 @@ const StockReport = () => {
     const matchesCategory = categoryFilter
       ? item.category === categoryFilter
       : true;
-    // Supplier filter not applied since backend doesn't return supplier in response
     const matchesLocation = locationFilter
       ? (item.location.type + " " + item.location.identifier)
           .toLowerCase()
@@ -212,7 +210,7 @@ const StockReport = () => {
         "Product Name": item.itemName ?? "N/A",
         Category: item.category ?? "N/A",
         Unit: item.unit ?? "N/A",
-        "Opening Stock": item.openingStock ?? 0,
+        "Opening Stock": item.initialOpeningStock ?? 0,
         Purchased: item.purchased ?? 0,
         Sold: item.sold ?? 0,
         "Closing Stock": item.closingStock ?? 0,
@@ -476,7 +474,7 @@ const StockReport = () => {
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {index + 1}
                     </td>
-                    <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                    <td className="border-b border-gray-100 dark:border-gramy-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {item.itemName ?? "N/A"}
                     </td>
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
@@ -486,7 +484,7 @@ const StockReport = () => {
                       {item.unit ?? "N/A"}
                     </td>
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
-                      {item.openingStock ?? 0}
+                      {item.initialOpeningStock ?? 0}
                     </td>
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {item.purchased ?? 0}

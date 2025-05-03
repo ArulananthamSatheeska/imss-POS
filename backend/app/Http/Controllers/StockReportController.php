@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\InvoiceItem;
-use Illuminate\Http\Request;
+use App\Models\PurchaseItem;
 use App\Models\Product;
 use App\Models\SaleItem;
-use App\Models\PurchaseItem;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
@@ -46,20 +46,37 @@ class StockReportController extends Controller
             Log::info('Products fetched:', $products->toArray());
 
             // Get the date range from the request
-            $fromDate = $request->input('fromDate');
+             $fromDate = $request->input('fromDate');
             $toDate = $request->input('toDate');
 
+            // Determine the shop's first day (earliest purchase date)
+            $firstPurchaseDate = DB::table('purchases')
+                ->select(DB::raw('MIN(date_of_purchase) as first_date'))
+                ->value('first_date');
+
+            $firstPurchaseDate = $firstPurchaseDate ? substr($firstPurchaseDate, 0, 10) : null;
+
             // Prepare the detailed stock report data
-            $stockReports = $products->map(function ($product) use ($fromDate, $toDate) {
-                // Calculate total sold quantity within the date range
-                $saleQuery = InvoiceItem::where('product_id', $product->product_id)
+            $stockReports = $products->map(function ($product) use ($fromDate, $toDate, $firstPurchaseDate) {
+                // Calculate total sold quantity within the date range (InvoiceItem + SaleItem)
+                $invoiceSaleQuery = InvoiceItem::where('product_id', $product->product_id)
                     ->whereHas('invoice', function ($q) use ($fromDate, $toDate) {
                         if ($fromDate && $toDate) {
                             $q->whereBetween('invoice_date', [$fromDate, $toDate]);
                         }
                     });
-                $totalSoldQuantity = $saleQuery->sum('quantity') ?? 0;
-                Log::debug('Total sold quantity for product ID ' . $product->product_id . ': ' . $totalSoldQuantity);
+                $invoiceSoldQuantity = $invoiceSaleQuery->sum('quantity') ?? 0;
+
+                $posSaleQuery = SaleItem::where('product_id', $product->product_id)
+                    ->whereHas('sale', function ($q) use ($fromDate, $toDate) {
+                        if ($fromDate && $toDate) {
+                            $q->whereBetween('created_at', [$fromDate . ' 00:00:00', $toDate . ' 23:59:59']);
+                        }
+                    });
+                $posSoldQuantity = $posSaleQuery->sum('quantity') ?? 0;
+
+                $totalSoldQuantity = $invoiceSoldQuantity + $posSoldQuantity;
+                Log::debug('Total sold quantity for product ID ' . $product->product_id . ': ' . $totalSoldQuantity . ' (Invoice: ' . $invoiceSoldQuantity . ', POS: ' . $posSoldQuantity . ')');
 
                 // Calculate total purchased quantity within the date range
                 $purchaseQuery = PurchaseItem::where('product_id', $product->product_id)
@@ -71,13 +88,45 @@ class StockReportController extends Controller
                 $totalPurchasedQuantity = $purchaseQuery->sum('quantity') ?? 0;
                 Log::debug('Total purchased quantity for product ID ' . $product->product_id . ': ' . $totalPurchasedQuantity);
 
-                // Calculate closing stock
+                // Determine opening stock
                 $openingStock = $product->opening_stock_quantity ?? 0;
+
+                if ($fromDate && $firstPurchaseDate && $fromDate !== $firstPurchaseDate) {
+                    // For subsequent days, calculate opening stock as previous day's closing stock
+                    $previousDay = date('Y-m-d', strtotime($fromDate . ' -1 day'));
+
+                    // Calculate total sold quantity up to the previous day (InvoiceItem + SaleItem)
+                    $prevInvoiceSaleQuery = InvoiceItem::where('product_id', $product->product_id)
+                        ->whereHas('invoice', function ($q) use ($previousDay) {
+                            $q->where('invoice_date', '<=', $previousDay);
+                        });
+                    $totalInvoiceSoldPrev = $prevInvoiceSaleQuery->sum('quantity') ?? 0;
+
+                    $prevPosSaleQuery = SaleItem::where('product_id', $product->product_id)
+                        ->whereHas('sale', function ($q) use ($previousDay) {
+                            $q->where('created_at', '<=', $previousDay . ' 23:59:59');
+                        });
+                    $totalPosSoldPrev = $prevPosSaleQuery->sum('quantity') ?? 0;
+
+                    $totalSoldPrev = $totalInvoiceSoldPrev + $totalPosSoldPrev;
+
+                    // Calculate total purchased quantity up to the previous day
+                    $prevPurchaseQuery = PurchaseItem::where('product_id', $product->product_id)
+                        ->whereHas('purchase', function ($q) use ($previousDay) {
+                            $q->where('date_of_purchase', '<=', $previousDay);
+                        });
+                    $totalPurchasedPrev = $prevPurchaseQuery->sum('quantity') ?? 0;
+
+                    // Previous day's closing stock = initial opening stock + total purchased - total sold
+                    $openingStock = ($product->opening_stock_quantity ?? 0) + $totalPurchasedPrev - $totalSoldPrev;
+                }
+
+                // Calculate closing stock
                 $closingStock = $openingStock + $totalPurchasedQuantity - $totalSoldQuantity;
 
                 // Calculate total purchase value (cost)
                 $buyingCost = $product->buying_cost ?? 0;
-                $totalPurchaseValue = ($openingStock + $totalPurchasedQuantity) * $buyingCost;
+                $totalPurchaseValue = $closingStock * $buyingCost;
 
                 // Calculate total sales value (selling price)
                 $sellingPrice = $product->sales_price ?? 0;
@@ -93,6 +142,7 @@ class StockReportController extends Controller
                     'itemName' => $product->product_name ?? 'N/A',
                     'category' => $product->category ?? 'N/A',
                     'unit' => $product->unit_type ?? 'N/A',
+                    'initialOpeningStock' => $product->opening_stock_quantity ?? 0,
                     'openingStock' => $openingStock,
                     'purchased' => $totalPurchasedQuantity,
                     'sold' => $totalSoldQuantity,
@@ -154,9 +204,37 @@ class StockReportController extends Controller
 
             Log::info('Products fetched:', $products->toArray());
 
-            $stockReports = $products->map(function ($product) {
-                $totalSoldQuantity = SaleItem::where('product_id', $product->product_id)->sum('quantity') ?? 0;
-                $actualStockQuantity = ($product->opening_stock_quantity ?? 0) - $totalSoldQuantity;
+            $stockReports = $products->map(function ($product) use ($request) {
+                // Calculate total sold quantity (InvoiceItem + SaleItem) with optional date filter
+                $invoiceSaleQuery = InvoiceItem::where('product_id', $product->product_id);
+                $posSaleQuery = SaleItem::where('product_id', $product->product_id);
+
+                if ($request->has('fromDate') && $request->has('toDate')) {
+                    $fromDate = $request->input('fromDate');
+                    $toDate = $request->input('toDate');
+                    $invoiceSaleQuery->whereHas('invoice', function ($q) use ($fromDate, $toDate) {
+                        $q->whereBetween('invoice_date', [$fromDate, $toDate]);
+                    });
+                    $posSaleQuery->whereHas('sale', function ($q) use ($fromDate, $toDate) {
+                        $q->whereBetween('created_at', [$fromDate . ' 00:00:00', $toDate . ' 23:59:59']);
+                    });
+                }
+
+                $totalInvoiceSold = $invoiceSaleQuery->sum('quantity') ?? 0;
+                $totalPosSold = $posSaleQuery->sum('quantity') ?? 0;
+                $totalSoldQuantity = $totalInvoiceSold + $totalPosSold;
+
+                // Calculate total purchased quantity with optional date filter
+                $purchaseQuery = PurchaseItem::where('product_id', $product->product_id);
+                if ($request->has('fromDate') && $request->has('toDate')) {
+                    $purchaseQuery->whereHas('purchase', function ($q) use ($fromDate, $toDate) {
+                        $q->whereBetween('date_of_purchase', [$fromDate, $toDate]);
+                    });
+                }
+                $totalPurchasedQuantity = $purchaseQuery->sum('quantity') ?? 0;
+
+                // Calculate stock quantity
+                $actualStockQuantity = ($product->opening_stock_quantity ?? 0) + $totalPurchasedQuantity - $totalSoldQuantity;
                 $stockValue = $actualStockQuantity * ($product->buying_cost ?? 0);
 
                 return [

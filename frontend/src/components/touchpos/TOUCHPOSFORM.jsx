@@ -207,14 +207,59 @@ const TOUCHPOSFORM = () => {
     setIsClosingRegister(true);
     setShowRegisterModal(true);
   };
+  useEffect(() => {
+    // Check register status on mount and when user changes
+    if (user && !registerStatus.isOpen) {
+      setShowRegisterModal(true);
+    }
+  }, [user, registerStatus.isOpen]);
 
-  const handleRegisterConfirm = (amount) => {
+  const handleRegisterConfirm = async (amount) => {
     if (isClosingRegister) {
-      const closingDetails = calculateClosingDetails(); // Implement this function
-      closeRegister({ ...closingDetails, inCashierAmount: amount });
-      setIsClosingRegister(false);
+      const closingDetails = calculateClosingDetails();
+      try {
+        await closeRegister({
+          ...closingDetails,
+          inCashierAmount: amount.inCashierAmount,
+          otherAmount: amount.otherAmount
+        });
+        setIsClosingRegister(false);
+        setShowRegisterModal(false);
+      } catch (error) {
+        console.error('Failed to close register:', error);
+      }
     } else {
-      openRegister(amount, user.id);
+      try {
+        await openRegister(amount, user.id);
+        setShowRegisterModal(false);
+      } catch (error) {
+        console.error('Failed to open register:', error);
+      }
+    }
+  };
+
+
+  const handleOpenRegister = async (amount) => {
+    try {
+      const isClosed = await checkRegisterStatus();
+      if (!isClosed) return;
+
+      const response = await openRegister({
+        user_id: user.id,
+        terminal_id: terminalId,
+        opening_cash: amount
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      // Success case
+      setCashOnHand(amount);
+      setRegisterOpen(true);
+    } catch (error) {
+      console.error('Failed to open register:', error);
+      alert(`Failed to open register: ${error.message}`);
     }
   };
 
@@ -832,6 +877,7 @@ const TOUCHPOSFORM = () => {
     setCustomerInfo(prev => ({ ...prev, bill_number: billNumber }));
     setShowBillModal(true);
   }, [products, billNumber, registerStatus.isOpen]);
+
   // Close Bill Modal
   const closeBillModal = useCallback(
     (saleSaved = false) => {
