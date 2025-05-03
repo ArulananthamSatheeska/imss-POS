@@ -215,15 +215,59 @@ const SalesInvoice = ({
   const [customersLoading, setCustomersLoading] = useState(false);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchProductsWithStock = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/api/products");
-        setProducts(response.data.data || []);
-      } catch {
-        toast.error("Failed to load products.");
+        const today = new Date().toISOString().split("T")[0];
+        const stockResponse = await axios.get(
+          "http://127.0.0.1:8000/api/detailed-stock-reports",
+          {
+            params: { toDate: today },
+          }
+        );
+
+        const productResponse = await axios.get(
+          "http://127.0.0.1:8000/api/products"
+        );
+
+        if (
+          stockResponse.data &&
+          Array.isArray(stockResponse.data) &&
+          productResponse.data &&
+          Array.isArray(productResponse.data.data)
+        ) {
+          const productsWithStock = productResponse.data.data.map((product) => {
+            const stockItem = stockResponse.data.find(
+              (stock) => stock.itemCode === product.item_code
+            );
+            return {
+              ...product,
+              product_id: product.product_id,
+              opening_stock_quantity: stockItem
+                ? parseFloat(stockItem.closingStock || 0)
+                : parseFloat(product.opening_stock_quantity || 0),
+            };
+          });
+          setProducts(productsWithStock);
+        } else {
+          setProducts([]);
+          toast.error("Invalid product or stock data format.");
+        }
+      } catch (error) {
+        setProducts([]);
+        toast.error(
+          "Failed to load products or stock. Using default stock quantities."
+        );
+        try {
+          const fallbackResponse = await axios.get(
+            "http://127.0.0.1:8000/api/products"
+          );
+          setProducts(fallbackResponse.data.data || []);
+        } catch (fallbackError) {
+          toast.error("Failed to load products.");
+        }
       }
     };
-    fetchProducts();
+    fetchProductsWithStock();
   }, []);
 
   useEffect(() => {
@@ -269,7 +313,6 @@ const SalesInvoice = ({
     let discountAmount = parseFloat(item.discountAmount) || 0;
     let discountPercentage = parseFloat(item.discountPercentage) || 0;
 
-    // If discountPercentage is provided, calculate discountAmount and salesPrice
     if (
       item.discountPercentage !== undefined &&
       item.discountPercentage !== ""
@@ -280,9 +323,10 @@ const SalesInvoice = ({
           : 0;
       discountAmount = (unitPrice * qty * discountPercentage) / 100;
       salesPrice = unitPrice - discountAmount / qty;
-    }
-    // If discountAmount is provided, calculate discountPercentage and salesPrice
-    else if (item.discountAmount !== undefined && item.discountAmount !== "") {
+    } else if (
+      item.discountAmount !== undefined &&
+      item.discountAmount !== ""
+    ) {
       discountAmount = discountAmount >= 0 ? discountAmount : 0;
       discountPercentage =
         unitPrice > 0 ? (discountAmount / (unitPrice * qty)) * 100 : 0;
@@ -316,7 +360,7 @@ const SalesInvoice = ({
             ...newItems[index],
             [targetName]: processedValue,
           };
-          newItems[index] = updateItemTotal(newItems[index]); // Update total, totalBuyingCost, discountAmount, and discountPercentage
+          newItems[index] = updateItemTotal(newItems[index]);
         } else {
           newItems[index] = {
             ...newItems[index],
@@ -386,7 +430,7 @@ const SalesInvoice = ({
       const unitPrice = product ? parseFloat(product.mrp) || 0 : 0;
       const salesPrice = product ? parseFloat(product.sales_price) || 0 : 0;
       const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
-      const discountAmount = qty * (unitPrice - salesPrice); // Discount = (MRP - Selling Price) * Quantity
+      const discountAmount = qty * (unitPrice - salesPrice);
       const discountPercentage =
         unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0;
       newItems[index] = {
@@ -400,7 +444,7 @@ const SalesInvoice = ({
         discountPercentage: discountPercentage >= 0 ? discountPercentage : 0,
         totalBuyingCost: qty * buyingCost,
       };
-      newItems[index] = updateItemTotal(newItems[index]); // Update total, totalBuyingCost, discountAmount, and discountPercentage
+      newItems[index] = updateItemTotal(newItems[index]);
       return { ...prev, items: newItems };
     });
     setErrors((prev) => ({ ...prev, [`itemDescription${index}`]: undefined }));
@@ -610,11 +654,6 @@ const SalesInvoice = ({
               .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
               .join("\n")
           : "No detailed errors provided.";
-        console.error("API Error Details:", {
-          message,
-          details,
-          response: error.response?.data,
-        });
         toast.error(`${message}\n${details}`);
       } finally {
         setLoading(false);
@@ -735,9 +774,7 @@ const SalesInvoice = ({
     () =>
       products.map((p) => ({
         value: p.product_id,
-        label: `${p.product_name} (Stock: ${
-          p.opening_stock_quantity ?? "N/A"
-        })`,
+        label: `${p.product_name} (${p.opening_stock_quantity ?? "N/A"})`,
       })),
     [products]
   );
@@ -782,18 +819,18 @@ const SalesInvoice = ({
 
   return (
     <ErrorBoundary>
-      <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-gray-900 bg-opacity-50">
-        <div className="flex flex-col w-full max-w-screen-2xl max-h-[95vh] p-6 bg-white rounded-lg shadow-xl">
-          <h3 className="mb-4 text-2xl font-bold text-blue-600">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm">
+        <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col">
+          <h3 className="text-2xl font-bold text-blue-600 p-6 border-b border-gray-200">
             {isEditMode ? "Edit Invoice" : "Create New Invoice"}
           </h3>
           <form
             id="invoiceForm"
             onSubmit={handleSubmit}
             noValidate
-            className="flex-grow p-4 overflow-y-auto border bg-gray-50 rounded-xl"
+            className="flex-grow p-6 overflow-y-auto bg-gray-50"
           >
-            <div className="p-4 mb-6 bg-white border rounded-lg">
+            <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
               <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
                 Invoice Details
               </h4>
@@ -878,7 +915,7 @@ const SalesInvoice = ({
               </div>
             </div>
 
-            <div className="p-4 mb-6 bg-white border rounded-lg">
+            <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
               <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
                 Customer Information
               </h4>
@@ -1003,7 +1040,7 @@ const SalesInvoice = ({
                 {formData.items.map((item, index) => (
                   <div
                     key={item.id}
-                    className="relative p-4 bg-white border rounded-lg"
+                    className="relative p-4 bg-white border rounded-lg shadow-sm"
                   >
                     {formData.items.length > 1 && (
                       <button
@@ -1024,8 +1061,8 @@ const SalesInvoice = ({
                         </svg>
                       </button>
                     )}
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-14">
-                      <div className="md:col-span-4">
+                    <div className="flex flex-wrap gap-4 items-end">
+                      <div className="flex-1 min-w-[200px]">
                         <label
                           htmlFor={`itemDescription${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1064,7 +1101,7 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-1">
+                      <div className="w-20">
                         <label
                           htmlFor={`itemQty${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1101,13 +1138,12 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-2">
+                      <div className="w-28">
                         <label
                           htmlFor={`itemUnitPrice${index}`}
                           className="block mb-1 text-sm font-medium"
                         >
-                          Unit Price (LKR){" "}
-                          <span className="text-red-500">*</span>
+                          Unit Price
                         </label>
                         <input
                           id={`itemUnitPrice${index}`}
@@ -1121,7 +1157,7 @@ const SalesInvoice = ({
                           readOnly
                         />
                       </div>
-                      <div className="md:col-span-2">
+                      <div className="w-28">
                         <label
                           htmlFor={`itemDiscountAmount${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1162,7 +1198,7 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-1">
+                      <div className="w-20">
                         <label
                           htmlFor={`itemDiscountPercentage${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1206,17 +1242,17 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-2">
+                      <div className="w-28">
                         <label className="block mb-1 text-sm font-medium">
-                          Total Buying Cost (LKR)
+                          Buy Cost
                         </label>
                         <span className="w-full p-2.5 text-right font-medium">
                           {(parseFloat(item.totalBuyingCost) || 0).toFixed(2)}
                         </span>
                       </div>
-                      <div className="md:col-span-2">
+                      <div className="w-28">
                         <label className="block mb-1 text-sm font-medium">
-                          Total (LKR)
+                          Total
                         </label>
                         <span className="w-full p-2.5 text-right font-medium">
                           {(parseFloat(item.total) || 0).toFixed(2)}
@@ -1229,7 +1265,7 @@ const SalesInvoice = ({
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              <div className="p-4 bg-white border rounded-lg md:col-span-2">
+              <div className="p-4 bg-white border rounded-lg shadow-sm md:col-span-2">
                 <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
                   Payment Details
                 </h4>
@@ -1320,7 +1356,7 @@ const SalesInvoice = ({
                   </div>
                 </div>
               </div>
-              <div className="p-4 bg-gray-100 border rounded-lg">
+              <div className="p-4 bg-gray-100 border rounded-lg shadow-sm">
                 <h4 className="mb-3 text-base font-semibold">
                   Invoice Summary
                 </h4>
@@ -1360,8 +1396,8 @@ const SalesInvoice = ({
               </div>
             </div>
 
-            <div className="sticky bottom-0 py-3 mt-6 -mx-4 bg-gray-100 border-t rounded-b-xl">
-              <div className="flex justify-end space-x-3">
+            <div className="sticky bottom-0 py-4 mt-6 -mx-6 bg-gray-100 border-t rounded-b-xl">
+              <div className="flex justify-end space-x-4 px-6">
                 <button
                   type="button"
                   onClick={onCancel}
