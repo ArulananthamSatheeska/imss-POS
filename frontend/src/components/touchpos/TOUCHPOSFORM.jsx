@@ -207,18 +207,33 @@ const TOUCHPOSFORM = () => {
     setIsClosingRegister(true);
     setShowRegisterModal(true);
   };
+  useEffect(() => {
+    // Check register status on mount and when user changes
+    if (user && !registerStatus.isOpen) {
+      setShowRegisterModal(true);
+    }
+  }, [user, registerStatus.isOpen]);
 
-  const handleRegisterConfirm = (amount) => {
+  const handleRegisterConfirm = async (amount) => {
     if (isClosingRegister) {
       const closingDetails = calculateClosingDetails();
-      const { inCashierAmount, otherAmount } = amount;
-      closingDetails.inCashierAmount = inCashierAmount;
-      closingDetails.otherAmount = otherAmount;
-      closeRegister(closingDetails);
-      setIsClosingRegister(false);
+      try {
+        await closeRegister({
+          ...closingDetails,
+          inCashierAmount: amount.inCashierAmount,
+          otherAmount: amount.otherAmount
+        });
+        setIsClosingRegister(false);
+        setShowRegisterModal(false);
+      } catch (error) {
+        console.error('Failed to close register:', error);
+      }
     } else {
-      if (!registerStatus.isOpen) {
-        openRegister(amount, user.id);
+      try {
+        await openRegister(amount, user.id);
+        setShowRegisterModal(false);
+      } catch (error) {
+        console.error('Failed to open register:', error);
       }
     }
   };
