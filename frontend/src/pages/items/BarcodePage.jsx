@@ -51,7 +51,7 @@ export const BarcodePage = () => {
               : 1.2;
           const barcodeHeight =
             parseInt(templateSize.split("x")[1].replace("mm", "")) <= 20
-              ? 10
+              ? 8
               : 15;
 
           try {
@@ -195,7 +195,7 @@ export const BarcodePage = () => {
           ? 0.8
           : 1.2;
       const barcodeHeight =
-        parseInt(templateSize.split("x")[1].replace("mm", "")) <= 20 ? 10 : 15;
+        parseInt(templateSize.split("x")[1].replace("mm", "")) <= 20 ? 8 : 15;
 
       try {
         JsBarcode(canvas, product.barcode, {
@@ -213,26 +213,37 @@ export const BarcodePage = () => {
     });
 
     const [labelWidth, labelHeight] = templateSize.split("x").map((dim) => dim);
+    const isSmallTemplate =
+      templateSize === "30mmx16mm" || templateSize === "60mmx15mm";
+    const fontSize = isSmallTemplate ? "7px" : "8px";
+    const margin = isSmallTemplate ? "0.5px" : "1px";
+    const barcodeFlex = templateSize === "30mmx16mm" ? "25%" : "30%";
+
     const printContent = printBarcodes
       .map(
         (product, index) => `
-        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: left; font-size: 8px; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm;">
-          <h3 style="margin: 0 0 1px 0; font-weight: bold; font-size: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.product_name.toUpperCase()}
-          </h3>
-          <div style="margin: 1px 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: left; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm;">
+          <div style="display: flex; align-items: center; margin: 0 0 ${margin} 0; overflow: hidden;">
+            <h3 style="flex: 1; margin: 0; font-weight: bold; font-size: 8px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${product.product_name.toUpperCase()}
+            </h3>
+            <div class="barcode-number" style="flex: 0 0 ${barcodeFlex}; font-size: ${fontSize}; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${product.barcode}
+            </div>
+          </div>
+          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             කල්. දිනය/ EXP Date: ${product.expiry_date}
           </div>
-          <div style="margin: 1px 0; line-height: "1.1"; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             කු. අං/ Batch No: ${product.batch_number}
           </div>
           <img src="${
             barcodeImages[index]
           }" style="margin: 0 auto; display: block; width: 80%; height: auto;" />
-          <div class="mrp" style="text-align: center; font-size: 8px; position: absolute; bottom: 10px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <div class="mrp" style="text-align: center; font-size: ${fontSize}; position: absolute; bottom: 10px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             MRP: ${product.mrp}
           </div>
-          <div class="seller" style="text-align: center; font-size: 8px; position: absolute; bottom: 1px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <div class="seller" style="text-align: center; font-size: ${fontSize}; position: absolute; bottom: 1px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             Import&Distributed by: ${product.supplier}
           </div>
         </div>
@@ -816,6 +827,14 @@ export const BarcodePage = () => {
                     const [labelWidth, labelHeight] = templateSize
                       .split("x")
                       .map((dim) => dim);
+                    const isSmallTemplate =
+                      templateSize === "30mmx16mm" ||
+                      templateSize === "60mmx15mm";
+                    const fontSize = isSmallTemplate ? "7px" : "8px";
+                    const margin = isSmallTemplate ? "0.5px" : "1px";
+                    const barcodeFlex =
+                      templateSize === "30mmx16mm" ? "25%" : "30%";
+
                     return (
                       <div
                         key={`${product.barcode}-${index}`}
@@ -824,7 +843,7 @@ export const BarcodePage = () => {
                           border: "1px solid #000",
                           padding: "2px",
                           textAlign: "left",
-                          fontSize: "8px",
+                          fontSize: fontSize,
                           width: labelWidth,
                           height: labelHeight,
                           backgroundColor: "#fff",
@@ -832,22 +851,45 @@ export const BarcodePage = () => {
                           position: "relative",
                         }}
                       >
-                        <h3
-                          style={{
-                            margin: "0 0 1px 0",
-                            fontWeight: "bold",
-                            fontSize: "10px",
-                            textAlign: "center",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {product.product_name.toUpperCase()}
-                        </h3>
                         <div
                           style={{
-                            margin: "1px 0",
+                            display: "flex",
+                            alignItems: "center",
+                            margin: `0 0 ${margin} 0`,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <h3
+                            style={{
+                              flex: 1,
+                              margin: 0,
+                              fontWeight: "bold",
+                              fontSize: "8px",
+                              textAlign: "left",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {product.product_name.toUpperCase()}
+                          </h3>
+                          <div
+                            className="barcode-number"
+                            style={{
+                              flex: `0 0 ${barcodeFlex}`,
+                              fontSize: fontSize,
+                              textAlign: "right",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {product.barcode}
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            margin: `${margin} 0`,
                             lineHeight: "1.1",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
@@ -858,14 +900,14 @@ export const BarcodePage = () => {
                         </div>
                         <div
                           style={{
-                            margin: "1px 0",
+                            margin: `${margin} 0`,
                             lineHeight: "1.1",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                           }}
                         >
-                          කු. අං/ Batch No: ${product.batch_number}
+                          කු. අං/ Batch No: {product.batch_number}
                         </div>
                         <canvas
                           id={`barcode-${index}`}
@@ -880,7 +922,7 @@ export const BarcodePage = () => {
                           className="mrp"
                           style={{
                             textAlign: "center",
-                            fontSize: "8px",
+                            fontSize: fontSize,
                             position: "absolute",
                             bottom: "10px",
                             width: "100%",
@@ -889,13 +931,13 @@ export const BarcodePage = () => {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          MRP: ${product.mrp}
+                          MRP: {product.mrp}
                         </div>
                         <div
                           className="seller"
                           style={{
                             textAlign: "center",
-                            fontSize: "8px",
+                            fontSize: fontSize,
                             position: "absolute",
                             bottom: "1px",
                             width: "100%",
@@ -904,7 +946,7 @@ export const BarcodePage = () => {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          Import&Distributed by: ${product.supplier}
+                          Import&Distributed by: {product.supplier}
                         </div>
                       </div>
                     );

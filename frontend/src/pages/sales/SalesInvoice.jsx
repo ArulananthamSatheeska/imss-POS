@@ -17,7 +17,7 @@ const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
     const end = endDate ? new Date(endDate) : null;
     return (!start || invDate >= start) && (!end || invDate <= end);
   } catch (e) {
-    console.error('Error checking date within scheme:', e);
+    console.error("Error checking date within scheme:", e);
     return false;
   }
 };
@@ -85,23 +85,26 @@ const SalesInvoice = ({
           hour12: false,
         }),
       },
-      customer: { id: null, name: '', address: '', phone: '', email: '' },
-      items: [{
-        id: Date.now(),
-        description: '',
-        qty: 1,
-        unitPrice: 0,
-        salesPrice: 0,
-        discountAmount: 0,
-        discountPercentage: 0,
-        specialDiscount: 0,
-        total: 0,
-        totalBuyingCost: 0,
-        productId: null,
-        categoryId: null,
-      }],
-      purchaseDetails: { method: 'cash', amount: 0, taxPercentage: 0 },
-      status: 'pending',
+      customer: { id: null, name: "", address: "", phone: "", email: "" },
+      items: [
+        {
+          id: Date.now(),
+          description: "",
+          qty: 1,
+          unitPrice: 0,
+          salesPrice: 0,
+          discountAmount: 0,
+          discountPercentage: 0,
+          specialDiscount: 0,
+          total: 0,
+          totalBuyingCost: 0,
+          productId: null,
+          buyingCost: 0,
+          categoryId: null,
+        },
+      ],
+      purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
+      status: "pending",
       id: null,
     };
 
@@ -131,6 +134,16 @@ const SalesInvoice = ({
             item.buyingCost || item.buying_cost || 0
           );
           const unitPrice = parseFloat(item.unitPrice || item.unit_price || 0);
+          const discountAmount = parseFloat(
+            item.discountAmount ||
+              item.discount_amount ||
+              unitPrice * qty - salesPrice * qty
+          );
+          const discountPercentage = parseFloat(
+            item.discountPercentage ||
+              item.discount_percentage ||
+              (unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0)
+          );
           return {
             ...item,
             id: item.id || Date.now() + idx,
@@ -140,10 +153,13 @@ const SalesInvoice = ({
             unitPrice,
             salesPrice,
             buyingCost,
-            discountAmount: parseFloat(item.discountAmount || item.discount_amount || 0),
-            discountPercentage: parseFloat(item.discountPercentage || item.discount_percentage || 0),
+            discountAmount: discountAmount >= 0 ? discountAmount : 0,
+            discountPercentage:
+              discountPercentage >= 0 ? discountPercentage : 0,
             specialDiscount: parseFloat(item.specialDiscount || 0),
-            total: parseFloat(item.total || qty * salesPrice),
+            total: parseFloat(
+              item.total || qty * salesPrice - (item.specialDiscount || 0)
+            ),
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
             ),
@@ -178,6 +194,13 @@ const SalesInvoice = ({
           const salesPrice = parseFloat(item.salesPrice || 0);
           const buyingCost = parseFloat(item.buyingCost || 0);
           const unitPrice = parseFloat(item.unitPrice || 0);
+          const discountAmount = parseFloat(
+            item.discountAmount || unitPrice * qty - salesPrice * qty
+          );
+          const discountPercentage = parseFloat(
+            item.discountPercentage ||
+              (unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0)
+          );
           return {
             ...item,
             id: item.id || Date.now() + idx,
@@ -187,10 +210,15 @@ const SalesInvoice = ({
             unitPrice,
             salesPrice,
             buyingCost,
-            discountAmount: parseFloat(item.discountAmount || 0),
-            discountPercentage: parseFloat(item.discountPercentage || 0),
+            discountAmount: discountAmount >= 0 ? discountAmount : 0,
+            discountPercentage:
+              discountPercentage >= 0 && discountPercentage <= 100
+                ? discountPercentage
+                : 0,
             specialDiscount: parseFloat(item.specialDiscount || 0),
-            total: parseFloat(item.total || qty * salesPrice),
+            total: parseFloat(
+              item.total || qty * salesPrice - (item.specialDiscount || 0)
+            ),
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
             ),
@@ -220,21 +248,93 @@ const SalesInvoice = ({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsResponse, customersResponse, categoriesResponse, schemesResponse] = await Promise.all([
-          axios.get('http://127.0.0.1:8000/api/products'),
-          axios.get('http://127.0.0.1:8000/api/customers'),
-          axios.get('http://127.0.0.1:8000/api/categories'),
-          axios.get('http://127.0.0.1:8000/api/discount-schemes'),
+        setCustomersLoading(true);
+        const today = new Date().toISOString().split("T")[0];
+        const [
+          stockResponse,
+          productResponse,
+          customersResponse,
+          categoriesResponse,
+          schemesResponse,
+        ] = await Promise.all([
+          axios.get("http://127.0.0.1:8000/api/detailed-stock-reports", {
+            params: { toDate: today },
+          }),
+          axios.get("http://127.0.0.1:8000/api/products"),
+          axios.get("http://127.0.0.1:8000/api/customers"),
+          axios.get("http://127.0.0.1:8000/api/categories"),
+          axios.get("http://127.0.0.1:8000/api/discount-schemes"),
         ]);
 
-        console.log('Raw Discount Schemes Response:', schemesResponse.data);
-        setProducts(productsResponse.data.data || []);
+        // Process products with stock and category_name
+        if (
+          stockResponse.data &&
+          Array.isArray(stockResponse.data) &&
+          productResponse.data &&
+          Array.isArray(productResponse.data.data)
+        ) {
+          const productsWithStock = productResponse.data.data.map((product) => {
+            const stockItem = stockResponse.data.find(
+              (stock) => stock.itemCode === product.item_code
+            );
+            return {
+              ...product,
+              product_id: product.product_id,
+              category_name: product.category || "Unknown",
+              opening_stock_quantity: stockItem
+                ? parseFloat(stockItem.closingStock || 0)
+                : parseFloat(product.opening_stock_quantity || 0),
+            };
+          });
+          setProducts(productsWithStock);
+          productsWithStock.forEach((p) => {
+            if (!p.category_name || p.category_name === "Unknown") {
+              console.warn(
+                `Missing or invalid category_name for product: ${p.product_name} (category_id: ${p.category_id})`
+              );
+            }
+          });
+        } else {
+          setProducts(
+            productResponse.data.data.map((product) => ({
+              ...product,
+              product_id: product.product_id,
+              category_name: product.category || "Unknown",
+              opening_stock_quantity: parseFloat(
+                product.opening_stock_quantity || 0
+              ),
+            }))
+          );
+          toast.warn(
+            "Invalid stock data format. Using default stock quantities."
+          );
+        }
+
         setCustomers(customersResponse.data.data || []);
         setCategories(categoriesResponse.data || []);
-        setDiscountSchemes(schemesResponse.data.data || schemesResponse.data || []);
+        setDiscountSchemes(
+          schemesResponse.data.data || schemesResponse.data || []
+        );
       } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Failed to load data. Check console for details.');
+        console.error("Error fetching data:", error);
+        toast.error("Failed to load data. Check console for details.");
+        try {
+          const fallbackResponse = await axios.get(
+            "http://127.0.0.1:8000/api/products"
+          );
+          setProducts(
+            fallbackResponse.data.data.map((product) => ({
+              ...product,
+              product_id: product.product_id,
+              category_name: product.category || "Unknown",
+              opening_stock_quantity: parseFloat(
+                product.opening_stock_quantity || 0
+              ),
+            }))
+          );
+        } catch (fallbackError) {
+          toast.error("Failed to load products.");
+        }
       } finally {
         setCustomersLoading(false);
       }
@@ -242,15 +342,17 @@ const SalesInvoice = ({
     fetchData();
   }, []);
 
-  // Recalculate special discounts when discountSchemes change
+  // Recalculate discounts when discountSchemes or products change
   useEffect(() => {
-    if (discountSchemes.length > 0) {
+    if (discountSchemes.length > 0 && products.length > 0) {
       setFormData((prev) => ({
         ...prev,
-        items: prev.items.map((item) => updateItemTotal(item, prev.invoice.date)),
+        items: prev.items.map((item) =>
+          updateItemTotal(item, prev.invoice.date)
+        ),
       }));
     }
-  }, [discountSchemes, products, categories]);
+  }, [discountSchemes, products]);
 
   useEffect(() => {
     itemRefs.current = formData.items.map((_, index) => ({
@@ -258,7 +360,6 @@ const SalesInvoice = ({
       qty: { current: null },
       discountAmount: { current: null },
       discountPercentage: { current: null },
-      specialDiscount: { current: null },
     }));
   }, [formData.items.length]);
 
@@ -273,114 +374,146 @@ const SalesInvoice = ({
     }
   }, [formData, isEditMode]);
 
-  // Calculate special discount based on product description or category
-  const calculateSpecialDiscount = useCallback((item, invoiceDate) => {
-    if (!item.productId) {
-      console.log('No productId for item:', item);
-      return 0;
-    }
-
-    const product = products.find((p) => p.product_id === item.productId);
-    if (!product) {
-      console.log('Product not found for productId:', item.productId);
-      return 0;
-    }
-
-    const category = categories.find((c) => c.id === product.category_id);
-    const categoryName = category ? category.name : null;
-    const qty = parseFloat(item.qty) || 1;
-    const salesPrice = parseFloat(item.salesPrice) || 0;
-    const totalAmount = qty * salesPrice;
-
-    console.log('Calculating special discount for:', {
-      productId: product.product_id,
-      productName: product.product_name,
-      productDescription: product.description,
-      categoryName,
-      qty,
-      salesPrice,
-      totalAmount,
-      discountSchemesCount: discountSchemes.length,
-    });
-
-    const applicableScheme = discountSchemes.find((scheme) => {
-      if (!scheme.active || !isDateWithinScheme(invoiceDate, scheme.start_date, scheme.end_date)) {
-        console.log('Scheme not active or out of date range:', scheme);
-        return false;
+  // Calculate special discount based on product or category
+  const calculateSpecialDiscount = useCallback(
+    (item, invoiceDate) => {
+      if (!item.productId) {
+        return { discount: 0, scheme: null, schemeType: null };
       }
-      const target = scheme.target?.trim().toLowerCase();
-      // For product, match target with product.description or product_name as fallback
-      const productMatch = scheme.applies_to === 'product' &&
-        target === (product.description?.trim().toLowerCase() || product.product_name?.trim().toLowerCase());
-      // For category, match target with category.name
-      const categoryMatch = scheme.applies_to === 'category' && categoryName &&
-        target === categoryName?.trim().toLowerCase();
-      console.log('Checking scheme:', {
-        schemeId: scheme.id,
-        appliesTo: scheme.applies_to,
-        target,
-        productDescription: product.description,
-        productName: product.product_name,
-        categoryName,
-        productMatch,
-        categoryMatch,
+
+      const product = products.find((p) => p.product_id === item.productId);
+      if (!product) {
+        console.warn(`Product not found for productId: ${item.productId}`);
+        return { discount: 0, scheme: null, schemeType: null };
+      }
+
+      const categoryName = product.category_name || "Unknown";
+      if (categoryName === "Unknown") {
+        console.warn(
+          `No valid category_name for product: ${product.product_name} (category_id: ${product.category_id})`
+        );
+      }
+
+      const qty = parseFloat(item.qty) || 1;
+      const salesPrice = parseFloat(item.salesPrice) || 0;
+      const totalAmount = qty * salesPrice;
+
+      const applicableScheme = discountSchemes.find((scheme) => {
+        if (
+          !scheme.active ||
+          !isDateWithinScheme(invoiceDate, scheme.start_date, scheme.end_date)
+        ) {
+          return false;
+        }
+        const target = scheme.target?.trim().toLowerCase();
+        const productMatch =
+          scheme.applies_to === "product" &&
+          target ===
+            (product.description?.trim().toLowerCase() ||
+              product.product_name?.trim().toLowerCase());
+        const categoryMatch =
+          scheme.applies_to === "category" &&
+          categoryName &&
+          target === categoryName?.trim().toLowerCase();
+        if (productMatch) {
+          console.log(
+            `Product discount match for ${product.product_name}: Target=${target}, Value=${scheme.value} ${scheme.type}`
+          );
+        }
+        if (categoryMatch) {
+          console.log(
+            `Category discount match for ${product.product_name} (Category: ${categoryName}): Target=${target}, Value=${scheme.value} ${scheme.type}`
+          );
+        }
+        return productMatch || categoryMatch;
       });
-      return productMatch || categoryMatch;
-    });
 
-    if (!applicableScheme) {
-      console.log('No applicable discount scheme found for item:', item);
-      return 0;
-    }
+      if (!applicableScheme) {
+        console.log(
+          `No discount scheme found for ${product.product_name} (Category: ${categoryName})`
+        );
+        return { discount: 0, scheme: null, schemeType: null };
+      }
 
-    let discount = 0;
-    if (applicableScheme.type === 'percentage') {
-      discount = (totalAmount * parseFloat(applicableScheme.value)) / 100;
-    } else if (applicableScheme.type === 'amount') {
-      discount = parseFloat(applicableScheme.value) * qty;
-    }
+      let discount = 0;
+      if (applicableScheme.type === "percentage") {
+        discount = (totalAmount * parseFloat(applicableScheme.value)) / 100;
+      } else if (applicableScheme.type === "amount") {
+        discount = parseFloat(applicableScheme.value) * qty;
+      }
 
-    console.log('Applied discount:', { scheme: applicableScheme, discount });
-    return discount >= 0 ? discount : 0;
-  }, [products, categories, discountSchemes]);
+      const schemeType =
+        applicableScheme.applies_to === "product" ? "product" : "category";
+      console.log(
+        `Applied ${schemeType} discount for ${product.product_name}: Target=${applicableScheme.target}, Discount=${discount}`
+      );
+      return {
+        discount: discount >= 0 ? discount : 0,
+        scheme: applicableScheme,
+        schemeType,
+      };
+    },
+    [products, discountSchemes]
+  );
 
   // Update item totals including special discount
-  const updateItemTotal = useCallback((item, invoiceDate) => {
-    const qty = parseFloat(item.qty) || 0;
-    const unitPrice = parseFloat(item.unitPrice) || 0;
-    const buyingCost = parseFloat(item.buyingCost) || 0;
-    let salesPrice = parseFloat(item.salesPrice) || unitPrice;
-    let discountAmount = parseFloat(item.discountAmount) || 0;
-    let discountPercentage = parseFloat(item.discountPercentage) || 0;
+  const updateItemTotal = useCallback(
+    (item, invoiceDate) => {
+      const qty = parseFloat(item.qty) || 0;
+      const unitPrice = parseFloat(item.unitPrice) || 0;
+      const buyingCost = parseFloat(item.buyingCost) || 0;
+      let salesPrice = parseFloat(item.salesPrice) || unitPrice;
+      let discountAmount = parseFloat(item.discountAmount) || 0;
+      let discountPercentage = parseFloat(item.discountPercentage) || 0;
 
-    // Calculate discount from percentage or amount
-    if (item.discountPercentage !== undefined && item.discountPercentage !== '') {
-      discountPercentage = discountPercentage >= 0 && discountPercentage <= 100 ? discountPercentage : 0;
-      discountAmount = (unitPrice * qty * discountPercentage) / 100;
-      salesPrice = unitPrice - (discountAmount / qty);
-    } else if (item.discountAmount !== undefined && item.discountAmount !== '') {
-      discountAmount = discountAmount >= 0 ? discountAmount : 0;
-      discountPercentage =
-        unitPrice > 0 ? (discountAmount / (unitPrice * qty)) * 100 : 0;
-      salesPrice = unitPrice - discountAmount / qty;
-    }
+      // Calculate discount from percentage or amount
+      if (
+        item.discountPercentage !== undefined &&
+        item.discountPercentage !== ""
+      ) {
+        discountPercentage =
+          discountPercentage >= 0 && discountPercentage <= 100
+            ? discountPercentage
+            : 0;
+        discountAmount = (unitPrice * qty * discountPercentage) / 100;
+        salesPrice = unitPrice - discountAmount / qty;
+      } else if (
+        item.discountAmount !== undefined &&
+        item.discountAmount !== ""
+      ) {
+        discountAmount = discountAmount >= 0 ? discountAmount : 0;
+        discountPercentage =
+          unitPrice > 0 ? (discountAmount / (unitPrice * qty)) * 100 : 0;
+        salesPrice = unitPrice - discountAmount / qty;
+      }
 
-    // Calculate special discount
-    const specialDiscount = calculateSpecialDiscount(item, invoiceDate);
+      // Calculate special discount
+      const {
+        discount: specialDiscount,
+        scheme,
+        schemeType,
+      } = calculateSpecialDiscount(item, invoiceDate);
 
-    // Calculate total after applying discounts
-    const total = qty * (salesPrice >= 0 ? salesPrice : 0) - specialDiscount;
+      // Calculate total after applying discounts
+      const total = qty * (salesPrice >= 0 ? salesPrice : 0) - specialDiscount;
 
-    return {
-      ...item,
-      salesPrice: salesPrice >= 0 ? salesPrice : 0,
-      discountAmount: discountAmount >= 0 ? discountAmount : 0,
-      discountPercentage: discountPercentage >= 0 && discountPercentage <= 100 ? discountPercentage : 0,
-      specialDiscount,
-      total: total >= 0 ? total : 0,
-      totalBuyingCost: qty * buyingCost,
-    };
-  }, [calculateSpecialDiscount]);
+      return {
+        ...item,
+        salesPrice: salesPrice >= 0 ? salesPrice : 0,
+        discountAmount: discountAmount >= 0 ? discountAmount : 0,
+        discountPercentage:
+          discountPercentage >= 0 && discountPercentage <= 100
+            ? discountPercentage
+            : 0,
+        specialDiscount,
+        discountScheme: scheme,
+        discountSchemeType: schemeType,
+        total: total >= 0 ? total : 0,
+        totalBuyingCost: qty * buyingCost,
+      };
+    },
+    [calculateSpecialDiscount]
+  );
 
   const handleInputChange = (e, section, field, index = null) => {
     const { name, value } = e.target;
@@ -391,10 +524,20 @@ const SalesInvoice = ({
       const newData = { ...prev };
       if (index !== null && section === "items") {
         const newItems = [...newData.items];
-        if (targetName === 'qty' || targetName === 'discountAmount' || targetName === 'discountPercentage') {
-          processedValue = value === '' ? '' : parseFloat(value) || 0;
-          newItems[index] = { ...newItems[index], [targetName]: processedValue };
-          newItems[index] = updateItemTotal(newItems[index], newData.invoice.date);
+        if (
+          targetName === "qty" ||
+          targetName === "discountAmount" ||
+          targetName === "discountPercentage"
+        ) {
+          processedValue = value === "" ? "" : parseFloat(value) || 0;
+          newItems[index] = {
+            ...newItems[index],
+            [targetName]: processedValue,
+          };
+          newItems[index] = updateItemTotal(
+            newItems[index],
+            newData.invoice.date
+          );
         } else {
           newItems[index] = {
             ...newItems[index],
@@ -409,9 +552,14 @@ const SalesInvoice = ({
         ) {
           processedValue = value === "" ? "" : parseFloat(value) || 0;
         }
-        newData[section] = { ...newData[section], [targetName]: processedValue };
-        if (section === 'invoice' && targetName === 'date') {
-          newData.items = newData.items.map((item) => updateItemTotal(item, processedValue));
+        newData[section] = {
+          ...newData[section],
+          [targetName]: processedValue,
+        };
+        if (section === "invoice" && targetName === "date") {
+          newData.items = newData.items.map((item) =>
+            updateItemTotal(item, processedValue)
+          );
         }
       }
       return newData;
@@ -429,6 +577,7 @@ const SalesInvoice = ({
             }`
       }`]: undefined,
       items: undefined,
+      purchaseAmount: undefined, // Clear purchaseAmount error on input change
     }));
   };
 
@@ -462,26 +611,34 @@ const SalesInvoice = ({
       const newItems = [...prev.items];
       const qty = parseFloat(newItems[index].qty) || 1;
       const unitPrice = product ? parseFloat(product.mrp) || 0 : 0;
-      const salesPrice = product ? parseFloat(product.sales_price) || unitPrice : 0;
+      const salesPrice = product
+        ? parseFloat(product.sales_price) || unitPrice
+        : 0;
       const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
+      const discountAmount = qty * (unitPrice - salesPrice);
+      const discountPercentage =
+        unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0;
 
       newItems[index] = {
         ...newItems[index],
         productId: product ? product.product_id : null,
         categoryId: product ? product.category_id : null,
-        description: product ? product.product_name : '',
+        description: product ? product.product_name : "",
         unitPrice,
         salesPrice,
         buyingCost,
-        discountAmount: 0,
-        discountPercentage: 0,
+        discountAmount: discountAmount >= 0 ? discountAmount : 0,
+        discountPercentage: discountPercentage >= 0 ? discountPercentage : 0,
         totalBuyingCost: qty * buyingCost,
       };
 
-      // Update with special discount
       newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
       return { ...prev, items: newItems };
     });
+
+    if (product && !product.category_name) {
+      toast.warn(`No category assigned to product: ${product.product_name}`);
+    }
 
     setErrors((prev) => ({ ...prev, [`itemDescription${index}`]: undefined }));
     setTimeout(() => itemRefs.current[index]?.qty?.current?.focus(), 0);
@@ -490,21 +647,24 @@ const SalesInvoice = ({
   const addItem = () => {
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items, {
-        id: Date.now(),
-        description: '',
-        qty: 1,
-        unitPrice: 0,
-        salesPrice: 0,
-        discountAmount: 0,
-        discountPercentage: 0,
-        specialDiscount: 0,
-        total: 0,
-        totalBuyingCost: 0,
-        productId: null,
-        buyingCost: 0,
-        categoryId: null,
-      }],
+      items: [
+        ...prev.items,
+        {
+          id: Date.now(),
+          description: "",
+          qty: 1,
+          unitPrice: 0,
+          salesPrice: 0,
+          discountAmount: 0,
+          discountPercentage: 0,
+          specialDiscount: 0,
+          total: 0,
+          totalBuyingCost: 0,
+          productId: null,
+          buyingCost: 0,
+          categoryId: null,
+        },
+      ],
     }));
     setTimeout(
       () =>
@@ -554,6 +714,8 @@ const SalesInvoice = ({
   const validateForm = () => {
     const newErrors = {};
     const { invoice, customer, items, purchaseDetails } = formData;
+    const total = calculateTotal();
+    const amountPaid = parseFloat(purchaseDetails.amount) || 0;
 
     if (!invoice.date) newErrors.invoiceDate = "Invoice date is required";
     if (!invoice.time || !/^\d{2}:\d{2}$/.test(invoice.time))
@@ -569,6 +731,29 @@ const SalesInvoice = ({
     ) {
       newErrors.purchaseTaxPercentage = "Tax percentage cannot be negative";
     }
+    if (purchaseDetails.amount !== "" && amountPaid < 0)
+      newErrors.purchaseAmount = "Amount paid cannot be negative";
+
+    // Validate amount paid based on payment method
+    const fullPaymentMethods = ["cash", "card", "online", "cheque"];
+    if (
+      fullPaymentMethods.includes(purchaseDetails.method) &&
+      purchaseDetails.amount !== "" &&
+      amountPaid < total
+    ) {
+      newErrors.purchaseAmount = `Amount paid must be at least LKR ${total.toFixed(
+        2
+      )} for ${purchaseDetails.method} payments`;
+    }
+    if (
+      purchaseDetails.method === "credit" &&
+      purchaseDetails.amount !== "" &&
+      amountPaid >= total
+    ) {
+      newErrors.purchaseAmount = `Amount paid must be less than LKR ${total.toFixed(
+        2
+      )} for credit payments`;
+    }
 
     items.forEach((item, idx) => {
       if (!item.productId && !item.description?.trim())
@@ -583,7 +768,9 @@ const SalesInvoice = ({
         newErrors[`itemDiscountPercentage${idx}`] =
           "Discount percentage must be between 0 and 100";
       }
-      if (item.specialDiscount < 0) newErrors[`itemSpecialDiscount${idx}`] = 'Special discount cannot be negative';
+      if (item.specialDiscount < 0)
+        newErrors[`itemSpecialDiscount${idx}`] =
+          "Special discount cannot be negative";
       const product = products.find((p) => p.product_id === item.productId);
       if (
         product &&
@@ -594,9 +781,6 @@ const SalesInvoice = ({
         ] = `Quantity exceeds stock (${product.opening_stock_quantity})`;
       }
     });
-
-    if (purchaseDetails.amount !== "" && parseFloat(purchaseDetails.amount) < 0)
-      newErrors.purchaseAmount = "Amount paid cannot be negative";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -651,25 +835,35 @@ const SalesInvoice = ({
           toast.success("Invoice created!");
           localStorage.removeItem(draftKey);
           setFormData({
-            invoice: { no: '', date: new Date().toISOString().split('T')[0], time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) },
-            customer: { id: null, name: '', address: '', phone: '', email: '' },
-            items: [{
-              id: Date.now(),
-              description: '',
-              qty: 1,
-              unitPrice: 0,
-              salesPrice: 0,
-              discountAmount: 0,
-              discountPercentage: 0,
-              specialDiscount: 0,
-              total: 0,
-              totalBuyingCost: 0,
-              productId: null,
-              buyingCost: 0,
-              categoryId: null,
-            }],
-            purchaseDetails: { method: 'cash', amount: 0, taxPercentage: 0 },
-            status: 'pending',
+            invoice: {
+              no: "",
+              date: new Date().toISOString().split("T")[0],
+              time: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              }),
+            },
+            customer: { id: null, name: "", address: "", phone: "", email: "" },
+            items: [
+              {
+                id: Date.now(),
+                description: "",
+                qty: 1,
+                unitPrice: 0,
+                salesPrice: 0,
+                discountAmount: 0,
+                discountPercentage: 0,
+                specialDiscount: 0,
+                total: 0,
+                totalBuyingCost: 0,
+                productId: null,
+                buyingCost: 0,
+                categoryId: null,
+              },
+            ],
+            purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
+            status: "pending",
             id: null,
           });
           setErrors({});
@@ -680,10 +874,14 @@ const SalesInvoice = ({
           error.response?.data?.message || "Failed to save invoice.";
         const details = error.response?.data?.errors
           ? Object.entries(error.response.data.errors)
-              .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
-              .join('\n')
-          : 'No detailed errors provided.';
-        console.error('API Error Details:', { message, details, response: error.response?.data });
+              .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+              .join("\n")
+          : "No detailed errors provided.";
+        console.error("API Error Details:", {
+          message,
+          details,
+          response: error.response?.data,
+        });
         toast.error(`${message}\n${details}`);
       } finally {
         setLoading(false);
@@ -718,11 +916,30 @@ const SalesInvoice = ({
     ];
     formData.items.forEach((_, index) => {
       fields.push(
-        { ref: itemRefs.current[index]?.description, name: `itemDescription${index}`, type: 'select', index },
-        { ref: itemRefs.current[index]?.qty, name: `itemQty${index}`, type: 'input', index },
-        { ref: itemRefs.current[index]?.discountAmount, name: `itemDiscountAmount${index}`, type: 'input', index },
-        { ref: itemRefs.current[index]?.discountPercentage, name: `itemDiscountPercentage${index}`, type: 'input', index },
-        { ref: itemRefs.current[index]?.specialDiscount, name: `itemSpecialDiscount${index}`, type: 'input', index }
+        {
+          ref: itemRefs.current[index]?.description,
+          name: `itemDescription${index}`,
+          type: "select",
+          index,
+        },
+        {
+          ref: itemRefs.current[index]?.qty,
+          name: `itemQty${index}`,
+          type: "input",
+          index,
+        },
+        {
+          ref: itemRefs.current[index]?.discountAmount,
+          name: `itemDiscountAmount${index}`,
+          type: "input",
+          index,
+        },
+        {
+          ref: itemRefs.current[index]?.discountPercentage,
+          name: `itemDiscountPercentage${index}`,
+          type: "input",
+          index,
+        }
       );
     });
     fields.push(
@@ -781,16 +998,46 @@ const SalesInvoice = ({
     () => customers.map((c) => ({ value: c.id, label: c.customer_name })),
     [customers]
   );
-  const productOptions = useMemo(
-    () =>
-      products.map((p) => ({
+  const productOptions = useMemo(() => {
+    return products.map((p) => {
+      const categoryName = p.category_name || "Unknown";
+      const productScheme = discountSchemes.find((scheme) => {
+        if (!scheme.active || scheme.applies_to !== "product") return false;
+        return (
+          scheme.target?.trim().toLowerCase() ===
+          (p.description?.trim().toLowerCase() ||
+            p.product_name?.trim().toLowerCase())
+        );
+      });
+      const categoryScheme = discountSchemes.find((scheme) => {
+        if (!scheme.active || scheme.applies_to !== "category") return false;
+        return (
+          scheme.target?.trim().toLowerCase() ===
+          categoryName?.trim().toLowerCase()
+        );
+      });
+      let discountInfo = "";
+      if (productScheme) {
+        discountInfo = `, Discount: Product ${productScheme.target} (${
+          productScheme.type === "percentage"
+            ? `${productScheme.value}%`
+            : `LKR ${productScheme.value}`
+        })`;
+      } else if (categoryScheme) {
+        discountInfo = `, Discount: Category ${categoryScheme.target} (${
+          categoryScheme.type === "percentage"
+            ? `${categoryScheme.value}%`
+            : `LKR ${categoryScheme.value}`
+        })`;
+      }
+      return {
         value: p.product_id,
         label: `${p.product_name} (Stock: ${
           p.opening_stock_quantity ?? "N/A"
-        })`,
-      })),
-    [products]
-  );
+        }, Category: ${categoryName}${discountInfo})`,
+      };
+    });
+  }, [products, discountSchemes]);
 
   const getSelectStyles = (hasError) => ({
     control: (provided, state) => ({
@@ -832,18 +1079,18 @@ const SalesInvoice = ({
 
   return (
     <ErrorBoundary>
-      <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-gray-900 bg-opacity-50">
-        <div className="flex flex-col w-full max-w-screen-2xl max-h-[95vh] p-6 bg-white rounded-lg shadow-xl">
-          <h3 className="mb-4 text-2xl font-bold text-blue-600">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm">
+        <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col">
+          <h3 className="p-6 text-2xl font-bold text-blue-600 border-b border-gray-200">
             {isEditMode ? "Edit Invoice" : "Create New Invoice"}
           </h3>
           <form
             id="invoiceForm"
             onSubmit={handleSubmit}
             noValidate
-            className="flex-grow p-4 overflow-y-auto border bg-gray-50 rounded-xl"
+            className="flex-grow p-6 overflow-y-auto bg-gray-50"
           >
-            <div className="p-4 mb-6 bg-white border rounded-lg">
+            <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
               <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
                 Invoice Details
               </h4>
@@ -928,7 +1175,7 @@ const SalesInvoice = ({
               </div>
             </div>
 
-            <div className="p-4 mb-6 bg-white border rounded-lg">
+            <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
               <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
                 Customer Information
               </h4>
@@ -1053,7 +1300,7 @@ const SalesInvoice = ({
                 {formData.items.map((item, index) => (
                   <div
                     key={item.id}
-                    className="relative p-4 bg-white border rounded-lg"
+                    className="relative p-4 bg-white border rounded-lg shadow-sm"
                   >
                     {formData.items.length > 1 && (
                       <button
@@ -1074,8 +1321,8 @@ const SalesInvoice = ({
                         </svg>
                       </button>
                     )}
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-16">
-                      <div className="md:col-span-4">
+                    <div className="flex flex-wrap items-end gap-4">
+                      <div className="flex-1 min-w-[200px]">
                         <label
                           htmlFor={`itemDescription${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1114,7 +1361,7 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-1">
+                      <div className="w-20">
                         <label
                           htmlFor={`itemQty${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1151,13 +1398,12 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-2">
+                      <div className="w-28">
                         <label
                           htmlFor={`itemUnitPrice${index}`}
                           className="block mb-1 text-sm font-medium"
                         >
-                          Unit Price (LKR){" "}
-                          <span className="text-red-500">*</span>
+                          Unit Price (LKR)
                         </label>
                         <input
                           id={`itemUnitPrice${index}`}
@@ -1171,7 +1417,7 @@ const SalesInvoice = ({
                           readOnly
                         />
                       </div>
-                      <div className="md:col-span-2">
+                      <div className="w-28">
                         <label
                           htmlFor={`itemDiscountAmount${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1212,7 +1458,7 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-1">
+                      <div className="w-20">
                         <label
                           htmlFor={`itemDiscountPercentage${index}`}
                           className="block mb-1 text-sm font-medium"
@@ -1256,25 +1502,68 @@ const SalesInvoice = ({
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-2">
-                        <label htmlFor={`itemSpecialDiscount${index}`} className="block mb-1 text-sm font-medium">Special Disc. (LKR)</label>
+                      <div className="w-28">
+                        <label
+                          htmlFor={`itemSpecialDiscount${index}`}
+                          className="block mb-1 text-sm font-medium"
+                        >
+                          Special Disc. (LKR)
+                        </label>
                         <input
                           id={`itemSpecialDiscount${index}`}
-                          ref={(el) => assignRef(index, 'specialDiscount', el)}
                           type="number"
                           value={item.specialDiscount}
-                          className={`w-full p-2.5 border rounded-md focus:outline-none ${errors[`itemSpecialDiscount${index}`] ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'}`}
+                          className={`w-full p-2.5 border rounded-md focus:outline-none ${
+                            errors[`itemSpecialDiscount${index}`]
+                              ? "border-red-500"
+                              : item.specialDiscount > 0
+                              ? item.discountSchemeType === "product"
+                                ? "border-purple-500 bg-purple-50"
+                                : "border-green-500 bg-green-50"
+                              : "border-gray-300 focus:border-blue-500"
+                          }`}
+                          title={
+                            item.discountScheme
+                              ? item.discountSchemeType === "product"
+                                ? `Product Discount: ${
+                                    item.discountScheme.target
+                                  } (${
+                                    item.discountScheme.type === "percentage"
+                                      ? `${item.discountScheme.value}%`
+                                      : `LKR ${item.discountScheme.value}`
+                                  })`
+                                : `Category Discount: ${
+                                    item.discountScheme.target
+                                  } (${
+                                    item.discountScheme.type === "percentage"
+                                      ? `${item.discountScheme.value}%`
+                                      : `LKR ${item.discountScheme.value}`
+                                  })`
+                              : "No special discount available"
+                          }
                           readOnly
                         />
-                        {errors[`itemSpecialDiscount${index}`] && <p className="mt-1 text-xs text-red-600">{errors[`itemSpecialDiscount${index}`]}</p>}
+                        {errors[`itemSpecialDiscount${index}`] && (
+                          <p className="mt-1 text-xs text-red-600">
+                            {errors[`itemSpecialDiscount${index}`]}
+                          </p>
+                        )}
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="block mb-1 text-sm font-medium">Total Buying Cost (LKR)</label>
-                        <span className="w-full p-2.5 text-right font-medium">{(parseFloat(item.totalBuyingCost) || 0).toFixed(2)}</span>
+                      <div className="w-28">
+                        <label className="block mb-1 text-sm font-medium">
+                          Total Buying Cost (LKR)
+                        </label>
+                        <span className="w-full p-2.5 text-right font-medium">
+                          {(parseFloat(item.totalBuyingCost) || 0).toFixed(2)}
+                        </span>
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="block mb-1 text-sm font-medium">Total (LKR)</label>
-                        <span className="w-full p-2.5 text-right font-medium">{(parseFloat(item.total) || 0).toFixed(2)}</span>
+                      <div className="w-28">
+                        <label className="block mb-1 text-sm font-medium">
+                          Total (LKR)
+                        </label>
+                        <span className="w-full p-2.5 text-right font-medium">
+                          {(parseFloat(item.total) || 0).toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1283,7 +1572,7 @@ const SalesInvoice = ({
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              <div className="p-4 bg-white border rounded-lg md:col-span-2">
+              <div className="p-4 bg-white border rounded-lg shadow-sm md:col-span-2">
                 <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
                   Payment Details
                 </h4>
@@ -1306,10 +1595,6 @@ const SalesInvoice = ({
                       className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
                     >
                       <option value="cash">Cash</option>
-                      <option value="card">Card</option>
-                      <option value="online">Online</option>
-                      <option value="cheque">Cheque</option>
-                      <option value="credit">Credit</option>
                       <option value="card">Card</option>
                       <option value="online">Online</option>
                       <option value="cheque">Cheque</option>
@@ -1378,7 +1663,7 @@ const SalesInvoice = ({
                   </div>
                 </div>
               </div>
-              <div className="p-4 bg-gray-100 border rounded-lg">
+              <div className="p-4 bg-gray-100 border rounded-lg shadow-sm">
                 <h4 className="mb-3 text-base font-semibold">
                   Invoice Summary
                 </h4>
@@ -1418,8 +1703,8 @@ const SalesInvoice = ({
               </div>
             </div>
 
-            <div className="sticky bottom-0 py-3 mt-6 -mx-4 bg-gray-100 border-t rounded-b-xl">
-              <div className="flex justify-end space-x-3">
+            <div className="sticky bottom-0 py-4 mt-6 -mx-6 bg-gray-100 border-t rounded-b-xl">
+              <div className="flex justify-end px-6 space-x-4">
                 <button
                   type="button"
                   onClick={onCancel}

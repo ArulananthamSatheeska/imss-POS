@@ -39,8 +39,8 @@ const SalesReport = () => {
   const [invoiceToEdit, setInvoiceToEdit] = useState(null);
   const [showBillPrintModal, setShowBillPrintModal] = useState(false);
   const [billPrintData, setBillPrintData] = useState(null);
-  const [showEditSaleModal, setShowEditSaleModal] = useState(false); // New state for POSForm
-  const [saleToEdit, setSaleToEdit] = useState(null); // New state for sale data
+  const [showEditSaleModal, setShowEditSaleModal] = useState(false);
+  const [saleToEdit, setSaleToEdit] = useState(null);
 
   const fetchReportData = useCallback(async () => {
     setLoading(true);
@@ -58,7 +58,6 @@ const SalesReport = () => {
       console.log("Fetched Invoices Response:", invoiceResponse);
       console.log("Fetched Sales Response:", salesResponse);
 
-      // Process invoices
       let invoices = [];
       if (invoiceResponse.data && Array.isArray(invoiceResponse.data.data)) {
         invoices = invoiceResponse.data.data;
@@ -223,7 +222,7 @@ const SalesReport = () => {
       );
       fetchReportData();
       setShowEditInvoiceModal(false);
-      setShowEditSaleModal(false); // Close POSForm
+      setShowEditSaleModal(false);
       setInvoiceToEdit(null);
       setSaleToEdit(null);
       alert(`${type === "invoice" ? "Invoice" : "Sale"} updated successfully!`);
@@ -407,6 +406,7 @@ const SalesReport = () => {
           unit_price: item.unit_price || item.sales_price || 0,
           discountAmount: item.discount || item.discount_amount || 0,
           discountPercentage: item.discount_percentage || 0,
+          specialDiscount: item.special_discount || 0,
           total:
             item.total ||
             item.quantity * (item.unit_price || item.sales_price) ||
@@ -459,7 +459,6 @@ const SalesReport = () => {
 
   const handleEditSale = (row) => {
     if (row.type === "sale") {
-      // Prepare data for POSForm
       const products = (Array.isArray(row.items) ? row.items : []).map(
         (item, index) => ({
           product_id: item.product_id || null,
@@ -527,7 +526,6 @@ const SalesReport = () => {
       });
       setShowEditSaleModal(true);
     } else {
-      // Existing logic for invoices
       const mappedDataForEdit = {
         id: row.id,
         type: row.type,
@@ -575,6 +573,7 @@ const SalesReport = () => {
               item.discount || item.discount_amount || 0
             ),
             discountPercentage: parseFloat(item.discount_percentage || 0),
+            specialDiscount: parseFloat(item.special_discount || 0),
             total: parseFloat(item.total || qty * unitPrice) || 0,
             totalBuyingCost: parseFloat(item.total_buying_cost || 0),
           };
@@ -604,7 +603,6 @@ const SalesReport = () => {
   };
 
   const handleUpdateSale = async (formData) => {
-    // Map POSForm data to SaleController's expected format
     const updatedSaleData = {
       customer_name: formData.customerInfo.name || "Walk-in Customer",
       customer_phone: formData.customerInfo.mobile || "",
@@ -626,7 +624,6 @@ const SalesReport = () => {
       })),
     };
 
-    // Call the existing update API function
     await handleUpdateInvoiceApiCall(updatedSaleData, formData.id, "sale");
   };
 
@@ -1073,7 +1070,21 @@ const SalesReport = () => {
                                     Discount:
                                   </div>
                                   <div className="font-medium text-right text-red-600 dark:text-red-400">
-                                    -{formatCurrency(row.discount)}
+                                    -{formatCurrency(
+                                      row.items.reduce(
+                                        (sum, item) =>
+                                          sum +
+                                          (parseFloat(
+                                            item.discount ||
+                                              item.discount_amount ||
+                                              0
+                                          ) +
+                                            parseFloat(
+                                              item.special_discount || 0
+                                            )),
+                                        0
+                                      )
+                                    )}
                                   </div>
                                   <div className="text-gray-500 dark:text-gray-400">
                                     Total:
@@ -1158,6 +1169,12 @@ const SalesReport = () => {
                                             Disc
                                           </th>
                                           <th className="px-2 py-1 font-medium text-right">
+                                            Special Disc
+                                          </th>
+                                          <th className="px-2 py-1 font-medium text-right">
+                                            Buying Price
+                                          </th>
+                                          <th className="px-2 py-1 font-medium text-right">
                                             Total
                                           </th>
                                         </tr>
@@ -1172,7 +1189,7 @@ const SalesReport = () => {
                                                 : item.description || "N/A"}
                                             </td>
                                             <td className="px-2 py-1 text-center text-gray-600 dark:text-gray-300">
-                                              {item.quantity || 0}
+                                              {item.quantity || item.qty || 0}
                                             </td>
                                             <td className="px-2 py-1 text-right text-gray-600 dark:text-gray-300">
                                               {formatCurrency(
@@ -1186,6 +1203,16 @@ const SalesReport = () => {
                                                 item.discount ||
                                                   item.discount_amount ||
                                                   0
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
+                                              {formatCurrency(
+                                                item.special_discount || 0
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-1 text-right text-gray-600 dark:text-gray-300">
+                                              {formatCurrency(
+                                                item.total_buying_cost || 0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 font-semibold text-right text-gray-900 dark:text-white">
