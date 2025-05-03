@@ -11,6 +11,7 @@ const SalesReturn = () => {
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
+  const [filteredInvoices, setFilteredInvoices] = useState([]);
   const [newReturn, setNewReturn] = useState({
     salesReturnNumber: "",
     invoiceOrBillNumber: "",
@@ -28,17 +29,22 @@ const SalesReturn = () => {
     buying_cost: 0,
     reason: "",
   });
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editReturnId, setEditReturnId] = useState(null);
   const [viewReturn, setViewReturn] = useState(null);
   const [expandedRows, setExpandedRows] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const [showInvoiceSuggestions, setShowInvoiceSuggestions] = useState(false);
+  const [productHighlightedIndex, setProductHighlightedIndex] = useState(-1);
+  const [invoiceHighlightedIndex, setInvoiceHighlightedIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const searchRef = useRef(null);
-  const searchInputRef = useRef(null);
+  const productSearchRef = useRef(null);
+  const invoiceSearchRef = useRef(null);
+  const productSearchInputRef = useRef(null);
+  const invoiceSearchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
   const buyingCostInputRef = useRef(null);
   const reasonInputRef = useRef(null);
@@ -240,14 +246,31 @@ const SalesReturn = () => {
         p.product_name.toLowerCase().includes(query)
       );
       setFilteredProducts(filtered);
-      setShowSuggestions(true);
-      setHighlightedIndex(-1);
+      setShowProductSuggestions(true);
+      setProductHighlightedIndex(-1);
     } else {
       setFilteredProducts([]);
-      setShowSuggestions(false);
-      setHighlightedIndex(-1);
+      setShowProductSuggestions(false);
+      setProductHighlightedIndex(-1);
     }
   }, [itemForm.search_query, products]);
+
+  // Filter invoices based on search query
+  useEffect(() => {
+    if (invoiceSearch.trim()) {
+      const query = invoiceSearch.toLowerCase();
+      const filtered = invoices.filter((inv) =>
+        inv.invoiceNumber.toLowerCase().includes(query)
+      );
+      setFilteredInvoices(filtered);
+      setShowInvoiceSuggestions(true);
+      setInvoiceHighlightedIndex(-1);
+    } else {
+      setFilteredInvoices([]);
+      setShowInvoiceSuggestions(false);
+      setInvoiceHighlightedIndex(-1);
+    }
+  }, [invoiceSearch, invoices]);
 
   // Prefill buying cost when selecting a product
   useEffect(() => {
@@ -268,9 +291,19 @@ const SalesReturn = () => {
   // Handle clicks outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-        setHighlightedIndex(-1);
+      if (
+        productSearchRef.current &&
+        !productSearchRef.current.contains(event.target)
+      ) {
+        setShowProductSuggestions(false);
+        setProductHighlightedIndex(-1);
+      }
+      if (
+        invoiceSearchRef.current &&
+        !invoiceSearchRef.current.contains(event.target)
+      ) {
+        setShowInvoiceSuggestions(false);
+        setInvoiceHighlightedIndex(-1);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -302,26 +335,65 @@ const SalesReturn = () => {
       search_query: product.product_name,
       buying_cost: parseFloat(product.buying_cost) || 0,
     });
-    setShowSuggestions(false);
-    setHighlightedIndex(-1);
+    setShowProductSuggestions(false);
+    setProductHighlightedIndex(-1);
     quantityInputRef.current?.focus();
   };
 
-  const handleSearchKeyDown = (e) => {
+  const handleSelectInvoice = (invoice) => {
+    setNewReturn((prev) => ({
+      ...prev,
+      invoiceOrBillNumber: invoice.invoiceNumber,
+      customerName: invoice.customerName,
+      type: invoice.type,
+    }));
+    setInvoiceSearch(invoice.invoiceNumber);
+    setShowInvoiceSuggestions(false);
+    setInvoiceHighlightedIndex(-1);
+    productSearchInputRef.current?.focus();
+  };
+
+  const handleProductSearchKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex((prev) =>
+      setProductHighlightedIndex((prev) =>
         prev < filteredProducts.length - 1 ? prev + 1 : prev
       );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
-    } else if (e.key === "Enter" && highlightedIndex >= 0) {
+      setProductHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === "Enter" && productHighlightedIndex >= 0) {
       e.preventDefault();
-      handleSelectProduct(filteredProducts[highlightedIndex]);
-    } else if (e.key === "Enter" && !showSuggestions && itemForm.product_id) {
+      handleSelectProduct(filteredProducts[productHighlightedIndex]);
+    } else if (
+      e.key === "Enter" &&
+      !showProductSuggestions &&
+      itemForm.product_id
+    ) {
       e.preventDefault();
       quantityInputRef.current?.focus();
+    }
+  };
+
+  const handleInvoiceSearchKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setInvoiceHighlightedIndex((prev) =>
+        prev < filteredInvoices.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setInvoiceHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === "Enter" && invoiceHighlightedIndex >= 0) {
+      e.preventDefault();
+      handleSelectInvoice(filteredInvoices[invoiceHighlightedIndex]);
+    } else if (
+      e.key === "Enter" &&
+      !showInvoiceSuggestions &&
+      newReturn.invoiceOrBillNumber
+    ) {
+      e.preventDefault();
+      productSearchInputRef.current?.focus();
     }
   };
 
@@ -343,7 +415,7 @@ const SalesReturn = () => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddItem();
-      searchInputRef.current?.focus();
+      productSearchInputRef.current?.focus();
     }
   };
 
@@ -388,8 +460,8 @@ const SalesReturn = () => {
       buying_cost: 0,
       reason: "",
     });
-    setShowSuggestions(false);
-    searchInputRef.current?.focus();
+    setShowProductSuggestions(false);
+    productSearchInputRef.current?.focus();
   };
 
   const handleRemoveItem = (index) => {
@@ -419,6 +491,7 @@ const SalesReturn = () => {
         remarks: data.remarks || "",
         status: data.status,
       });
+      setInvoiceSearch(data.invoice_no || data.bill_number);
       setEditMode(true);
       setEditReturnId(returnItem.id);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -462,6 +535,7 @@ const SalesReturn = () => {
       buying_cost: 0,
       reason: "",
     });
+    setInvoiceSearch("");
   };
 
   const handleSubmitReturn = async () => {
@@ -536,6 +610,7 @@ const SalesReturn = () => {
         buying_cost: 0,
         reason: "",
       });
+      setInvoiceSearch("");
     } catch (error) {
       const errorMsg =
         error.response?.data?.message ||
@@ -653,28 +728,51 @@ const SalesReturn = () => {
                       disabled
                     />
                   </div>
-                  <div>
+                  <div ref={invoiceSearchRef} className="relative">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                       Invoice/Bill Number
                     </label>
-                    <select
-                      name="invoiceOrBillNumber"
-                      value={newReturn.invoiceOrBillNumber}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      disabled={loading}
-                    >
-                      <option value="">Select Invoice/Bill Number</option>
-                      {invoices.map((inv) => (
-                        <option
-                          key={`${inv.type}-${inv.id}`}
-                          value={inv.invoiceNumber}
-                        >
-                          {inv.invoiceNumber} (
-                          {inv.type === "invoice" ? "Invoice" : "Sale"})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        ref={invoiceSearchInputRef}
+                        type="text"
+                        value={invoiceSearch}
+                        onChange={(e) => setInvoiceSearch(e.target.value)}
+                        onFocus={() =>
+                          invoiceSearch && setShowInvoiceSuggestions(true)
+                        }
+                        onKeyDown={handleInvoiceSearchKeyDown}
+                        placeholder="Search Invoice/Bill Number..."
+                        className="w-full p-2 pl-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        disabled={loading}
+                      />
+                      <FiSearch className="absolute left-2 top-3 text-gray-400" />
+                    </div>
+                    {showInvoiceSuggestions && filteredInvoices.length > 0 && (
+                      <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {filteredInvoices.map((invoice, index) => (
+                          <li
+                            key={`${invoice.type}-${invoice.id}`}
+                            onClick={() => handleSelectInvoice(invoice)}
+                            className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white ${
+                              invoiceHighlightedIndex === index
+                                ? "bg-gray-100 dark:bg-gray-600"
+                                : ""
+                            }`}
+                          >
+                            {invoice.invoiceNumber} (
+                            {invoice.type === "invoice" ? "Invoice" : "Sale"})
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {showInvoiceSuggestions &&
+                      invoiceSearch &&
+                      filteredInvoices.length === 0 && (
+                        <div className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg p-4 text-gray-500 dark:text-gray-300">
+                          No invoices or bills found
+                        </div>
+                      )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
@@ -696,45 +794,47 @@ const SalesReturn = () => {
                     Items to Return
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-                    <div ref={searchRef} className="relative">
+                    <div ref={productSearchRef} className="relative">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Search Product
                       </label>
                       <div className="relative">
                         <input
-                          ref={searchInputRef}
+                          ref={productSearchInputRef}
                           type="text"
                           name="search_query"
                           value={itemForm.search_query}
                           onChange={handleItemFormChange}
                           onFocus={() =>
-                            itemForm.search_query && setShowSuggestions(true)
+                            itemForm.search_query &&
+                            setShowProductSuggestions(true)
                           }
-                          onKeyDown={handleSearchKeyDown}
+                          onKeyDown={handleProductSearchKeyDown}
                           placeholder="Search Product..."
                           className="w-full p-2 pl-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                           disabled={loading}
                         />
                         <FiSearch className="absolute left-2 top-3 text-gray-400" />
                       </div>
-                      {showSuggestions && filteredProducts.length > 0 && (
-                        <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
-                          {filteredProducts.map((product, index) => (
-                            <li
-                              key={product.product_id ?? index}
-                              onClick={() => handleSelectProduct(product)}
-                              className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white ${
-                                highlightedIndex === index
-                                  ? "bg-gray-100 dark:bg-gray-600"
-                                  : ""
-                              }`}
-                            >
-                              {product.product_name}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {showSuggestions &&
+                      {showProductSuggestions &&
+                        filteredProducts.length > 0 && (
+                          <ul className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                            {filteredProducts.map((product, index) => (
+                              <li
+                                key={product.product_id ?? index}
+                                onClick={() => handleSelectProduct(product)}
+                                className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer dark:text-white ${
+                                  productHighlightedIndex === index
+                                    ? "bg-gray-100 dark:bg-gray-600"
+                                    : ""
+                                }`}
+                              >
+                                {product.product_name}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      {showProductSuggestions &&
                         itemForm.search_query &&
                         filteredProducts.length === 0 && (
                           <div className="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg p-4 text-gray-500 dark:text-gray-300">
