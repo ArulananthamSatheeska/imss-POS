@@ -210,11 +210,41 @@ const TOUCHPOSFORM = () => {
 
   const handleRegisterConfirm = (amount) => {
     if (isClosingRegister) {
-      const closingDetails = calculateClosingDetails(); // Implement this function
-      closeRegister({ ...closingDetails, inCashierAmount: amount });
+      const closingDetails = calculateClosingDetails();
+      const { inCashierAmount, otherAmount } = amount;
+      closingDetails.inCashierAmount = inCashierAmount;
+      closingDetails.otherAmount = otherAmount;
+      closeRegister(closingDetails);
       setIsClosingRegister(false);
     } else {
-      openRegister(amount, user.id);
+      if (!registerStatus.isOpen) {
+        openRegister(amount, user.id);
+      }
+    }
+  };
+
+
+  const handleOpenRegister = async (amount) => {
+    try {
+      const isClosed = await checkRegisterStatus();
+      if (!isClosed) return;
+
+      const response = await openRegister({
+        user_id: user.id,
+        terminal_id: terminalId,
+        opening_cash: amount
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      // Success case
+      setCashOnHand(amount);
+      setRegisterOpen(true);
+    } catch (error) {
+      console.error('Failed to open register:', error);
+      alert(`Failed to open register: ${error.message}`);
     }
   };
 
@@ -832,6 +862,7 @@ const TOUCHPOSFORM = () => {
     setCustomerInfo(prev => ({ ...prev, bill_number: billNumber }));
     setShowBillModal(true);
   }, [products, billNumber, registerStatus.isOpen]);
+
   // Close Bill Modal
   const closeBillModal = useCallback(
     (saleSaved = false) => {
