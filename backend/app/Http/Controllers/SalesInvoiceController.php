@@ -3,14 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Invoice;
-use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use Throwable;
-
 
 class SalesInvoiceController extends Controller
 {
@@ -31,20 +29,27 @@ class SalesInvoiceController extends Controller
             'customer.address' => 'nullable|string|max:255',
             'customer.phone' => 'nullable|string|max:20',
             'customer.email' => 'nullable|email|max:255',
-            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer,cheque,online',
+            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer,cheque,online,credit',
             'purchaseDetails.amount' => 'required|numeric|min:0',
+            'purchaseDetails.taxPercentage' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|exists:products,product_id',
             'items.*.description' => 'required|string|max:255',
-            'items.*.qty' => 'required|numeric|min:1',
+            'items.*.qty' => 'required|numeric|min:0.01',
             'items.*.unitPrice' => 'required|numeric|min:0',
+            'items.*.salesPrice' => 'required|numeric|min:0', // Added salesPrice validation
             'items.*.discountAmount' => 'required|numeric|min:0',
             'items.*.discountPercentage' => 'nullable|numeric|min:0|max:100',
-            'status' => 'nullable|string|in:pending,paid,cancelled',
+            'items.*.specialDiscount' => 'required|numeric|min:0',
             'items.*.totalBuyingCost' => 'required|numeric|min:0',
+            'status' => 'nullable|string|in:pending,paid,cancelled',
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Validation failed for invoice store:', [
+                'errors' => $validator->errors(),
+                'request_data' => request()->all(),
+            ]);
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
@@ -54,14 +59,16 @@ class SalesInvoiceController extends Controller
         $validatedData = $validator->validated();
         Log::info('Validated Store Invoice Data:', $validatedData);
 
-        $taxRate = isset($validatedData['purchaseDetails']['tax_percentage'])
-            ? $validatedData['purchaseDetails']['tax_percentage'] / 100
+        $taxRate = isset($validatedData['purchaseDetails']['taxPercentage'])
+            ? $validatedData['purchaseDetails']['taxPercentage'] / 100
             : 0;
         $calculatedSubtotal = 0;
         $itemsData = [];
 
         foreach ($validatedData['items'] as $itemInput) {
-            $itemTotal = ($itemInput['qty'] * $itemInput['unitPrice']) - $itemInput['discountAmount'];
+            // Use salesPrice for calculations
+            $salesPrice = isset($itemInput['salesPrice']) ? $itemInput['salesPrice'] : $itemInput['unitPrice'];
+            $itemTotal = ($itemInput['qty'] * $salesPrice) - ($itemInput['specialDiscount'] ?? 0);
             $calculatedSubtotal += $itemTotal;
 
             $itemsData[] = [
@@ -69,10 +76,12 @@ class SalesInvoiceController extends Controller
                 'description' => $itemInput['description'],
                 'quantity' => $itemInput['qty'],
                 'unit_price' => $itemInput['unitPrice'],
+                'sales_price' => $salesPrice, // Store salesPrice
                 'discount_amount' => $itemInput['discountAmount'],
                 'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
+                'special_discount' => $itemInput['specialDiscount'] ?? 0,
                 'total' => $itemTotal,
-                'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0, 
+                'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0,
             ];
         }
 
@@ -145,20 +154,21 @@ class SalesInvoiceController extends Controller
             'customer.address' => 'nullable|string|max:255',
             'customer.phone' => 'nullable|string|max:20',
             'customer.email' => 'nullable|email|max:255',
-            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer,cheque,online',
+            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer,cheque,online,credit',
             'purchaseDetails.amount' => 'required|numeric|min:0',
+            'purchaseDetails.taxPercentage' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.id' => 'nullable|exists:invoice_items,id,invoice_id,' . $invoice->id,
             'items.*.product_id' => 'nullable|exists:products,product_id',
             'items.*.description' => 'required|string|max:255',
-            'items.*.qty' => 'required|numeric|min:1',
+            'items.*.qty' => 'required|numeric|min:0.01',
             'items.*.unitPrice' => 'required|numeric|min:0',
+            'items.*.salesPrice' => 'required|numeric|min:0', // Added salesPrice validation
             'items.*.discountAmount' => 'required|numeric|min:0',
             'items.*.discountPercentage' => 'nullable|numeric|min:0|max:100',
-            'status' => 'nullable|string|in:pending,paid,cancelled',
-            'purchaseDetails.taxPercentage' => 'nullable|numeric|min:0|max:100',
+            'items.*.specialDiscount' => 'required|numeric|min:0',
             'items.*.totalBuyingCost' => 'required|numeric|min:0',
-            
+            'status' => 'nullable|string|in:pending,paid,cancelled',
         ]);
 
         if ($validator->fails()) {
@@ -178,14 +188,16 @@ class SalesInvoiceController extends Controller
 
         DB::beginTransaction();
         try {
-            $taxRate = isset($validatedData['purchaseDetails']['tax_percentage'])
-                ? $validatedData['purchaseDetails']['tax_percentage'] / 100
+            $taxRate = isset($validatedData['purchaseDetails']['taxPercentage'])
+                ? $validatedData['purchaseDetails']['taxPercentage'] / 100
                 : 0;
             $calculatedSubtotal = 0;
             $itemsData = [];
 
             foreach ($validatedData['items'] as $itemInput) {
-                $itemTotal = ($itemInput['qty'] * $itemInput['unitPrice']) - $itemInput['discountAmount'];
+                // Use salesPrice for calculations
+                $salesPrice = isset($itemInput['salesPrice']) ? $itemInput['salesPrice'] : $itemInput['unitPrice'];
+                $itemTotal = ($itemInput['qty'] * $salesPrice) - ($itemInput['specialDiscount'] ?? 0);
                 $calculatedSubtotal += $itemTotal;
 
                 $itemsData[] = [
@@ -194,8 +206,10 @@ class SalesInvoiceController extends Controller
                     'description' => $itemInput['description'],
                     'quantity' => $itemInput['qty'],
                     'unit_price' => $itemInput['unitPrice'],
+                    'sales_price' => $salesPrice, // Store salesPrice
                     'discount_amount' => $itemInput['discountAmount'],
                     'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
+                    'special_discount' => $itemInput['specialDiscount'] ?? 0,
                     'total' => $itemTotal,
                     'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0,
                 ];
@@ -220,7 +234,6 @@ class SalesInvoiceController extends Controller
                 'total_amount' => $calculatedTotalAmount,
                 'balance' => $calculatedBalance,
                 'status' => $validatedData['status'] ?? $invoice->status,
-                
             ]);
 
             $newItemIds = [];

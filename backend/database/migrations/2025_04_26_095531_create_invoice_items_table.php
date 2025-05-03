@@ -22,6 +22,7 @@ return new class extends Migration
             $table->decimal('quantity', 15, 2); // Use decimal for potential fractional quantities
             $table->decimal('unit_price', 15, 2);
             $table->decimal('discount_amount', 15, 2)->default(0);
+            $table->decimal('special_discount', 15, 2)->default(0);
             $table->decimal('discount_percentage', 5, 2)->default(0); // e.g., 10.50 for 10.50%
             $table->decimal('total', 15, 2); // Calculated item total: (qty * unit_price) - discount_amount
             $table->decimal('total_buying_cost', 15, 2)->default(0);
