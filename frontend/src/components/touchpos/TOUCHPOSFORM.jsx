@@ -24,6 +24,10 @@ import BillPrintModal from "../models/BillPrintModel.jsx";
 import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
+import HeldSalesList from "../pos/HeldSalesList";  // Import HeldSalesList component
+import { useRegister } from '../../context/RegisterContext';
+import RegisterModal from "../models/registerModel.jsx";
+import { useAuth } from '../../context/NewAuthContext.jsx'; // Import auth context
 
 // Helper Function to Apply Discount Schemes
 const applyDiscountScheme = (product, saleType, schemes) => {
@@ -147,6 +151,130 @@ const TOUCHPOSFORM = () => {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [filterError, setFilterError] = useState(null); // For filter error messages
+
+  const [user, setUser] = useState(null); // User state for authentication
+
+  const auth = useAuth();
+
+  useEffect(() => {
+    if (auth && auth.user) {
+      setUser(auth.user);
+    }
+  }, [auth]);
+  const terminalId = "T-1"; // Default terminal ID
+  const userId = 1; // Default user ID
+  const { registerStatus, openRegister, closeRegister, isRegisterOpen, handleLogoutClick, cashOnHand, setCashOnHand } = useRegister();
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [isClosingRegister, setIsClosingRegister] = useState(false);
+
+  const handleLogout = () => {
+    const canLogout = handleLogoutClick();
+    if (canLogout) {
+      // Perform actual logout
+      navigate("/login");
+    }
+  };
+
+  // Load held sales from backend API
+  const loadHeldSales = useCallback(async () => {
+    setLoadingHeldSales(true);
+    try {
+      const response = await axios.get("/api/holds", {
+        params: { terminal_id: terminalId, status: "held" },
+      });
+      if (response.data.status === "success") {
+        setHeldSales(response.data.data);
+      } else {
+        alert("Failed to load held sales: " + (response.data.message || "Unknown error"));
+        setHeldSales([]);
+      }
+    } catch (error) {
+      console.error("Error loading held sales:", error);
+      setHeldSales([]);
+    } finally {
+      setLoadingHeldSales(false);
+    }
+  }, [terminalId]);
+
+  useEffect(() => {
+    // Check register status when component mounts
+    if (!registerStatus.isOpen) {
+      setShowRegisterModal(true);
+    }
+  }, [registerStatus.isOpen]);
+
+  const handleCloseRegister = () => {
+    setIsClosingRegister(true);
+    setShowRegisterModal(true);
+  };
+
+  const handleRegisterConfirm = (amount) => {
+    if (isClosingRegister) {
+      const closingDetails = calculateClosingDetails(); // Implement this function
+      closeRegister({ ...closingDetails, inCashierAmount: amount });
+      setIsClosingRegister(false);
+    } else {
+      openRegister(amount, user.id);
+    }
+  };
+
+  // Open held sales list modal
+  const openHeldSalesList = () => {
+    loadHeldSales();
+    setShowHeldSalesList(true);
+  };
+
+  // Close held sales list modal
+  const closeHeldSalesList = () => {
+    setShowHeldSalesList(false);
+  };
+
+  // Recall a held sale by hold_id
+  const recallHeldSale = async (hold_id) => {
+    try {
+      const response = await axios.post(`/api/holds/${hold_id}/recall`);
+      if (response.data.status === "success") {
+        const sale = response.data.data;
+        setProducts(sale.products || []);
+        setTax(sale.tax || 0);
+        setBillDiscount(sale.billDiscount || 0);
+        setShipping(sale.shipping || 0);
+        setSaleType(sale.saleType || "Retail");
+        setCustomerInfo(sale.customerInfo || { name: "", mobile: "", bill_number: "", userId: "U-1", receivedAmount: 0 });
+        setBillNumber(sale.billNumber || "");
+        // Remove recalled sale from heldSales list immediately
+        setHeldSales((prevHeldSales) => prevHeldSales.filter(s => s.hold_id !== hold_id));
+        setShowHeldSalesList(false);
+        alert(`Recalled sale with ID: ${hold_id}`);
+      } else {
+        alert("Failed to recall sale: " + (response.data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error recalling sale:", error);
+      alert("Failed to recall sale. Check console for details.");
+    }
+  };
+
+  // Delete a held sale by hold_id
+  const deleteHeldSale = async (hold_id) => {
+    try {
+      const response = await axios.delete(`/api/holds/${hold_id}`);
+      if (response.data.status === "success") {
+        alert("Held sale deleted successfully");
+        loadHeldSales();
+      } else {
+        alert("Failed to delete held sale: " + (response.data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error deleting held sale:", error);
+      alert("Failed to delete held sale. Check console for details.");
+    }
+  };
+
+  // New states for held sales
+  const [heldSales, setHeldSales] = useState([]);
+  const [loadingHeldSales, setLoadingHeldSales] = useState(false);
+  const [showHeldSalesList, setShowHeldSalesList] = useState(false);
 
   // Category and brand states
   const [categories, setCategories] = useState([]);
@@ -281,6 +409,17 @@ const TOUCHPOSFORM = () => {
         setLoadingBrands(false);
       });
   }, []);
+
+  const calculateClosingDetails = () => {
+    const totals = calculateTotals();
+    return {
+      salesAmount: totals.finalTotal,
+      totalSalesQty: totals.totalQty,
+      cashOnHand: cashOnHand,
+      inCashierAmount: 0, // Will be filled by user
+      otherAmount: 0 // Will be filled by user
+    };
+  };
 
   // Fetch Active Discount Schemes
   useEffect(() => {
@@ -603,49 +742,7 @@ const TOUCHPOSFORM = () => {
     }
   };
 
-  // Hold Sale
-  const holdSale = useCallback(() => {
-    if (products.length === 0) {
-      alert("Cannot hold an empty sale.");
-      return;
-    }
-    const currentTotals = calculateTotals();
-    const saleId = `HELD-${Date.now()}`;
-    const saleData = {
-      saleId,
-      products,
-      totals: currentTotals,
-      tax,
-      billDiscount,
-      shipping,
-      saleType,
-      customerInfo,
-      billNumber,
-      heldAt: new Date().toISOString(),
-    };
-    try {
-      const heldSales = JSON.parse(localStorage.getItem("heldSales") || "[]");
-      heldSales.push(saleData);
-      localStorage.setItem("heldSales", JSON.stringify(heldSales));
-      alert(`Sale held with ID: ${saleId}. Use 'View Hold List' to retrieve.`);
-      resetPOS(false);
-      loadHeldSales();
-    } catch (error) {
-      console.error("Error holding sale:", error);
-      alert("Failed to hold sale. Check console for details.");
-    }
-  }, [
-    products,
-    calculateTotals,
-    tax,
-    billDiscount,
-    shipping,
-    saleType,
-    customerInfo,
-    billNumber,
-  ]);
-
-  // Reset POS
+  // First declare resetPOS before holdSale
   const resetPOS = useCallback(
     (fetchNewBill = true) => {
       setProducts([]);
@@ -684,20 +781,57 @@ const TOUCHPOSFORM = () => {
     },
     [items]
   );
+  const holdSale = useCallback(async () => {
+    if (products.length === 0) {
+      alert("Cannot hold an empty sale.");
+      return;
+    }
+    const currentTotals = calculateTotals();
+    const saleData = {
+      products,
+      totals: currentTotals,
+      tax,
+      billDiscount,
+      shipping,
+      saleType,
+      customerInfo,
+      billNumber,
+    };
+    try {
+      const response = await axios.post("/api/holds", {
+        terminal_id: "T-1",
+        user_id: 1,
+        sale_data: saleData,
+      });
+      if (response.data.status === "success") {
+        alert(`Sale held successfully with ID: ${response.data.data.hold_id}`);
+        resetPOS(false);
+        loadHeldSales();
+      } else {
+        alert("Failed to hold sale: " + (response.data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error holding sale:", error);
+      alert("Failed to hold sale. Check console for details.");
+    }
+  }, [products, calculateTotals, tax, billDiscount, shipping, saleType, customerInfo, billNumber, resetPOS, loadHeldSales]);
 
   // Open Bill Modal
   const handleOpenBill = useCallback(() => {
+    if (!registerStatus.isOpen) {
+      alert("Please open the register before processing sales");
+      setShowRegisterModal(true);
+      return;
+    }
+
     if (products.length === 0) {
       alert("Cannot proceed to payment with an empty bill.");
       return;
     }
-    setCustomerInfo((prevState) => ({
-      ...prevState,
-      bill_number: billNumber,
-    }));
-    setShowBillModal(true);
-  }, [products, billNumber]);
 
+    setCustomerInfo(prev => ({ ...prev, bill_number: billNumber }));
+    setShowBillModal(true);
+  }, [products, billNumber, registerStatus.isOpen]);
   // Close Bill Modal
   const closeBillModal = useCallback(
     (saleSaved = false) => {
@@ -734,8 +868,10 @@ const TOUCHPOSFORM = () => {
     >
       {/* Main Content */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[40%_60%] gap-2 sm:gap-4">
+
+
         {/* Left Side: Billing System */}
-        <div className="p-2 sm:p-4 bg-white rounded-lg shadow-lg flex flex-col relative">
+        <div className="p-2 sm:p-4 bg-white dark:bg-slate-900 dark:text-white rounded-lg shadow-lg flex flex-col relative">
           <div className="flex items-center justify-between mb-2 sm:mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Billing</h2>
             <div className="flex gap-1 sm:gap-2">
@@ -758,12 +894,22 @@ const TOUCHPOSFORM = () => {
                 Wholesale
               </button>
             </div>
+            {/* Add HeldSalesList modal here */}
+            {showHeldSalesList && (
+              <HeldSalesList
+                heldSales={heldSales}
+                loading={loadingHeldSales}
+                onRecall={recallHeldSale}
+                onDelete={deleteHeldSale}
+                onClose={closeHeldSalesList}
+              />
+            )}
           </div>
 
           {/* Bill Table */}
           <div className="overflow-x-auto">
             <table className="w-full border">
-              <thead className="bg-gray-200">
+              <thead className="bg-gray-200 dark:bg-slate-700">
                 <tr>
                   <th className="p-1 sm:p-2 text-left text-xs sm:text-sm">
                     S.No
@@ -789,7 +935,7 @@ const TOUCHPOSFORM = () => {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="p-4 text-center text-gray-500">
+                    <td colSpan="7" className="p-4 text-center text-gray-500 dark:text-white">
                       No items added to the bill yet.
                     </td>
                   </tr>
@@ -804,7 +950,7 @@ const TOUCHPOSFORM = () => {
                           <span className="font-semibold text-xs sm:text-sm">
                             {product.product_name}
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-white">
                             Barcode: {product.barcode}
                           </span>
                         </div>
@@ -813,7 +959,7 @@ const TOUCHPOSFORM = () => {
                         <div className="flex items-center justify-center gap-1 sm:gap-2">
                           <button
                             onClick={() => decrementQuantity(index)}
-                            className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                            className="p-1 sm:p-2 bg-gray-300 dark:bg-slate-800 rounded-lg"
                           >
                             <Minus size={16} className="sm:w-5 sm:h-5" />
                           </button>
@@ -822,7 +968,7 @@ const TOUCHPOSFORM = () => {
                           </span>
                           <button
                             onClick={() => incrementQuantity(index)}
-                            className="p-1 sm:p-2 bg-gray-300 rounded-lg"
+                            className="p-1 sm:p-2 bg-gray-300  dark:bg-slate-800  rounded-lg"
                           >
                             <Plus size={16} className="sm:w-5 sm:h-5" />
                           </button>
@@ -844,7 +990,7 @@ const TOUCHPOSFORM = () => {
                       <td className="p-1 sm:p-2 text-center">
                         <button
                           onClick={() => handleDeleteClick(index)}
-                          className="p-1 sm:p-2 bg-red-500 text-white rounded-lg"
+                          className="p-1 sm:p-2 bg-red-500 text-white dark:text-slate-900 rounded-lg"
                         >
                           <Trash2 size={16} className="sm:w-5 sm:h-5" />
                         </button>
@@ -857,7 +1003,7 @@ const TOUCHPOSFORM = () => {
           </div>
 
           {/* Totals Section */}
-          <div className="mt-2 sm:mt-4 flex flex-col sm:flex-row gap-4 sm:gap-6">
+          <div className="mt-2 sm:mt-4  dark:bg-slate-800  flex flex-col sm:flex-row gap-4 sm:gap-6">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm sm:text-lg font-semibold">
                 <span>Total Quantity:</span>
@@ -869,13 +1015,13 @@ const TOUCHPOSFORM = () => {
             <div className="flex-1 space-y-2 sm:space-y-3">
               <div className="grid grid-cols-1 gap-4 sm:gap-6 min-w-fit">
                 <div className="flex-shrink-0">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 whitespace-normal">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-white whitespace-normal">
                     Tax (%):
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
                     <button
                       onClick={() => setTax((prev) => Math.max(prev - 1, 0))}
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
                     </button>
@@ -887,7 +1033,7 @@ const TOUCHPOSFORM = () => {
                         const value = e.target.value;
                         setTax(value === "" ? 0 : parseFloat(value) || 0);
                       }}
-                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
+                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white  dark:bg-slate-800  w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
                       min="0"
                       step="0.01"
                       placeholder="e.g., 5.0%"
@@ -895,14 +1041,14 @@ const TOUCHPOSFORM = () => {
                     />
                     <button
                       onClick={() => setTax((prev) => prev + 1)}
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
                 <div className="flex-shrink-0">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 whitespace-normal">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700  dark:bg-slate-800  whitespace-normal">
                     Discount (Rs.):
                   </label>
                   <div className="flex items-center gap-1 sm:gap-2">
@@ -910,7 +1056,7 @@ const TOUCHPOSFORM = () => {
                       onClick={() =>
                         setBillDiscount((prev) => Math.max(prev - 100, 0))
                       }
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Minus size={16} className="sm:w-5 sm:h-5" />
                     </button>
@@ -924,7 +1070,7 @@ const TOUCHPOSFORM = () => {
                           value === "" ? 0 : parseFloat(value) || 0
                         );
                       }}
-                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-400 placeholder-opacity-75 placeholder-italic"
+                      className="text-xs sm:text-sm p-2 sm:p-3 border border-gray-300 rounded-lg  dark:bg-slate-800  bg-white w-20 sm:w-24 text-center focus:ring-2 focus:ring-blue-500 transition-colors placeholder-gray-300 placeholder-opacity-75 placeholder-italic"
                       min="0"
                       step="1"
                       placeholder="e.g., 100 Rs."
@@ -932,14 +1078,14 @@ const TOUCHPOSFORM = () => {
                     />
                     <button
                       onClick={() => setBillDiscount((prev) => prev + 100)}
-                      className="p-2 sm:p-3 bg-gray-300 rounded-lg"
+                      className="p-2 sm:p-3 bg-gray-300  dark:bg-slate-800  rounded-lg"
                     >
                       <Plus size={16} className="sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
               </div>
-              <div className="p-2 sm:p-4 bg-gray-100 rounded-lg border border-gray-200">
+              <div className="p-2 sm:p-4 bg-gray-100 dark:bg-slate-800  rounded-lg border border-gray-200">
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span>Sub Total (MRP):</span>
@@ -993,23 +1139,23 @@ const TOUCHPOSFORM = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="sticky bottom-0 bg-white pt-2 sm:pt-4">
+          <div className="sticky bottom-0 bg-white  dark:bg-slate-800  pt-2 sm:pt-4">
             <div className="flex gap-1 sm:gap-2">
               <button
-                className="flex-1 p-2 sm:p-4 bg-pink-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
+                className="flex-1 p-2 sm:p-4 bg-pink-500 text-white dark:text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
                 onClick={holdSale}
                 disabled={products.length === 0}
               >
                 <FaPause /> Hold
               </button>
               <button
-                className="flex-1 p-2 sm:p-4 bg-red-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
+                className="flex-1 p-2 sm:p-4 bg-red-500 text-white  dark:text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
                 onClick={() => resetPOS(false)}
               >
                 <FaRedo /> Reset
               </button>
               <button
-                className="flex-1 p-2 sm:p-4 bg-green-500 text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
+                className="flex-1 p-2 sm:p-4 bg-green-500 text-white  dark:text-white rounded-lg text-sm sm:text-lg flex items-center justify-center gap-2"
                 onClick={handleOpenBill}
                 disabled={products.length === 0}
               >
@@ -1020,7 +1166,8 @@ const TOUCHPOSFORM = () => {
         </div>
 
         {/* Right Side: Product Selection */}
-        <div className="p-2 sm:p-4 bg-white rounded-lg shadow-lg flex flex-col">
+        <div className="p-2 sm:p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg flex flex-col">
+
           {/* Search Bar */}
           <input
             ref={searchInputRef}
@@ -1040,25 +1187,26 @@ const TOUCHPOSFORM = () => {
             loadingSchemes ||
             loadingCategories ||
             loadingBrands) && (
-              <span className="text-xs text-gray-500">Loading...</span>
+              <span className="text-xs text-gray-500  dark:text-white">Loading...</span>
             )}
 
           {/* Action Buttons */}
           <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4">
             <button
-              className="p-2 sm:p-3 bg-blue-500 text-white rounded-lg"
-              onClick={() => alert("Feature Coming Soon")}
+              className="p-2 sm:p-3 bg-blue-500 text-white dark:text-slate-800 rounded-lg"
+              onClick={openHeldSalesList}
             >
               <ClipboardList size={20} className="sm:w-7 sm:h-7" />
             </button>
             <button
-              className="p-2 sm:p-3 bg-red-500 text-white rounded-lg"
-              onClick={() => navigate("/pos")}
+              className="p-2 text-white dark:text-slate-800 bg-red-500 rounded-lg shadow hover:bg-red-600"
+              title="Close Register"
+              onClick={handleCloseRegister}
             >
-              <LogOut size={20} className="sm:w-7 sm:h-7" />
+              <LogOut size={24} />
             </button>
             <button
-              className="p-2 sm:p-3 bg-green-500 text-white rounded-lg"
+              className="p-2 sm:p-3 bg-green-500 text-white dark:text-slate-800 rounded-lg"
               onClick={toggleFullScreen}
             >
               {isFullScreen ? (
@@ -1068,13 +1216,13 @@ const TOUCHPOSFORM = () => {
               )}
             </button>
             <button
-              className="p-2 sm:p-3 bg-purple-500 text-white rounded-lg"
+              className="p-2 sm:p-3 bg-purple-500 text-white dark:text-slate-800 rounded-lg"
               onClick={() => setShowCalculatorModal(true)}
             >
               <Calculator size={20} className="sm:w-7 sm:h-7" />
             </button>
             <button
-              className="p-2 sm:p-3 bg-yellow-500 text-white rounded-lg"
+              className="p-2 sm:p-3 bg-yellow-500 text-white dark:text-slate-800 rounded-lg"
               onClick={() => navigate("/Dashboard")}
             >
               <LayoutDashboard size={20} className="sm:w-7 sm:h-7" />
@@ -1088,8 +1236,8 @@ const TOUCHPOSFORM = () => {
                 <button
                   key={category.id}
                   className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category.name
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-blue-500 text-white dark:text-slate-800"
+                    : "bg-gray-200 dark:bg-slate-700 dark:text-white"
                     }`}
                   onClick={() => {
                     setSelectedCategory(category.name);
@@ -1102,7 +1250,7 @@ const TOUCHPOSFORM = () => {
               ))}
             </div>
             {loadingCategories && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-white">
                 Loading categories...
               </span>
             )}
@@ -1115,8 +1263,8 @@ const TOUCHPOSFORM = () => {
                 <button
                   key={brand.id}
                   className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand.name
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200"
+                    ? "bg-blue-500 text-white dark:text-slate-800"
+                    : "bg-gray-200 dark:bg-slate-700 dark:text-white"
                     }`}
                   onClick={() => {
                     setSelectedBrand(brand.name);
@@ -1129,14 +1277,14 @@ const TOUCHPOSFORM = () => {
               ))}
             </div>
             {loadingBrands && (
-              <span className="text-xs text-gray-500">Loading brands...</span>
+              <span className="text-xs text-gray-500 dark:text-white">Loading brands...</span>
             )}
           </div>
 
           {/* Reset Filters Button */}
           <div className="mb-2 sm:mb-4">
             <button
-              className="p-2 sm:p-3 bg-gray-500 text-white rounded-lg text-sm sm:text-lg"
+              className="p-2 sm:p-3 bg-gray-500 text-white dark:text-slate-800 rounded-lg text-sm sm:text-lg"
               onClick={() => {
                 setSelectedCategory("All Categories");
                 setSelectedBrand("All Brands");
@@ -1154,9 +1302,9 @@ const TOUCHPOSFORM = () => {
           )}
 
           {/* Product Results */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 max-h-[50vh] sm:max-h-[60vh] overflow-auto">
+          <div className="grid grid-cols-2 dark:bg-slate-600 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 max-h-[50vh] sm:max-h-[60vh] overflow-auto">
             {searchResults.length === 0 ? (
-              <div className="col-span-full text-center text-gray-500">
+              <div className="col-span-full text-center dark:bg-slate-600 text-gray-500 dark:text-white">
                 No products found.
               </div>
             ) : (
@@ -1164,18 +1312,18 @@ const TOUCHPOSFORM = () => {
                 <div
                   key={item.id}
                   className={`
-                    relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer 
-                    border-4 border-black  
+                    relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer
+                    border-4 border-black
                     ${categoryColors[item.category_name] ||
-                    "bg-gradient-to-br from-gray-50 to-gray-100"
+                    "bg-gradient-to-br from-gray-50 to-gray-100  dark:bg-slate-700 dark:text-white"
                     }
-                    hover:shadow-xl hover:border-purple-800 
+                    hover:shadow-xl hover:border-purple-800
                     active:scale-95 transition-all duration-200
                     flex flex-col justify-between min-h-[140px] sm:min-h-[160px]
                   `}
                   onClick={() => addProductToTable(item)}
                 >
-                  <div className="flex justify-between items-start mb-1">
+                  <div className="flex justify-between items-start mb-1 dark:bg-slate-200">
                     <div className="flex flex-col">
                       <div className="text-xs sm:text-sm font-semibold text-green-700">
                         {formatNumberWithCommas(
@@ -1207,12 +1355,12 @@ const TOUCHPOSFORM = () => {
                   </div> */}
                   <div className="flex flex-col items-center">
                     <h3
-                      className="text-center font-bold text-gray-800 text-xs sm:text-sm line-clamp-2 hover:line-clamp-none"
+                      className="text-center font-bold text-gray-800 dark:text-white text-xs sm:text-sm line-clamp-2 hover:line-clamp-none"
                       title={item.product_name}
                     >
                       {item.product_name}
                     </h3>
-                    <div className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
+                    <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-200 mt-0.5">
                       Barcode: {item.barcode}
                     </div>
                   </div>
@@ -1261,6 +1409,26 @@ const TOUCHPOSFORM = () => {
           </button>
         </Notification>
       )}
+
+      {showRegisterModal && (
+        <RegisterModal
+          isOpen={showRegisterModal}
+          onClose={() => {
+            if (!registerStatus.isOpen) {
+              navigate('/dashboard'); // Redirect if they cancel opening register
+            }
+            setShowRegisterModal(false);
+            setIsClosingRegister(false);
+          }}
+          onConfirm={handleRegisterConfirm}
+          cashOnHand={registerStatus.cashOnHand}
+          setCashOnHand={(amount) => setCashOnHand(amount)}
+          user={user}
+          isClosing={isClosingRegister}
+          closingDetails={calculateClosingDetails()}
+        />
+      )}
+
     </div>
   );
 };

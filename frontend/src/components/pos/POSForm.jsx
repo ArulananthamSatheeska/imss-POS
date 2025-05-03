@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import debounce from "lodash/debounce";
 import CloseRegisterModal from "../models/CloseRegisterModal";
 import HeldSalesList from "./HeldSalesList";
+import RegisterModal from "../models/registerModel.jsx";
 import {
   ClipboardList,
   Trash2,
@@ -20,6 +21,8 @@ import BillPrintModal from "../models/BillPrintModel.jsx";
 import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
+import { useRegister } from '../../context/RegisterContext';
+import { useAuth } from '../../context/NewAuthContext';
 
 const applyDiscountScheme = (product, saleType, schemes) => {
   if (!product || !product.product_id || !Array.isArray(schemes)) {
@@ -104,6 +107,7 @@ const applyDiscountScheme = (product, saleType, schemes) => {
   return basePrice;
 };
 
+
 const POSForm = ({
   initialProducts = [],
   initialBillDiscount = 0,
@@ -114,6 +118,7 @@ const POSForm = ({
   onSubmit,
   onCancel,
 }) => {
+  const { user } = useAuth();
   const terminalId = "T-1";
   const userId = 1;
   const navigate = useNavigate();
@@ -144,6 +149,9 @@ const POSForm = ({
   const [isCloseRegisterOpen, setIsCloseRegisterOpen] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingSchemes, setLoadingSchemes] = useState(false);
+  const { registerStatus, openRegister, closeRegister } = useRegister();
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [isClosingRegister, setIsClosingRegister] = useState(false);
 
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
@@ -750,6 +758,39 @@ const POSForm = ({
     }
   };
 
+  useEffect(() => {
+    // Check register status when component mounts
+    if (!registerStatus.isOpen) {
+      setShowRegisterModal(true);
+    }
+  }, [registerStatus.isOpen]);
+
+  const calculateClosingDetails = () => {
+    // Calculate closing details for the register
+    // This is a basic implementation; adjust as needed
+    const totalSales = products.reduce((sum, p) => sum + (p.total || 0), 0);
+    const cashInRegister = registerStatus.cashOnHand || 0;
+    return {
+      totalSales,
+      cashInRegister,
+    };
+  };
+
+  const handleCloseRegister = () => {
+    setIsClosingRegister(true);
+    setShowRegisterModal(true);
+  };
+
+  const handleRegisterConfirm = (amount) => {
+    if (isClosingRegister) {
+      const closingDetails = calculateClosingDetails(); // Implement this function
+      closeRegister({ ...closingDetails, inCashierAmount: amount });
+      setIsClosingRegister(false);
+    } else {
+      openRegister(amount, user.id);
+    }
+  };
+
   return (
     <div className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""}`}>
       <div className="p-2 mb-4 rounded-lg shadow-xl bg-gradient-to-r from-slate-700 to-slate-600 dark:from-slate-800 dark:to-slate-700">
@@ -790,7 +831,11 @@ const POSForm = ({
             <button className="p-2 text-white bg-green-500 rounded-lg shadow hover:bg-green-600" title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"} onClick={toggleFullScreen}>
               {isFullScreen ? <Minimize size={24} /> : <Maximize size={24} />}
             </button>
-            <button className="p-2 text-white bg-red-500 rounded-lg shadow hover:bg-red-600" title="Close Register" onClick={() => setIsCloseRegisterOpen(true)}>
+            <button
+              className="p-2 text-white bg-red-500 rounded-lg shadow hover:bg-red-600"
+              title="Close Register"
+              onClick={handleCloseRegister}
+            >
               <LogOut size={24} />
             </button>
           </div>
@@ -1028,6 +1073,26 @@ const POSForm = ({
           </div>
         </div>
       </div>
+
+      {showRegisterModal && (
+        <RegisterModal
+          isOpen={showRegisterModal}
+          onClose={() => {
+            // Remove navigation to dashboard to prevent unwanted redirect
+            if (!registerStatus.isOpen) {
+              navigate('/dashboard'); // Redirect if they cancel opening register
+            }
+            setShowRegisterModal(false);
+            setIsClosingRegister(false);
+          }}
+          onConfirm={handleRegisterConfirm}
+          cashOnHand={registerStatus.cashOnHand}
+          setCashOnHand={(amount) => setCashOnHand(amount)}
+          user={user}
+          isClosing={isClosingRegister}
+          closingDetails={calculateClosingDetails()}
+        />
+      )}
 
       {showBillModal && (
         <BillPrintModal

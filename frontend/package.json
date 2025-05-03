@@ -65,6 +65,7 @@
     "react-tsparticles": "^2.12.2",
     "recharts": "^2.14.1",
     "three": "^0.171.0",
+    "uuid": "^11.1.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

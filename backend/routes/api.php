@@ -24,7 +24,8 @@ use App\Http\Controllers\{
     PurchaseOrderController,
     PurchaseReturnController,
     RawMaterialController,
-    SalesInvoiceController
+    SalesInvoiceController,
+    SalesReturnController
 };
 
 
@@ -188,6 +189,14 @@ Route::delete('/purchase-returns/{id}', [PurchaseReturnController::class, 'destr
 
 Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
 Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
-    Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
-    Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update']);
-    Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy']);
+Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
+Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update']);
+Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy']);
+
+Route::get('/products', [ProductController::class, 'index']);
+
+// Invoices endpoint
+Route::get('/invoices', [SalesInvoiceController::class, 'index']);
+
+// Sales Returns resource routes
+Route::resource('sales-returns', SalesReturnController::class)->except(['create', 'edit']);
