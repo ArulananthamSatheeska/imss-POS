@@ -21,6 +21,7 @@ use App\Http\Controllers\{
     ProductionCategoryController,
     ProductionItemController,
     PurchaseController,
+    PurchaseOrderController,
     PurchaseReturnController,
     RawMaterialController,
     SalesInvoiceController,
@@ -186,6 +187,11 @@ Route::put('/purchase-returns/{id}', [PurchaseReturnController::class, 'update']
 // routes/api.php
 Route::delete('/purchase-returns/{id}', [PurchaseReturnController::class, 'destroy']);
 
+Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
+Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
+Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update']);
+Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy']);
 
 Route::get('/products', [ProductController::class, 'index']);
 
