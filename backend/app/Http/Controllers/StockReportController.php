@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\InvoiceItem;
-use Illuminate\Http\Request;
-use App\Models\Product;
-use App\Models\SaleItem;
 use App\Models\PurchaseItem;
+use App\Models\Product;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use App\Models\SaleItem;
 
 class StockReportController extends Controller
 {
@@ -49,8 +49,15 @@ class StockReportController extends Controller
             $fromDate = $request->input('fromDate');
             $toDate = $request->input('toDate');
 
+            // Determine the shop's first day (earliest purchase date)
+            $firstPurchaseDate = DB::table('purchases')
+                ->select(DB::raw('MIN(date_of_purchase) as first_date'))
+                ->value('first_date');
+
+            $firstPurchaseDate = $firstPurchaseDate ? substr($firstPurchaseDate, 0, 10) : null;
+
             // Prepare the detailed stock report data
-            $stockReports = $products->map(function ($product) use ($fromDate, $toDate) {
+            $stockReports = $products->map(function ($product) use ($fromDate, $toDate, $firstPurchaseDate) {
                 // Calculate total sold quantity within the date range
                 $saleQuery = InvoiceItem::where('product_id', $product->product_id)
                     ->whereHas('invoice', function ($q) use ($fromDate, $toDate) {
@@ -71,8 +78,32 @@ class StockReportController extends Controller
                 $totalPurchasedQuantity = $purchaseQuery->sum('quantity') ?? 0;
                 Log::debug('Total purchased quantity for product ID ' . $product->product_id . ': ' . $totalPurchasedQuantity);
 
-                // Calculate closing stock
+                // Determine opening stock
                 $openingStock = $product->opening_stock_quantity ?? 0;
+
+                if ($fromDate && $firstPurchaseDate && $fromDate !== $firstPurchaseDate) {
+                    // For subsequent days, calculate opening stock as previous day's closing stock
+                    $previousDay = date('Y-m-d', strtotime($fromDate . ' -1 day'));
+
+                    // Calculate total sold quantity up to the previous day
+                    $prevSaleQuery = InvoiceItem::where('product_id', $product->product_id)
+                        ->whereHas('invoice', function ($q) use ($previousDay) {
+                            $q->where('invoice_date', '<=', $previousDay);
+                        });
+                    $totalSoldPrev = $prevSaleQuery->sum('quantity') ?? 0;
+
+                    // Calculate total purchased quantity up to the previous day
+                    $prevPurchaseQuery = PurchaseItem::where('product_id', $product->product_id)
+                        ->whereHas('purchase', function ($q) use ($previousDay) {
+                            $q->where('date_of_purchase', '<=', $previousDay);
+                        });
+                    $totalPurchasedPrev = $prevPurchaseQuery->sum('quantity') ?? 0;
+
+                    // Previous day's closing stock = initial opening stock + total purchased - total sold
+                    $openingStock = ($product->opening_stock_quantity ?? 0) + $totalPurchasedPrev - $totalSoldPrev;
+                }
+
+                // Calculate closing stock
                 $closingStock = $openingStock + $totalPurchasedQuantity - $totalSoldQuantity;
 
                 // Calculate total purchase value (cost)
@@ -93,6 +124,7 @@ class StockReportController extends Controller
                     'itemName' => $product->product_name ?? 'N/A',
                     'category' => $product->category ?? 'N/A',
                     'unit' => $product->unit_type ?? 'N/A',
+                    'initialOpeningStock' => $product->opening_stock_quantity ?? 0, // Added for frontend display
                     'openingStock' => $openingStock,
                     'purchased' => $totalPurchasedQuantity,
                     'sold' => $totalSoldQuantity,
