@@ -119,8 +119,9 @@ const POSForm = ({
   onCancel,
 }) => {
   const { user } = useAuth();
-  const terminalId = "T-1";
-  const userId = 1;
+  const { registerStatus } = useRegister();
+  const terminalId = registerStatus.terminalId || "T-1";
+  const userId = user?.id || 1;
   const navigate = useNavigate();
 
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -149,7 +150,7 @@ const POSForm = ({
   const [isCloseRegisterOpen, setIsCloseRegisterOpen] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingSchemes, setLoadingSchemes] = useState(false);
-  const { registerStatus, openRegister, closeRegister } = useRegister();
+  const { openRegister, closeRegister, refreshRegisterStatus } = useRegister();
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isClosingRegister, setIsClosingRegister] = useState(false);
 
@@ -809,8 +810,20 @@ const POSForm = ({
           alert("User information is missing. Cannot open register.");
           return;
         }
-        await openRegister(amount, user.id);
-        setShowRegisterModal(false);
+        let openingCash = 0;
+        if (typeof amount === 'number') {
+          openingCash = amount;
+        } else if (typeof amount === 'object' && amount !== null && 'inCashierAmount' in amount) {
+          openingCash = amount.inCashierAmount;
+        } else {
+          alert("Invalid amount provided for opening register.");
+          return;
+        }
+        const success = await openRegister(openingCash, user.id);
+        if (success) {
+          refreshRegisterStatus();
+          setShowRegisterModal(false);
+        }
       } catch (error) {
         console.error('Failed to open register:', error);
       }

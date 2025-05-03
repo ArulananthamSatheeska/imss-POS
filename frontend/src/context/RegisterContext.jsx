@@ -101,11 +101,13 @@ export const RegisterProvider = ({ children }) => {
     const openRegister = async (amount, userId) => {
         setLoading(true);
         try {
+            console.log('openRegister called with:', { amount, userId, terminalId });
             const response = await axios.post('/api/register/open', {
                 user_id: userId,
                 terminal_id: terminalId,
                 opening_cash: amount,
             });
+            console.log('openRegister response:', response);
 
             if (response.status === 201) {
                 const register = response.data.register;
@@ -131,6 +133,9 @@ export const RegisterProvider = ({ children }) => {
             return false;
         } catch (error) {
             console.error('Failed to open register:', error);
+            if (error.response) {
+                console.error('Error response data:', error.response.data);
+            }
 
             let errorMessage = 'Failed to open register. Please try again.';
             if (error.response) {
