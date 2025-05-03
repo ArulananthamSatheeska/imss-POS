@@ -38,6 +38,7 @@ import BillPrintModal from "./components/models/BillPrintModel.jsx";
 import CustomerManagement from "./pages/sales/Customers.jsx";
 import SalesReturn from "./pages/sales/SalesReturn.jsx";
 import { AuthProvider } from "./context/NewAuthContext";
+import { RegisterProvider } from "./context/RegisterContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import StockRecheck from "./pages/Report/StockRecheck.jsx";
 import AdminAccessPanel from "./pages/UserManagement/RoleList.jsx";
@@ -106,182 +107,183 @@ function App() {
       setNotification({ ...notification, visible: false });
     }, 3000);
   };
-
   return (
     <div className="min-h-screen text-gray-900 bg-white dark:bg-gray-800 dark:text-gray-300">
       <AuthProvider>
-        <Router>
-          {notification.visible && (
-            <Notification
-              message={notification.message}
-              type={notification.type}
-              onClose={() =>
-                setNotification({ ...notification, visible: false })
-              }
-            />
-          )}
-          <Routes>
-            {/* Auth Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
+        <RegisterProvider>
+          <Router>
+            {notification.visible && (
+              <Notification
+                message={notification.message}
+                type={notification.type}
+                onClose={() =>
+                  setNotification({ ...notification, visible: false })
+                }
+              />
+            )}
+            <Routes>
+              {/* Auth Routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Protected Layout */}
-            <Route element={<ProtectedRoute />}>
+              {/* Protected Layout */}
+              <Route element={<ProtectedRoute />}>
+                <Route
+                  element={
+                    <Layout
+                      isDarkMode={isDarkMode}
+                      onThemeToggle={handleThemeToggle}
+                    />
+                  }
+                >
+                  <Route index element={<Dashboard />} />
+                  <Route path="items" element={<Items />} />
+                  <Route path="expiry" element={<Expiry />} />
+                  <Route path="purchasing" element={<PurchasingEntryForm />} />
+                  <Route path="sales" element={<Sales />} />
+                  <Route path="SalesReturn" element={<SalesReturn />} />
+                  <Route path="PurchaseReturn" element={<PurchaseReturn />} />
+                  <Route path="settings" element={<SettingsForm />} />
+                </Route>
+
+                {/* POS Routes with minimal layout */}
+                <Route element={<POSLayout />}>
+                  <Route path="pos" element={<POSForm />} />
+                  <Route path="touchpos" element={<TOUCHPOSFORM />} />
+                </Route>
+
+                <Route
+                  element={
+                    <Layout
+                      isDarkMode={isDarkMode}
+                      onThemeToggle={handleThemeToggle}
+                    />
+                  }
+                >
+                  <Route path="suppliers" element={<Suppliers />} />
+                  <Route path="categories" element={<Categories />} />
+                  <Route path="units" element={<Units />} />
+                  <Route path="UnitForm" element={<UnitForm />} />
+                  <Route path="BarcodePage" element={<BarcodePage />} />
+
+                  <Route path="SupplierForm" element={<SupplierForm />} />
+                  <Route path="CategoryForm" element={<CategoryForm />} />
+                  <Route path="store-locations" element={<StoreLocations />} />
+                  <Route path="StockReport" element={<StockReportForm />} />
+                  <Route
+                    path="ItemWiseStockReport"
+                    element={<ItemWiseReport />}
+                  />
+                  <Route path="DailyProfit" element={<DailyProfitReport />} />
+                  <Route
+                    path="BillWiseProfit"
+                    element={<BillWiseProfitReport />}
+                  />
+                  <Route
+                    path="CompanyWiseProfit"
+                    element={<CompanyWiseProfit />}
+                  />
+                  <Route
+                    path="SupplierWiseProfit"
+                    element={<SupplierWiseProfit />}
+                  />
+                  <Route path="ReportTable" element={<ReportTable />} />
+                  <Route path="StockRecheck" element={<StockRecheck />} />
+                  <Route path="CalculatorModal" element={<Calculator />} />
+                  <Route path="billPrintModel" element={<BillPrintModal />} />
+                  <Route path="Customers" element={<CustomerManagement />} />
+                  <Route path="SalesInvoice" element={<SalesInvoice />} />
+                  <Route path="quotation" element={<Quotation />} />
+                  <Route path="PurchaseInvoice" element={<PurchaseInvoice />} />
+                  <Route path="PurchaseOrder" element={<PurchaseOrder />} />
+                  <Route path="Outstanding" element={<Outstanding />} />
+                  <Route path="CreateCompany" element={<CreateCompany />} />
+                  <Route path="production" element={<ProductionManagement />} />
+                  <Route path="MakeProductForm" element={<MakeProductForm />} />
+                  <Route path="ProductModal" element={<ProductModal />} />
+                  <Route path="RecycleBin" element={<RecycleBin />} />
+                  <Route path="PERMISSIONS" element={<Permissions />} />
+                  <Route path="RoleList" element={<RoleList />} />
+                  <Route path="HomePage" element={<HomePage />} />
+                  <Route path="ProjectsPage" element={<ProjectsPage />} />
+                  <Route path="ReportPage" element={<ReportPage />} />
+                  <Route path="TasksPage" element={<TasksPage />} />
+                  <Route path="TasksPage" element={<TasksPage />} />
+                  <Route path="SubtasksPage" element={<SubtasksPage />} />
+                  <Route path="ProjectForm" element={<ProjectForm />} />
+                  <Route path="SubtaskForm" element={<SubtaskForm />} />
+                  <Route path="TaskForm" element={<TaskForm />} />
+                  <Route path="Home" element={<Home />} />
+
+                  <Route
+                    path="ProductionCategoryModal"
+                    element={<ProductionCategoryModal />}
+                  />
+                  <Route path="RawMaterialModal" element={<RawMaterialModal />} />
+                </Route>
+              </Route>
+
+              {/* Admin Routes */}
+              <Route element={<ProtectedRoute adminOnly />}>
+                <Route
+                  element={
+                    <Layout
+                      isDarkMode={isDarkMode}
+                      onThemeToggle={handleThemeToggle}
+                    />
+                  }
+                >
+                  <Route path="UserModal" element={<UserModal />} />
+                  <Route path="UserList" element={<UserList />} />
+                  <Route path="StaffManagement" element={<StaffManagement />} />
+                  <Route
+                    path="StaffRegistration"
+                    element={<StaffRegistration />}
+                  />
+                  <Route
+                    path="RoleBasedAccessControl"
+                    element={<RoleBasedAccessControl />}
+                  />
+                  <Route
+                    path="AttendanceShiftManagement"
+                    element={<AttendanceShiftManagement />}
+                  />
+                  <Route
+                    path="PayrollSalaryManagement"
+                    element={<PayrollSalaryManagement />}
+                  />
+                  <Route path="Approvels" element={<Approvels />} />
+                  <Route path="StockTransfer" element={<StockTransfer />} />
+                  <Route path="DiscountScheam" element={<DiscountScheam />} />
+                </Route>
+              </Route>
+
+              {/* Manager & Admin Reports */}
               <Route
                 element={
-                  <Layout
-                    isDarkMode={isDarkMode}
-                    onThemeToggle={handleThemeToggle}
-                  />
+                  <ProtectedRoute roles={["manager", "admin", "superadmin"]} />
                 }
               >
-                <Route index element={<Dashboard />} />
-                <Route path="items" element={<Items />} />
-                <Route path="expiry" element={<Expiry />} />
-                <Route path="purchasing" element={<PurchasingEntryForm />} />
-                <Route path="sales" element={<Sales />} />
-                <Route path="SalesReturn" element={<SalesReturn />} />
-                <Route path="PurchaseReturn" element={<PurchaseReturn />} />
-                <Route path="settings" element={<SettingsForm />} />
+                <Route
+                  element={
+                    <Layout
+                      isDarkMode={isDarkMode}
+                      onThemeToggle={handleThemeToggle}
+                    />
+                  }
+                >
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="reports" element={<Reports />} />
+                </Route>
               </Route>
 
-              {/* POS Routes with minimal layout */}
-              <Route element={<POSLayout />}>
-                <Route path="pos" element={<POSForm />} />
-                <Route path="touchpos" element={<TOUCHPOSFORM />} />
-              </Route>
-
-              <Route
-                element={
-                  <Layout
-                    isDarkMode={isDarkMode}
-                    onThemeToggle={handleThemeToggle}
-                  />
-                }
-              >
-                <Route path="suppliers" element={<Suppliers />} />
-                <Route path="categories" element={<Categories />} />
-                <Route path="units" element={<Units />} />
-                <Route path="UnitForm" element={<UnitForm />} />
-                <Route path="BarcodePage" element={<BarcodePage />} />
-
-                <Route path="SupplierForm" element={<SupplierForm />} />
-                <Route path="CategoryForm" element={<CategoryForm />} />
-                <Route path="store-locations" element={<StoreLocations />} />
-                <Route path="StockReport" element={<StockReportForm />} />
-                <Route
-                  path="ItemWiseStockReport"
-                  element={<ItemWiseReport />}
-                />
-                <Route path="DailyProfit" element={<DailyProfitReport />} />
-                <Route
-                  path="BillWiseProfit"
-                  element={<BillWiseProfitReport />}
-                />
-                <Route
-                  path="CompanyWiseProfit"
-                  element={<CompanyWiseProfit />}
-                />
-                <Route
-                  path="SupplierWiseProfit"
-                  element={<SupplierWiseProfit />}
-                />
-                <Route path="ReportTable" element={<ReportTable />} />
-                <Route path="StockRecheck" element={<StockRecheck />} />
-                <Route path="CalculatorModal" element={<Calculator />} />
-                <Route path="billPrintModel" element={<BillPrintModal />} />
-                <Route path="Customers" element={<CustomerManagement />} />
-                <Route path="SalesInvoice" element={<SalesInvoice />} />
-                <Route path="quotation" element={<Quotation />} />
-                <Route path="PurchaseInvoice" element={<PurchaseInvoice />} />
-                <Route path="PurchaseOrder" element={<PurchaseOrder />} />
-                <Route path="Outstanding" element={<Outstanding />} />
-                <Route path="CreateCompany" element={<CreateCompany />} />
-                <Route path="production" element={<ProductionManagement />} />
-                <Route path="MakeProductForm" element={<MakeProductForm />} />
-                <Route path="ProductModal" element={<ProductModal />} />
-                <Route path="RecycleBin" element={<RecycleBin />} />
-                <Route path="PERMISSIONS" element={<Permissions />} />
-                <Route path="RoleList" element={<RoleList />} />
-                <Route path="HomePage" element={<HomePage />} />
-                <Route path="ProjectsPage" element={<ProjectsPage />} />
-                <Route path="ReportPage" element={<ReportPage />} />
-                <Route path="TasksPage" element={<TasksPage />} />
-                <Route path="TasksPage" element={<TasksPage />} />
-                <Route path="SubtasksPage" element={<SubtasksPage />} />
-                <Route path="ProjectForm" element={<ProjectForm />} />
-                <Route path="SubtaskForm" element={<SubtaskForm />} />
-                <Route path="TaskForm" element={<TaskForm />} />
-                <Route path="Home" element={<Home />} />
-
-                <Route
-                  path="ProductionCategoryModal"
-                  element={<ProductionCategoryModal />}
-                />
-                <Route path="RawMaterialModal" element={<RawMaterialModal />} />
-              </Route>
-            </Route>
-
-            {/* Admin Routes */}
-            <Route element={<ProtectedRoute adminOnly />}>
-              <Route
-                element={
-                  <Layout
-                    isDarkMode={isDarkMode}
-                    onThemeToggle={handleThemeToggle}
-                  />
-                }
-              >
-                <Route path="UserModal" element={<UserModal />} />
-                <Route path="UserList" element={<UserList />} />
-                <Route path="StaffManagement" element={<StaffManagement />} />
-                <Route
-                  path="StaffRegistration"
-                  element={<StaffRegistration />}
-                />
-                <Route
-                  path="RoleBasedAccessControl"
-                  element={<RoleBasedAccessControl />}
-                />
-                <Route
-                  path="AttendanceShiftManagement"
-                  element={<AttendanceShiftManagement />}
-                />
-                <Route
-                  path="PayrollSalaryManagement"
-                  element={<PayrollSalaryManagement />}
-                />
-                <Route path="Approvels" element={<Approvels />} />
-                <Route path="StockTransfer" element={<StockTransfer />} />
-                <Route path="DiscountScheam" element={<DiscountScheam />} />
-              </Route>
-            </Route>
-
-            {/* Manager & Admin Reports */}
-            <Route
-              element={
-                <ProtectedRoute roles={["manager", "admin", "superadmin"]} />
-              }
-            >
-              <Route
-                element={
-                  <Layout
-                    isDarkMode={isDarkMode}
-                    onThemeToggle={handleThemeToggle}
-                  />
-                }
-              >
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="reports" element={<Reports />} />
-              </Route>
-            </Route>
-
-            {/* Fallback */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Router>
+              {/* Fallback */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Router>
+        </RegisterProvider>
       </AuthProvider>
     </div>
   );
