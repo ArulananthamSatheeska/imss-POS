@@ -23,6 +23,7 @@ import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
 import { useRegister } from "../../context/RegisterContext";
 import { useAuth } from "../../context/NewAuthContext";
+import ProductDetailsModal from "../../pages/items/ProductDetailsModal.jsx";
 
 // Helper function to check if date is within discount scheme period
 const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
@@ -180,6 +181,8 @@ const POSForm = ({
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isClosingRegister, setIsClosingRegister] = useState(false);
   const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState(null);
 
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
@@ -275,20 +278,21 @@ const POSForm = ({
     if (activeSchemes.length > 0 || !loadingSchemes) {
       setProducts((prevProducts) =>
         prevProducts.map((product) => {
-          const { price: newPrice, schemeName } = applyDiscountScheme(product, saleType, activeSchemes);
+          const { price: discountedPrice, schemeName } = applyDiscountScheme(product, saleType, activeSchemes);
           const mrp = parseFloat(product.mrp || 0);
-          const discountPerUnit = Math.max(0, mrp - newPrice);
+          const salesPrice = parseFloat(product.sales_price || 0);
+          const discountPerUnit = Math.max(0, mrp - salesPrice);
           const productWithQty = { ...product, qty: product.qty || 1 };
           const specialDiscount = calculateSpecialDiscount(
             productWithQty,
             saleType,
             new Date().toISOString().split("T")[0]
           );
-          const total = newPrice * (product.qty || 0) - (specialDiscount || 0);
+          const total = salesPrice * (product.qty || 0) - (specialDiscount || 0);
 
           return {
             ...product,
-            price: newPrice,
+            price: salesPrice,
             discount: discountPerUnit,
             schemeName: schemeName,
             specialDiscount: specialDiscount,
@@ -497,13 +501,14 @@ const POSForm = ({
       return;
     }
 
-    const { price: finalUnitPrice, schemeName } = applyDiscountScheme(
+    const salesPrice = parseFloat(selectedProduct.sales_price || 0);
+    const mrp = parseFloat(selectedProduct.mrp || 0);
+    const discountPerUnit = Math.max(0, mrp - salesPrice);
+    const { schemeName } = applyDiscountScheme(
       selectedProduct,
       saleType,
       activeSchemes
     );
-    const mrp = parseFloat(selectedProduct.mrp || 0);
-    const discountPerUnit = Math.max(0, mrp - finalUnitPrice);
 
     const productWithQty = { ...selectedProduct, qty: currentQuantity };
     const specialDiscount = calculateSpecialDiscount(
@@ -545,11 +550,11 @@ const POSForm = ({
       updatedProducts[existingProductIndex] = {
         ...existingProduct,
         qty: newQuantity,
-        price: finalUnitPrice,
+        price: salesPrice,
         discount: discountPerUnit,
         schemeName: schemeName,
         specialDiscount: newSpecialDiscount,
-        total: finalUnitPrice * newQuantity - newSpecialDiscount,
+        total: salesPrice * newQuantity - newSpecialDiscount,
       };
       setProducts(updatedProducts);
     } else {
@@ -565,11 +570,11 @@ const POSForm = ({
       const newProduct = {
         ...selectedProduct,
         qty: currentQuantity,
-        price: finalUnitPrice,
+        price: salesPrice,
         discount: discountPerUnit,
         schemeName: schemeName,
         specialDiscount: specialDiscount,
-        total: finalUnitPrice * currentQuantity - specialDiscount,
+        total: salesPrice * currentQuantity - specialDiscount,
         serialNumber: products.length + 1,
       };
       setProducts([...products, newProduct]);
@@ -1132,6 +1137,16 @@ const POSForm = ({
     return discountInfo;
   };
 
+  const openProductModal = (productId) => {
+    setSelectedProductId(productId);
+    setShowProductModal(true);
+  };
+
+  const closeProductModal = () => {
+    setShowProductModal(false);
+    setSelectedProductId(null);
+  };
+
   return (
     <div
       className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${
@@ -1386,7 +1401,12 @@ const POSForm = ({
                         className="px-4 py-2 border-r dark:border-gray-700"
                         title={product.product_name}
                       >
-                        {product.product_name}
+                        <button
+                          className="text-blue-600 dark:text-blue-400 hover:underline"
+                          onClick={() => openProductModal(product.product_id)}
+                        >
+                          {product.product_name}
+                        </button>
                       </td>
                       <td className="px-3 py-2 text-right border-r dark:border-gray-700">
                         {formatNumberWithCommas(product.mrp)}
@@ -1670,6 +1690,12 @@ const POSForm = ({
           onRecall={recallHeldSale}
           onDelete={deleteHeldSale}
           onClose={closeHeldSalesList}
+        />
+      )}
+      {showProductModal && (
+        <ProductDetailsModal
+          productId={selectedProductId}
+          onClose={closeProductModal}
         />
       )}
     </div>

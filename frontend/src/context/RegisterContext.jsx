@@ -39,11 +39,52 @@ export const RegisterProvider = ({ children }) => {
         if (!storedUser) return {};
 
         const user = JSON.parse(storedUser);
+
+        // Check if token is expired (optional)
+        const isTokenExpired = (token) => {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const exp = payload.exp;
+                if (!exp) return false;
+                return Date.now() >= exp * 1000;
+            } catch (e) {
+                return false;
+            }
+        };
+
+        if (isTokenExpired(user.token)) {
+            // Token expired, clear storage and redirect to login
+            localStorage.removeItem('user');
+            sessionStorage.removeItem('user');
+            window.location.href = '/login';
+            return {};
+        }
+
         return {
             headers: {
                 Authorization: `Bearer ${user.token}`,
                 'Content-Type': 'application/json',
             }
+        };
+    }, []);
+
+    // Add axios interceptor to handle 401 errors globally
+    useEffect(() => {
+        const interceptor = axios.interceptors.response.use(
+            response => response,
+            error => {
+                if (error.response && error.response.status === 401) {
+                    // Unauthorized, clear storage and redirect to login
+                    localStorage.removeItem('user');
+                    sessionStorage.removeItem('user');
+                    window.location.href = '/login';
+                }
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            axios.interceptors.response.eject(interceptor);
         };
     }, []);
 
