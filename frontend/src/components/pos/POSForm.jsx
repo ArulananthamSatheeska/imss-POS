@@ -21,23 +21,39 @@ import BillPrintModal from "../models/BillPrintModel.jsx";
 import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
-import { useRegister } from '../../context/RegisterContext';
-import { useAuth } from '../../context/NewAuthContext';
+import { useRegister } from "../../context/RegisterContext";
+import { useAuth } from "../../context/NewAuthContext";
 
+// Helper function to check if date is within discount scheme period
+const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
+  try {
+    const invDate = new Date(invoiceDate);
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    return (!start || invDate >= start) && (!end || invDate <= end);
+  } catch (e) {
+    console.error("Error checking date within scheme:", e);
+    return false;
+  }
+};
+
+// Function to apply discount schemes for products or categories
 const applyDiscountScheme = (product, saleType, schemes) => {
   if (!product || !product.product_id || !Array.isArray(schemes)) {
-    const fallbackPrice = saleType === "Wholesale"
-      ? parseFloat(product?.wholesale_price || product?.sales_price || 0)
-      : parseFloat(product?.sales_price || 0);
-    return Math.max(0, fallbackPrice);
+    const fallbackPrice =
+      saleType === "Wholesale"
+        ? parseFloat(product?.wholesale_price || product?.sales_price || 0)
+        : parseFloat(product?.sales_price || 0);
+    return { price: Math.max(0, fallbackPrice), schemeName: null };
   }
 
-  const basePrice = saleType === "Wholesale"
-    ? parseFloat(product.wholesale_price || product.sales_price || 0)
-    : parseFloat(product.sales_price || 0);
+  const basePrice =
+    saleType === "Wholesale"
+      ? parseFloat(product.wholesale_price || product.sales_price || 0)
+      : parseFloat(product.sales_price || 0);
 
   if (isNaN(basePrice) || basePrice <= 0) {
-    return 0;
+    return { price: 0, schemeName: null };
   }
 
   const today = new Date();
@@ -47,8 +63,14 @@ const applyDiscountScheme = (product, saleType, schemes) => {
   let maxDiscountValue = -1;
 
   const findBestScheme = (schemeList) => {
-    schemeList.forEach(scheme => {
-      if (!scheme.active || !scheme.type || scheme.value === null || scheme.value === undefined) return;
+    schemeList.forEach((scheme) => {
+      if (
+        !scheme.active ||
+        !scheme.type ||
+        scheme.value === null ||
+        scheme.value === undefined
+      )
+        return;
 
       const startDate = scheme.start_date ? new Date(scheme.start_date) : null;
       const endDate = scheme.end_date ? new Date(scheme.end_date) : null;
@@ -61,9 +83,9 @@ const applyDiscountScheme = (product, saleType, schemes) => {
       let currentDiscountValue = 0;
       const schemeValue = parseFloat(scheme.value || 0);
 
-      if (scheme.type === 'percentage' && schemeValue > 0) {
+      if (scheme.type === "percentage" && schemeValue > 0) {
         currentDiscountValue = (basePrice * schemeValue) / 100;
-      } else if (scheme.type === 'amount' && schemeValue > 0) {
+      } else if (scheme.type === "amount" && schemeValue > 0) {
         currentDiscountValue = schemeValue;
       } else {
         return;
@@ -78,16 +100,14 @@ const applyDiscountScheme = (product, saleType, schemes) => {
     });
   };
 
-  const productSchemes = schemes.filter(s =>
-    s.applies_to === 'product' &&
-    s.target === product.product_name
+  const productSchemes = schemes.filter(
+    (s) => s.applies_to === "product" && s.target === product.product_name
   );
   findBestScheme(productSchemes);
 
   if ((!bestScheme || maxDiscountValue <= 0) && product.category_name) {
-    const categorySchemes = schemes.filter(s =>
-      s.applies_to === 'category' &&
-      s.target === product.category_name
+    const categorySchemes = schemes.filter(
+      (s) => s.applies_to === "category" && s.target === product.category_name
     );
     findBestScheme(categorySchemes);
   }
@@ -96,30 +116,37 @@ const applyDiscountScheme = (product, saleType, schemes) => {
     let discountedPrice = basePrice;
     const schemeValue = parseFloat(bestScheme.value || 0);
 
-    if (bestScheme.type === 'percentage') {
+    if (bestScheme.type === "percentage") {
       discountedPrice = basePrice * (1 - schemeValue / 100);
-    } else if (bestScheme.type === 'amount') {
+    } else if (bestScheme.type === "amount") {
       discountedPrice = basePrice - schemeValue;
     }
-    return Math.max(0, discountedPrice);
+    return {
+      price: Math.max(0, discountedPrice),
+      schemeName: bestScheme.name || "Unnamed Scheme",
+    };
   }
 
-  return basePrice;
+  return { price: basePrice, schemeName: null };
 };
-
 
 const POSForm = ({
   initialProducts = [],
   initialBillDiscount = 0,
   initialTax = 0,
   initialShipping = 0,
-  initialCustomerInfo = { name: "", mobile: "", bill_number: "", userId: "U-1" },
+  initialCustomerInfo = {
+    name: "",
+    mobile: "",
+    bill_number: "",
+    userId: "U-1",
+  },
   isEditMode = false,
   onSubmit,
   onCancel,
 }) => {
   const { user } = useAuth();
-  const { registerStatus } = useRegister();
+  const { registerStatus, openRegister, closeRegister, refreshRegisterStatus } = useRegister();
   const terminalId = registerStatus.terminalId || "T-1";
   const userId = user?.id || 1;
   const navigate = useNavigate();
@@ -150,7 +177,6 @@ const POSForm = ({
   const [isCloseRegisterOpen, setIsCloseRegisterOpen] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingSchemes, setLoadingSchemes] = useState(false);
-  const { openRegister, closeRegister, refreshRegisterStatus } = useRegister();
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isClosingRegister, setIsClosingRegister] = useState(false);
   const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
@@ -159,6 +185,7 @@ const POSForm = ({
   const quantityInputRef = useRef(null);
   const payButtonRef = useRef(null);
 
+  // Fetch next bill number on component mount if not in edit mode
   useEffect(() => {
     if (!isEditMode) {
       const fetchNextBillNumber = async () => {
@@ -175,19 +202,28 @@ const POSForm = ({
       };
       fetchNextBillNumber();
     }
-  }, [isEditMode]);
+  }, [isEditMode, user]);
 
+  // Fetch products
   useEffect(() => {
     setLoadingItems(true);
     axios
       .get("http://127.0.0.1:8000/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
-          const productsWithOpeningStock = response.data.data.map(p => ({
-            ...p,
-            stock: parseFloat(p.opening_stock_quantity || 0),
-            category_name: p.category_name || 'Unknown Category',
-          }));
+          const productsWithOpeningStock = response.data.data.map((p) => {
+            const categoryName = p.category || p.category_name || "Unknown";
+            if (categoryName === "Unknown") {
+              console.warn(
+                `Missing category_name for product: ${p.product_name} (category_id: ${p.category_id})`
+              );
+            }
+            return {
+              ...p,
+              stock: parseFloat(p.opening_stock_quantity || 0),
+              category_name: categoryName,
+            };
+          });
           setItems(productsWithOpeningStock);
           console.log("Fetched Products:", productsWithOpeningStock);
         } else {
@@ -204,19 +240,20 @@ const POSForm = ({
       });
   }, []);
 
+  // Fetch discount schemes
   useEffect(() => {
     setLoadingSchemes(true);
     axios
       .get("http://127.0.0.1:8000/api/discount-schemes")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
-          const formattedSchemes = response.data.data.map(s => ({
+          const formattedSchemes = response.data.data.map((s) => ({
             ...s,
             applies_to: s.applies_to || s.appliesTo,
             start_date: s.start_date || s.startDate,
             end_date: s.end_date || s.endDate,
           }));
-          const active = formattedSchemes.filter(scheme => scheme.active);
+          const active = formattedSchemes.filter((scheme) => scheme.active);
           setActiveSchemes(active);
           console.log("Fetched Active Schemes:", active);
         } else {
@@ -233,25 +270,118 @@ const POSForm = ({
       });
   }, []);
 
+  // Apply discounts and special discounts to products
   useEffect(() => {
     if (activeSchemes.length > 0 || !loadingSchemes) {
       setProducts((prevProducts) =>
         prevProducts.map((product) => {
-          const newPrice = applyDiscountScheme(product, saleType, activeSchemes);
+          const { price: newPrice, schemeName } = applyDiscountScheme(product, saleType, activeSchemes);
           const mrp = parseFloat(product.mrp || 0);
           const discountPerUnit = Math.max(0, mrp - newPrice);
+          const productWithQty = { ...product, qty: product.qty || 1 };
+          const specialDiscount = calculateSpecialDiscount(
+            productWithQty,
+            saleType,
+            new Date().toISOString().split("T")[0]
+          );
+          const total = newPrice * (product.qty || 0) - (specialDiscount || 0);
 
           return {
             ...product,
             price: newPrice,
             discount: discountPerUnit,
-            total: newPrice * (product.qty || 0),
+            schemeName: schemeName,
+            specialDiscount: specialDiscount,
+            total: total >= 0 ? total : 0,
           };
         })
       );
     }
   }, [saleType, activeSchemes, loadingSchemes]);
 
+  // Calculate special discounts
+  const calculateSpecialDiscount = useCallback(
+    (item, saleType, billDate) => {
+      if (!item || !item.product_id) {
+        console.warn("No product_id provided for discount calculation");
+        return 0;
+      }
+
+      const product = items.find((p) => p.product_id === item.product_id);
+      if (!product) {
+        console.warn(`Product not found for product_id: ${item.product_id}`);
+        return 0;
+      }
+
+      const categoryName = product.category_name || "Unknown";
+      if (categoryName === "Unknown") {
+        console.warn(
+          `No valid category_name for product: ${product.product_name} (category_id: ${product.category_id})`
+        );
+      }
+
+      const basePrice =
+        saleType === "Wholesale"
+          ? parseFloat(product.wholesale_price || product.sales_price || 0)
+          : parseFloat(product.sales_price || 0);
+      const qty = parseFloat(item.qty) || 1;
+      const totalAmount = basePrice * qty;
+
+      const applicableScheme = activeSchemes.find((scheme) => {
+        if (
+          !scheme.active ||
+          !isDateWithinScheme(billDate, scheme.start_date, scheme.end_date)
+        ) {
+          return false;
+        }
+        const target = scheme.target?.trim().toLowerCase();
+        const productMatch =
+          scheme.applies_to === "product" &&
+          target ===
+            (product.product_name?.trim().toLowerCase() ||
+              product.description?.trim().toLowerCase());
+        const categoryMatch =
+          scheme.applies_to === "category" &&
+          categoryName &&
+          target === categoryName?.trim().toLowerCase();
+        if (productMatch) {
+          console.log(
+            `Product discount match for ${product.product_name}: Target=${target}, Value=${scheme.value} ${scheme.type}`
+          );
+        }
+        if (categoryMatch) {
+          console.log(
+            `Category discount match for ${product.product_name} (Category: ${categoryName}): Target=${target}, Value=${scheme.value} ${scheme.type}`
+          );
+        }
+        return productMatch || categoryMatch;
+      });
+
+      if (!applicableScheme) {
+        console.log(
+          `No discount scheme found for ${product.product_name} (Category: ${categoryName})`
+        );
+        return 0;
+      }
+
+      let discount = 0;
+      if (applicableScheme.type === "percentage") {
+        discount = (totalAmount * parseFloat(applicableScheme.value)) / 100;
+      } else if (applicableScheme.type === "amount") {
+        discount = parseFloat(applicableScheme.value) * qty;
+      }
+
+      console.log(
+        `Applied ${applicableScheme.applies_to} discount for ${
+          product.product_name
+        }: Target=${applicableScheme.target}, Discount=${discount.toFixed(2)}`
+      );
+      return discount >= 0 ? discount : 0;
+    },
+    [items, activeSchemes]
+  );
+
+  // Debounced search for products
   const debouncedSearch = useCallback(
     debounce((query) => {
       if (!Array.isArray(items)) {
@@ -294,17 +424,19 @@ const POSForm = ({
   const handleKeyDown = (e) => {
     const numSearchResults = searchResults.length;
 
-    if (e.key === 'ArrowDown') {
+    if (e.key === "ArrowDown") {
       if (numSearchResults > 0) {
         e.preventDefault();
-        setSelectedSearchIndex(prev => (prev + 1) % numSearchResults);
+        setSelectedSearchIndex((prev) => (prev + 1) % numSearchResults);
       }
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       if (numSearchResults > 0) {
         e.preventDefault();
-        setSelectedSearchIndex(prev => (prev - 1 + numSearchResults) % numSearchResults);
+        setSelectedSearchIndex(
+          (prev) => (prev - 1 + numSearchResults) % numSearchResults
+        );
       }
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (document.activeElement === searchInputRef.current) {
         if (numSearchResults > 0 && selectedSearchIndex >= 0) {
@@ -359,13 +491,26 @@ const POSForm = ({
 
     const availableStock = parseFloat(selectedProduct.stock || 0);
     if (isNaN(availableStock)) {
-      alert(`Stock information missing or invalid for ${selectedProduct.product_name}. Cannot add.`);
+      alert(
+        `Stock information missing or invalid for ${selectedProduct.product_name}. Cannot add.`
+      );
       return;
     }
 
-    const finalUnitPrice = applyDiscountScheme(selectedProduct, saleType, activeSchemes);
+    const { price: finalUnitPrice, schemeName } = applyDiscountScheme(
+      selectedProduct,
+      saleType,
+      activeSchemes
+    );
     const mrp = parseFloat(selectedProduct.mrp || 0);
     const discountPerUnit = Math.max(0, mrp - finalUnitPrice);
+
+    const productWithQty = { ...selectedProduct, qty: currentQuantity };
+    const specialDiscount = calculateSpecialDiscount(
+      productWithQty,
+      saleType,
+      new Date().toISOString().split("T")[0]
+    );
 
     const existingProductIndex = products.findIndex(
       (p) => p.product_id === selectedProduct.product_id
@@ -379,17 +524,32 @@ const POSForm = ({
 
       if (newQuantity > availableStock) {
         alert(
-          `Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available. You already have ${existingProduct.qty || 0} in the bill.`
+          `Insufficient stock for ${
+            selectedProduct.product_name
+          }! Only ${availableStock} available. You already have ${
+            existingProduct.qty || 0
+          } in the bill.`
         );
         quantityInputRef.current?.focus();
         quantityInputRef.current?.select();
         return;
       }
 
+      const updatedProductWithQty = { ...existingProduct, qty: newQuantity };
+      const newSpecialDiscount = calculateSpecialDiscount(
+        updatedProductWithQty,
+        saleType,
+        new Date().toISOString().split("T")[0]
+      );
+
       updatedProducts[existingProductIndex] = {
         ...existingProduct,
         qty: newQuantity,
-        total: finalUnitPrice * newQuantity,
+        price: finalUnitPrice,
+        discount: discountPerUnit,
+        schemeName: schemeName,
+        specialDiscount: newSpecialDiscount,
+        total: finalUnitPrice * newQuantity - newSpecialDiscount,
       };
       setProducts(updatedProducts);
     } else {
@@ -407,7 +567,9 @@ const POSForm = ({
         qty: currentQuantity,
         price: finalUnitPrice,
         discount: discountPerUnit,
-        total: finalUnitPrice * currentQuantity,
+        schemeName: schemeName,
+        specialDiscount: specialDiscount,
+        total: finalUnitPrice * currentQuantity - specialDiscount,
         serialNumber: products.length + 1,
       };
       setProducts([...products, newProduct]);
@@ -437,17 +599,27 @@ const POSForm = ({
       const availableStock = parseFloat(productToUpdate.stock || 0);
 
       if (!isNaN(availableStock) && newQty > availableStock) {
-        alert(`Quantity exceeds stock! Only ${availableStock} available for ${productToUpdate.product_name}.`);
+        alert(
+          `Quantity exceeds stock! Only ${availableStock} available for ${productToUpdate.product_name}.`
+        );
         return prevProducts;
       }
 
+      const updatedProductWithQty = { ...productToUpdate, qty: newQty };
+      const newSpecialDiscount = calculateSpecialDiscount(
+        updatedProductWithQty,
+        saleType,
+        new Date().toISOString().split("T")[0]
+      );
+
       return prevProducts.map((product, i) => {
         if (i === index) {
-          const newTotal = newQty * product.price;
+          const newTotal = newQty * product.price - newSpecialDiscount;
           return {
             ...product,
             qty: newQty,
-            total: newTotal,
+            specialDiscount: newSpecialDiscount,
+            total: newTotal >= 0 ? newTotal : 0,
           };
         }
         return product;
@@ -466,12 +638,20 @@ const POSForm = ({
         if (i === index) {
           const mrp = parseFloat(product.mrp || 0);
           const newDiscountPerUnit = Math.max(0, mrp - newPrice);
-          const newTotal = newPrice * (product.qty || 0);
+          const updatedProductWithQty = { ...product, qty: product.qty || 1 };
+          const newSpecialDiscount = calculateSpecialDiscount(
+            updatedProductWithQty,
+            saleType,
+            new Date().toISOString().split("T")[0]
+          );
+          const newTotal = newPrice * (product.qty || 0) - newSpecialDiscount;
           return {
             ...product,
             price: newPrice,
             discount: newDiscountPerUnit,
-            total: newTotal,
+            schemeName: null,
+            specialDiscount: newSpecialDiscount,
+            total: newTotal >= 0 ? newTotal : 0,
           };
         }
         return product;
@@ -485,7 +665,11 @@ const POSForm = ({
   };
 
   const confirmDelete = () => {
-    if (pendingDeleteIndex !== null && pendingDeleteIndex >= 0 && pendingDeleteIndex < products.length) {
+    if (
+      pendingDeleteIndex !== null &&
+      pendingDeleteIndex >= 0 &&
+      pendingDeleteIndex < products.length
+    ) {
       setProducts((prevProducts) => {
         const updated = prevProducts.filter((_, i) => i !== pendingDeleteIndex);
         return updated.map((p, idx) => ({ ...p, serialNumber: idx + 1 }));
@@ -506,17 +690,20 @@ const POSForm = ({
     let totalQty = 0;
     let subTotalMRP = 0;
     let totalItemDiscounts = 0;
+    let totalSpecialDiscounts = 0;
     let grandTotalBeforeAdjustments = 0;
 
-    products.forEach(p => {
+    products.forEach((p) => {
       const qty = p.qty || 0;
       const mrp = parseFloat(p.mrp || 0);
       const unitDiscount = p.discount || 0;
       const unitPrice = p.price || 0;
+      const specialDiscount = p.specialDiscount || 0;
 
       totalQty += qty;
       subTotalMRP += mrp * qty;
       totalItemDiscounts += unitDiscount * qty;
+      totalSpecialDiscounts += specialDiscount;
       grandTotalBeforeAdjustments += p.total;
     });
 
@@ -524,24 +711,34 @@ const POSForm = ({
     const currentBillDiscount = parseFloat(billDiscount || 0);
     const currentShipping = parseFloat(shipping || 0);
     const taxAmount = grandTotalBeforeAdjustments * (currentTaxRate / 100);
-    const finalTotalDiscount = totalItemDiscounts + currentBillDiscount;
-    const finalTotal = grandTotalBeforeAdjustments + taxAmount - currentBillDiscount + currentShipping;
+    const finalTotalDiscount =
+      totalItemDiscounts + totalSpecialDiscounts + currentBillDiscount;
+    const finalTotal =
+      grandTotalBeforeAdjustments +
+      taxAmount -
+      currentBillDiscount +
+      currentShipping;
 
     return {
       totalQty,
       subTotalMRP: isNaN(subTotalMRP) ? 0 : subTotalMRP,
       totalItemDiscounts: isNaN(totalItemDiscounts) ? 0 : totalItemDiscounts,
+      totalSpecialDiscounts: isNaN(totalSpecialDiscounts)
+        ? 0
+        : totalSpecialDiscounts,
       totalBillDiscount: isNaN(currentBillDiscount) ? 0 : currentBillDiscount,
       finalTotalDiscount: isNaN(finalTotalDiscount) ? 0 : finalTotalDiscount,
       taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
-      grandTotalBeforeAdjustments: isNaN(grandTotalBeforeAdjustments) ? 0 : grandTotalBeforeAdjustments,
+      grandTotalBeforeAdjustments: isNaN(grandTotalBeforeAdjustments)
+        ? 0
+        : grandTotalBeforeAdjustments,
       finalTotal: isNaN(finalTotal) ? 0 : finalTotal,
     };
   }, [products, tax, billDiscount, shipping]);
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
+      document.documentElement.requestFullscreen().catch((err) => {
         console.error(`Error enabling full-screen: ${err.message}`);
         alert(`Could not enter full-screen: ${err.message}`);
       });
@@ -582,7 +779,9 @@ const POSForm = ({
         resetPOS(false);
         loadHeldSales();
       } else {
-        alert("Failed to hold sale: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to hold sale: " + (response.data.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Error holding sale:", error);
@@ -590,7 +789,18 @@ const POSForm = ({
     } finally {
       setHoldingSale(false);
     }
-  }, [products, calculateTotals, tax, billDiscount, shipping, saleType, customerInfo, billNumber]);
+  }, [
+    products,
+    calculateTotals,
+    tax,
+    billDiscount,
+    shipping,
+    saleType,
+    customerInfo,
+    billNumber,
+    terminalId,
+    userId,
+  ]);
 
   const loadHeldSales = useCallback(async () => {
     setLoadingHeldSales(true);
@@ -601,7 +811,10 @@ const POSForm = ({
       if (response.data.status === "success") {
         setHeldSales(response.data.data);
       } else {
-        alert("Failed to load held sales: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to load held sales: " +
+            (response.data.message || "Unknown error")
+        );
         setHeldSales([]);
       }
     } catch (error) {
@@ -631,13 +844,22 @@ const POSForm = ({
         setBillDiscount(sale.billDiscount || 0);
         setShipping(sale.shipping || 0);
         setSaleType(sale.saleType || "Retail");
-        setCustomerInfo(sale.customerInfo || { name: "", mobile: "", bill_number: "", userId: "U-1" });
+        setCustomerInfo(
+          sale.customerInfo || {
+            name: "",
+            mobile: "",
+            bill_number: "",
+            userId: "U-1",
+          }
+        );
         setBillNumber(sale.billNumber || "");
-        setHeldSales((prev) => prev.filter(s => s.hold_id !== holdId));
+        setHeldSales((prev) => prev.filter((s) => s.hold_id !== holdId));
         setShowHeldSalesList(false);
         alert(`Recalled sale with ID: ${holdId}`);
       } else {
-        alert("Failed to recall sale: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to recall sale: " + (response.data.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Error recalling sale:", error);
@@ -652,7 +874,10 @@ const POSForm = ({
         alert("Held sale deleted successfully");
         loadHeldSales();
       } else {
-        alert("Failed to delete held sale: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to delete held sale: " +
+            (response.data.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Error deleting held sale:", error);
@@ -660,39 +885,54 @@ const POSForm = ({
     }
   };
 
-  const resetPOS = useCallback((fetchNewBill = true) => {
-    setProducts([]);
-    setTax(0);
-    setBillDiscount(0);
-    setShipping(0);
-    setSearchQuery("");
-    setSelectedProduct(null);
-    setQuantity(1);
-    setSearchResults([]);
-    setSelectedSearchIndex(-1);
-    setCustomerInfo({ name: "", mobile: "", bill_number: "", userId: "U-1" });
+  const resetPOS = useCallback(
+    (fetchNewBill = true) => {
+      setProducts([]);
+      setTax(0);
+      setBillDiscount(0);
+      setShipping(0);
+      setSearchQuery("");
+      setSelectedProduct(null);
+      setQuantity(1);
+      setSearchResults([]);
+      setSelectedSearchIndex(-1);
+      setCustomerInfo({ name: "", mobile: "", bill_number: "", userId: "U-1" });
 
-    if (fetchNewBill && !isEditMode) {
-      const fetchNextBillNumber = async () => {
-        try {
-          const response = await axios.get("http://127.0.0.1:8000/api/next-bill-number");
-          setBillNumber(response.data.next_bill_number);
-          setCustomerInfo(prev => ({ ...prev, bill_number: response.data.next_bill_number }));
-        } catch (error) {
-          console.error("Error fetching next bill number:", error);
-          setBillNumber("ERR-XXX");
-        }
-      };
-      fetchNextBillNumber();
-    } else {
-      setCustomerInfo(prev => ({ ...prev, bill_number: isEditMode ? billNumber : "" }));
-    }
+      if (fetchNewBill && !isEditMode) {
+        const fetchNextBillNumber = async () => {
+          try {
+            const token = user?.token;
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const response = await axios.get(
+              "http://127.0.0.1:8000/api/next-bill-number",
+              { headers }
+            );
+            setBillNumber(response.data.next_bill_number);
+            setCustomerInfo((prev) => ({
+              ...prev,
+              bill_number: response.data.next_bill_number,
+            }));
+          } catch (error) {
+            console.error("Error fetching next bill number:", error);
+            setBillNumber("ERR-XXX");
+          }
+        };
+        fetchNextBillNumber();
+      } else {
+        setCustomerInfo((prev) => ({
+          ...prev,
+          bill_number: isEditMode ? billNumber : "",
+        }));
+      }
 
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [isEditMode, billNumber]);
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    },
+    [isEditMode, billNumber, user]
+  );
 
+  // Handle Alt+L for opening held sales list
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.altKey && e.key.toLowerCase() === "l") {
@@ -716,28 +956,47 @@ const POSForm = ({
     setShowBillModal(true);
   }, [products, billNumber]);
 
-  const closeBillModal = useCallback((saleSaved = false) => {
-    setShowBillModal(false);
-    if (saleSaved) {
-      resetPOS(true);
-    } else {
-      searchInputRef.current?.focus();
-    }
-    setCustomerInfo((prevState) => ({
-      ...prevState,
-      name: "",
-      mobile: "",
-      bill_number: isEditMode ? billNumber : "",
-    }));
-  }, [resetPOS, isEditMode, billNumber]);
+  const closeBillModal = useCallback(
+    (saleSaved = false) => {
+      setShowBillModal(false);
+      if (saleSaved) {
+        resetPOS(true);
+      } else {
+        searchInputRef.current?.focus();
+      }
+      setCustomerInfo((prevState) => ({
+        ...prevState,
+        name: "",
+        mobile: "",
+        bill_number: isEditMode ? billNumber : "",
+      }));
+    },
+    [resetPOS, isEditMode, billNumber]
+  );
 
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
-      if (e.altKey && e.key.toLowerCase() === "p") { e.preventDefault(); handleOpenBill(); }
-      if (e.altKey && e.key.toLowerCase() === "h") { e.preventDefault(); holdSale(); }
-      if (e.altKey && e.key.toLowerCase() === "r") { e.preventDefault(); resetPOS(false); }
-      if (e.altKey && e.key.toLowerCase() === "c") { e.preventDefault(); setShowCalculatorModal(true); }
-      if (e.altKey && e.key.toLowerCase() === "s") { e.preventDefault(); searchInputRef.current?.focus(); }
+      if (e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        handleOpenBill();
+      }
+      if (e.altKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        holdSale();
+      }
+      if (e.altKey && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        resetPOS(false);
+      }
+      if (e.altKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        setShowCalculatorModal(true);
+      }
+      if (e.altKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
     };
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
@@ -755,16 +1014,16 @@ const POSForm = ({
         totals,
         customerInfo,
         saleType,
-        payment_type: "Cash", // Adjust based on actual payment type if needed
-        received_amount: totals.finalTotal, // Adjust as needed
-        balance_amount: 0, // Adjust as needed
+        payment_type: "Cash",
+        received_amount: totals.finalTotal,
+        balance_amount: 0,
       });
     }
   };
 
+  // Check register status on mount
   useEffect(() => {
-    // Check register status when component mounts and loading is false
-    const registerModalDismissed = localStorage.getItem('registerModalDismissed');
+    const registerModalDismissed = localStorage.getItem("registerModalDismissed");
     if (!registerStatus.isOpen && !registerModalDismissed) {
       setShowRegisterModal(true);
     } else {
@@ -774,15 +1033,13 @@ const POSForm = ({
   }, [registerStatus.isOpen]);
 
   const calculateClosingDetails = () => {
-    // Calculate closing details for the register
-    // This is a basic implementation; adjust as needed
     const totalSales = products.reduce((sum, p) => sum + (p.total || 0), 0);
     const cashInRegister = registerStatus.cashOnHand || 0;
     return {
       totalSales,
       cashInRegister,
-      inCashierAmount: 0, // to be filled by user input
-      otherAmount: 0, // to be filled by user input
+      inCashierAmount: 0,
+      otherAmount: 0,
     };
   };
 
@@ -790,12 +1047,6 @@ const POSForm = ({
     setIsClosingRegister(true);
     setShowRegisterModal(true);
   };
-  useEffect(() => {
-    // Check register status on mount and when user changes
-    if (user && !registerStatus.isOpen) {
-      setShowRegisterModal(true);
-    }
-  }, [user, registerStatus.isOpen]);
 
   const handleRegisterConfirm = async (amount) => {
     if (isClosingRegister) {
@@ -804,12 +1055,13 @@ const POSForm = ({
         await closeRegister({
           ...closingDetails,
           inCashierAmount: amount.inCashierAmount,
-          otherAmount: amount.otherAmount
+          otherAmount: amount.otherAmount,
         });
         setIsClosingRegister(false);
         setShowRegisterModal(false);
       } catch (error) {
-        console.error('Failed to close register:', error);
+        console.error("Failed to close register:", error);
+        alert("Failed to close register.");
       }
     } else {
       try {
@@ -818,37 +1070,81 @@ const POSForm = ({
           return;
         }
         let openingCash = 0;
-        if (typeof amount === 'number') {
+        if (typeof amount === "number") {
           openingCash = amount;
-        } else if (typeof amount === 'object' && amount !== null && 'inCashierAmount' in amount) {
+        } else if (
+          typeof amount === "object" &&
+          amount !== null &&
+          "inCashierAmount" in amount
+        ) {
           openingCash = amount.inCashierAmount;
         } else {
           alert("Invalid amount provided for opening register.");
           return;
         }
-        const success = await openRegister({ user_id: user.id, terminal_id: terminalId, opening_cash: openingCash });
+        const success = await openRegister({
+          user_id: user.id,
+          terminal_id: terminalId,
+          opening_cash: openingCash,
+        });
         if (success) {
           refreshRegisterStatus();
           setShowRegisterModal(false);
         }
       } catch (error) {
-        console.error('Failed to open register:', error);
+        console.error("Failed to open register:", error);
+        alert("Failed to open register.");
       }
     }
   };
-  useEffect(() => {
-    if (user && !registerStatus.isOpen && !isClosingRegister) {
-      setShowRegisterModal(true);
+
+  // Display discount info in search results
+  const getProductDiscountInfo = (item) => {
+    const productScheme = activeSchemes.find(
+      (scheme) =>
+        scheme.active &&
+        scheme.applies_to === "product" &&
+        scheme.target?.trim().toLowerCase() ===
+          (item.product_name?.trim().toLowerCase() ||
+            item.description?.trim().toLowerCase())
+    );
+    const categoryScheme = activeSchemes.find(
+      (scheme) =>
+        scheme.active &&
+        scheme.applies_to === "category" &&
+        scheme.target?.trim().toLowerCase() ===
+          item.category_name?.trim().toLowerCase()
+    );
+    let discountInfo = "";
+    if (productScheme) {
+      discountInfo = `, Discount: Product ${productScheme.target} (${
+        productScheme.type === "percentage"
+          ? `${productScheme.value}%`
+          : `Rs. ${productScheme.value}`
+      })`;
+    } else if (categoryScheme) {
+      discountInfo = `, Discount: Category ${categoryScheme.target} (${
+        categoryScheme.type === "percentage"
+          ? `${categoryScheme.value}%`
+          : `Rs. ${categoryScheme.value}`
+      })`;
     }
-  }, [user, registerStatus.isOpen, isClosingRegister]);
+    return discountInfo;
+  };
 
   return (
-    <div className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""}`}>
+    <div
+      className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${
+        isFullScreen ? "fullscreen-mode" : ""
+      }`}
+    >
       <div className="p-2 mb-4 rounded-lg shadow-xl bg-gradient-to-r from-slate-700 to-slate-600 dark:from-slate-800 dark:to-slate-700">
         <div className="flex flex-wrap items-center justify-between w-full gap-2 p-3 rounded-lg shadow-md md:gap-4 bg-slate-500 dark:bg-slate-600">
           <div className="flex items-center space-x-4">
             <div>
-              <label className="block mb-1 text-sm font-bold text-white">Sale Type</label>
+              <label className="block mb-1 text-sm font-bold text-white">
+                Sale Type
+              </label>
               <select
                 className="px-3 py-2 text-base text-orange-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-orange-400 dark:border-gray-600"
                 value={saleType}
@@ -861,7 +1157,9 @@ const POSForm = ({
           </div>
           <div className="flex flex-wrap items-center justify-end flex-grow gap-2 md:gap-3">
             <div className="flex items-center space-x-2">
-              <label className="hidden font-bold text-white sm:inline">Bill No:</label>
+              <label className="hidden font-bold text-white sm:inline">
+                Bill No:
+              </label>
               <input
                 type="text"
                 className="w-24 px-2 py-2 font-bold text-center text-orange-700 bg-white border border-gray-300 rounded-lg md:w-32 dark:bg-gray-700 dark:text-orange-400 dark:border-gray-600"
@@ -870,16 +1168,32 @@ const POSForm = ({
                 title="Current Bill Number"
               />
             </div>
-            <button className="p-2 text-white bg-blue-500 rounded-lg shadow hover:bg-blue-600" title="View Hold List (Alt+L)" onClick={openHeldSalesList}>
+            <button
+              className="p-2 text-white bg-blue-500 rounded-lg shadow hover:bg-blue-600"
+              title="View Hold List (Alt+L)"
+              onClick={openHeldSalesList}
+            >
               <ClipboardList size={24} />
             </button>
-            <button className="p-2 text-white bg-yellow-500 rounded-lg shadow hover:bg-yellow-600" title="Dashboard" onClick={() => navigate("/Dashboard")}>
+            <button
+              className="p-2 text-white bg-yellow-500 rounded-lg shadow hover:bg-yellow-600"
+              title="Dashboard"
+              onClick={() => navigate("/Dashboard")}
+            >
               <LayoutDashboard size={24} />
             </button>
-            <button className="p-2 text-white bg-purple-500 rounded-lg shadow hover:bg-purple-600" title="Calculator (Alt+C)" onClick={() => setShowCalculatorModal(true)}>
+            <button
+              className="p-2 text-white bg-purple-500 rounded-lg shadow hover:bg-purple-600"
+              title="Calculator (Alt+C)"
+              onClick={() => setShowCalculatorModal(true)}
+            >
               <Calculator size={24} />
             </button>
-            <button className="p-2 text-white bg-green-500 rounded-lg shadow hover:bg-green-600" title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"} onClick={toggleFullScreen}>
+            <button
+              className="p-2 text-white bg-green-500 rounded-lg shadow hover:bg-green-600"
+              title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+              onClick={toggleFullScreen}
+            >
               {isFullScreen ? <Minimize size={24} /> : <Maximize size={24} />}
             </button>
             <button
@@ -897,7 +1211,12 @@ const POSForm = ({
         <div className="p-4 rounded-lg shadow-inner lg:col-span-2 bg-slate-200 dark:bg-gray-800">
           <div className="relative flex flex-col items-stretch gap-2 mb-4 md:flex-row md:items-end">
             <div className="relative flex-grow">
-              <label htmlFor="productSearch" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Search Product (Alt+S)</label>
+              <label
+                htmlFor="productSearch"
+                className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Search Product (Alt+S)
+              </label>
               <input
                 id="productSearch"
                 ref={searchInputRef}
@@ -907,29 +1226,44 @@ const POSForm = ({
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={loadingItems || loadingSchemes || !registerStatus.isOpen}
+                disabled={
+                  loadingItems || loadingSchemes || !registerStatus.isOpen
+                }
                 autoComplete="off"
               />
               {(loadingItems || loadingSchemes) && (
-                <span className="absolute text-xs text-gray-500 top-1 right-2 dark:text-gray-400">Loading...</span>
+                <span className="absolute text-xs text-gray-500 top-1 right-2 dark:text-gray-400">
+                  Loading...
+                </span>
               )}
               {searchResults.length > 0 && (
                 <ul className="absolute z-50 w-full mt-1 overflow-auto bg-white border border-gray-300 rounded-lg shadow-lg dark:bg-gray-700 dark:border-gray-600 max-h-60">
                   {searchResults.map((item, index) => (
                     <li
                       key={item.product_id || index}
-                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${index === selectedSearchIndex ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white" : "text-black dark:text-gray-200"}`}
+                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${
+                        index === selectedSearchIndex
+                          ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white"
+                          : "text-black dark:text-gray-200"
+                      }`}
                       onClick={() => handleItemSelection(item)}
                       onMouseEnter={() => setSelectedSearchIndex(index)}
                     >
-                      {item.product_name} ({item.item_code || 'No Code'}) - Stock: {item.stock ?? 'N/A'} - MRP: {formatNumberWithCommas(item.mrp || 0)}
+                      {item.product_name} (Code: {item.item_code || "N/A"},
+                      Stock: {item.stock ?? "N/A"}, Category:{" "}
+                      {item.category_name}${getProductDiscountInfo(item)})
                     </li>
                   ))}
                 </ul>
               )}
             </div>
             <div className="flex-shrink-0 w-full md:w-24">
-              <label htmlFor="quantityInput" className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</label>
+              <label
+                htmlFor="quantityInput"
+                className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Quantity
+              </label>
               <input
                 id="quantityInput"
                 ref={quantityInputRef}
@@ -941,45 +1275,122 @@ const POSForm = ({
                 value={quantity}
                 onChange={handleQuantityChange}
                 onKeyDown={handleKeyDown}
-                disabled={!selectedProduct || loadingItems || loadingSchemes || !registerStatus.isOpen}
+                disabled={
+                  !selectedProduct ||
+                  loadingItems ||
+                  loadingSchemes ||
+                  !registerStatus.isOpen
+                }
               />
             </div>
             <div className="flex-shrink-0 w-full md:w-auto">
-              <label className="block mb-1 text-sm font-medium text-transparent dark:text-transparent">Add</label>
+              <label className="block mb-1 text-sm font-medium text-transparent dark:text-transparent">
+                Add
+              </label>
               <button
                 className="w-full px-5 py-2 text-base font-semibold text-white bg-green-600 rounded-lg shadow md:w-auto hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={addProductToTable}
-                disabled={!selectedProduct || parseFloat(quantity || 0) <= 0 || loadingItems || loadingSchemes || !registerStatus.isOpen}
+                disabled={
+                  !selectedProduct ||
+                  parseFloat(quantity || 0) <= 0 ||
+                  loadingItems ||
+                  loadingSchemes ||
+                  !registerStatus.isOpen
+                }
               >
                 Add
               </button>
             </div>
           </div>
 
-          <h2 className="my-4 text-lg font-bold text-gray-800 dark:text-gray-200">Current Bill Items ({products.length})</h2>
+          <h2 className="my-4 text-lg font-bold text-gray-800 dark:text-gray-200">
+            Current Bill Items ({products.length})
+          </h2>
           <div className="overflow-x-auto max-h-[50vh] border border-gray-300 dark:border-gray-600 rounded-lg">
             <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300">
               <thead className="text-xs text-white uppercase bg-gray-700 dark:bg-gray-700 dark:text-amber-400">
                 <tr>
-                  <th scope="col" className="px-3 py-3 border-r dark:border-gray-600">S.No</th>
-                  <th scope="col" className="px-4 py-3 border-r dark:border-gray-600 min-w-[200px]">Name</th>
-                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600">MRP</th>
-                  <th scope="col" className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]">Qty</th>
-                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]">U.Price</th>
-                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]">U.Disc</th>
-                  <th scope="col" className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]">Total</th>
-                  <th scope="col" className="px-3 py-3 text-center"><Trash2 size={16} /></th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 border-r dark:border-gray-600"
+                  >
+                    S.No
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-3 border-r dark:border-gray-600 min-w-[200px]"
+                  >
+                    Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600"
+                  >
+                    MRP
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]"
+                  >
+                    Qty
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]"
+                  >
+                    U.Price
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                  >
+                    U.Disc
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                  >
+                    Sp.Disc
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]"
+                  >
+                    Total
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-center">
+                    <Trash2 size={16} />
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                 {products.length === 0 ? (
-                  <tr><td colSpan="8" className="py-6 italic text-center text-gray-500 dark:text-gray-400">No items added to the bill yet.</td></tr>
+                  <tr>
+                    <td
+                      colSpan="10"
+                      className="py-6 italic text-center text-gray-500 dark:text-gray-400"
+                    >
+                      No items added to the bill yet.
+                    </td>
+                  </tr>
                 ) : (
                   products.map((product, index) => (
-                    <tr key={product.product_id + '-' + index} className="hover:bg-gray-100 dark:hover:bg-gray-700">
-                      <td className="px-3 py-2 font-medium text-gray-900 border-r dark:text-white dark:border-gray-700">{product.serialNumber}</td>
-                      <td className="px-4 py-2 border-r dark:border-gray-700" title={product.product_name}>{product.product_name}</td>
-                      <td className="px-3 py-2 text-right border-r dark:border-gray-700">{formatNumberWithCommas(product.mrp)}</td>
+                    <tr
+                      key={product.product_id + "-" + index}
+                      className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <td className="px-3 py-2 font-medium text-gray-900 border-r dark:text-white dark:border-gray-700">
+                        {product.serialNumber}
+                      </td>
+                      <td
+                        className="px-4 py-2 border-r dark:border-gray-700"
+                        title={product.product_name}
+                      >
+                        {product.product_name}
+                      </td>
+                      <td className="px-3 py-2 text-right border-r dark:border-gray-700">
+                        {formatNumberWithCommas(product.mrp)}
+                      </td>
                       <td className="px-1 py-1 text-center border-r dark:border-gray-700">
                         <input
                           type="number"
@@ -987,7 +1398,9 @@ const POSForm = ({
                           min="0"
                           className="w-16 py-1 text-sm text-center bg-transparent border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:text-white"
                           value={product.qty}
-                          onChange={(e) => updateProductQuantity(index, e.target.value)}
+                          onChange={(e) =>
+                            updateProductQuantity(index, e.target.value)
+                          }
                           onFocus={(e) => e.target.select()}
                         />
                       </td>
@@ -998,11 +1411,27 @@ const POSForm = ({
                           min="0"
                           className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                           value={product.price.toFixed(2)}
-                          readOnly
+                          onChange={(e) =>
+                            updateProductPrice(index, e.target.value)
+                          }
+                          onFocus={(e) => e.target.select()}
                         />
                       </td>
-                      <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">{formatNumberWithCommas(product.discount?.toFixed(2) ?? 0.00)}</td>
-                      <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">{formatNumberWithCommas(product.total?.toFixed(2) ?? 0.00)}</td>
+                      <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
+                        {formatNumberWithCommas(
+                          product.discount?.toFixed(2) ?? 0.00
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
+                        {formatNumberWithCommas(
+                          product.specialDiscount?.toFixed(2) ?? 0.00
+                        )}
+                      </td>
+                      <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">
+                        {formatNumberWithCommas(
+                          product.total?.toFixed(2) ?? 0.00
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-center">
                         <button
                           onClick={() => handleDeleteClick(index)}
@@ -1019,7 +1448,12 @@ const POSForm = ({
             </table>
           </div>
           {showNotification && (
-            <Notification message={`Delete item "${products[pendingDeleteIndex]?.product_name ?? 'this item'}"?`} onClose={cancelDelete}>
+            <Notification
+              message={`Delete item "${
+                products[pendingDeleteIndex]?.product_name ?? "this item"
+              }"?`}
+              onClose={cancelDelete}
+            >
               <div className="flex justify-end gap-4 mt-4">
                 <button
                   onClick={confirmDelete}
@@ -1042,39 +1476,101 @@ const POSForm = ({
           <h2 className="mb-4 text-xl font-bold text-white">Bill Summary</h2>
           <div className="space-y-3">
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">Tax (%)</label>
+              <label className="block mb-1 text-sm font-medium text-gray-200">
+                Tax (%)
+              </label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={tax}
-                onChange={(e) => setTax(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                onChange={(e) =>
+                  setTax(
+                    e.target.value === "" ? "" : parseFloat(e.target.value) || 0
+                  )
+                }
                 className="w-full px-3 py-2 text-black bg-white border border-gray-300 rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., 5"
               />
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">Bill Discount (Amount)</label>
+              <label className="block mb-1 text-sm font-medium text-gray-200">
+                Bill Discount (Amount)
+              </label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={billDiscount}
-                onChange={(e) => setBillDiscount(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                onChange={(e) =>
+                  setBillDiscount(
+                    e.target.value === "" ? "" : parseFloat(e.target.value) || 0
+                  )
+                }
                 className="w-full px-3 py-2 text-black bg-white border border-gray-300 rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Discount amount"
               />
             </div>
           </div>
           <div className="p-4 mt-6 text-sm text-gray-100 bg-transparent border border-gray-500 rounded-lg shadow-inner space-y-1.5 dark:border-gray-600">
-            <div className="flex justify-between"><span>Total Items / Qty:</span><span className="font-medium">{products.length} / {formatNumberWithCommas(totals.totalQty.toFixed(1))}</span></div>
-            <div className="flex justify-between"><span>Sub Total (MRP):</span><span className="font-medium">Rs. {formatNumberWithCommas(totals.subTotalMRP.toFixed(2))}</span></div>
-            <div className="flex justify-between text-red-300"><span>(-) Item Discounts:</span><span className="font-medium">Rs. {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}</span></div>
-            <div className="flex justify-between"><span>Net Item Total:</span><span className="font-medium">Rs. {formatNumberWithCommas(totals.grandTotalBeforeAdjustments.toFixed(2))}</span></div>
-            <div className="flex justify-between text-yellow-300"><span>(+) Tax ({parseFloat(tax || 0).toFixed(1)}%):</span><span className="font-medium">Rs. {formatNumberWithCommas(totals.taxAmount.toFixed(2))}</span></div>
-            <div className="flex justify-between text-red-300"><span>(-) Bill Discount:</span><span className="font-medium">Rs. {formatNumberWithCommas(totals.totalBillDiscount.toFixed(2))}</span></div>
+            <div className="flex justify-between">
+              <span>Total Items / Qty:</span>
+              <span className="font-medium">
+                {products.length} /{" "}
+                {formatNumberWithCommas(totals.totalQty.toFixed(1))}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Sub Total (MRP):</span>
+              <span className="font-medium">
+                Rs. {formatNumberWithCommas(totals.subTotalMRP.toFixed(2))}
+              </span>
+            </div>
+            <div className="flex justify-between text-red-300">
+              <span>(-) Item Discounts:</span>
+              <span className="font-medium">
+                Rs.{" "}
+                {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}
+              </span>
+            </div>
+            <div className="flex justify-between text-red-300">
+              <span>(-) Special Discounts:</span>
+              <span className="font-medium">
+                Rs.{" "}
+                {formatNumberWithCommas(
+                  totals.totalSpecialDiscounts.toFixed(2)
+                )}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Net Item Total:</span>
+              <span className="font-medium">
+                Rs.{" "}
+                {formatNumberWithCommas(
+                  totals.grandTotalBeforeAdjustments.toFixed(2)
+                )}
+              </span>
+            </div>
+            <div className="flex justify-between text-yellow-300">
+              <span>(+) Tax ({parseFloat(tax || 0).toFixed(1)}%):</span>
+              <span className="font-medium">
+                Rs. {formatNumberWithCommas(totals.taxAmount.toFixed(2))}
+              </span>
+            </div>
+            <div className="flex justify-between text-red-300">
+              <span>(-) Bill Discount:</span>
+              <span className="font-medium">
+                Rs.{" "}
+                {formatNumberWithCommas(totals.totalBillDiscount.toFixed(2))}
+              </span>
+            </div>
             <hr className="my-2 border-gray-500 dark:border-gray-600" />
-            <div className="flex justify-between text-xl font-bold text-green-400"><span>Grand Total:</span><span>Rs. {formatNumberWithCommas(totals.finalTotal.toFixed(2))}</span></div>
+            <div className="flex justify-between text-xl font-bold text-green-400">
+              <span>Grand Total:</span>
+              <span>
+                Rs. {formatNumberWithCommas(totals.finalTotal.toFixed(2))}
+              </span>
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-3 mt-6">
             {isEditMode ? (
@@ -1099,7 +1595,7 @@ const POSForm = ({
                   className="flex items-center justify-center gap-1 px-3 py-3 text-sm font-semibold text-white rounded-lg shadow bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
                   onClick={holdSale}
                   title="Hold Bill (Alt+H)"
-                  disabled={products.length === 0}
+                  disabled={products.length === 0 || holdingSale}
                 >
                   <PauseCircle size={18} /> Hold
                 </button>
@@ -1129,14 +1625,14 @@ const POSForm = ({
         <RegisterModal
           isOpen={showRegisterModal}
           onClose={() => {
-            // Remove navigation to dashboard to prevent unwanted redirect
-
             setShowRegisterModal(false);
             setIsClosingRegister(false);
+            if (!registerStatus.isOpen) {
+              navigate("/dashboard");
+            }
           }}
           onConfirm={handleRegisterConfirm}
           cashOnHand={registerStatus.cashOnHand}
-          setCashOnHand={(amount) => setCashOnHand(amount)}
           user={user}
           isClosing={isClosingRegister}
           closingDetails={calculateClosingDetails()}
@@ -1151,6 +1647,7 @@ const POSForm = ({
           initialShipping={parseFloat(shipping || 0)}
           initialTotals={totals}
           initialCustomerInfo={customerInfo}
+          saleType={saleType}
           onClose={closeBillModal}
         />
       )}

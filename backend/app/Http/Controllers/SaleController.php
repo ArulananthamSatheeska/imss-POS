@@ -56,6 +56,7 @@ class SaleController extends Controller
             'items.*.mrp' => 'required|numeric|min:0',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'required|numeric|min:0',
+            'items.*.special_discount' => 'nullable|numeric|min:0',
             'items.*.total' => 'required|numeric|min:0',
         ]);
 
@@ -143,9 +144,10 @@ class SaleController extends Controller
                 if ($product) {
                     // Calculate discount and adjust unit price and total
                     $discountAmount = $calculateDiscount($product, $activeSchemes);
+                    $specialDiscount = $item['special_discount'] ?? 0;
                     $unitPrice = $product->sales_price - $discountAmount;
                     $unitPrice = max(0, $unitPrice);
-                    $totalPrice = $unitPrice * $item['quantity'];
+                    $totalPrice = ($unitPrice * $item['quantity']) - $specialDiscount;
 
                     SaleItem::create([
                         'sale_id' => $sale->id,
@@ -155,6 +157,7 @@ class SaleController extends Controller
                         'mrp' => $item['mrp'],
                         'unit_price' => $unitPrice,
                         'discount' => $discountAmount,
+                        'special_discount' => $specialDiscount,
                         'total' => $totalPrice,
                     ]);
                 } else {
@@ -167,6 +170,7 @@ class SaleController extends Controller
                         'mrp' => $item['mrp'],
                         'unit_price' => $item['unit_price'],
                         'discount' => $item['discount'],
+                        'special_discount' => $item['special_discount'] ?? 0,
                         'total' => $item['total'],
                     ]);
                 }
@@ -201,6 +205,7 @@ class SaleController extends Controller
             'items.*.mrp' => 'required|numeric|min:0',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'required|numeric|min:0',
+            'items.*.special_discount' => 'nullable|numeric|min:0',
             'items.*.total' => 'required|numeric|min:0',
         ]);
 
@@ -276,9 +281,10 @@ class SaleController extends Controller
                 if ($product) {
                     // Calculate discount and adjust unit price and total
                     $discountAmount = $calculateDiscount($product, $activeSchemes);
+                    $specialDiscount = $item['special_discount'] ?? 0;
                     $unitPrice = $product->sales_price - $discountAmount;
                     $unitPrice = max(0, $unitPrice);
-                    $totalPrice = $unitPrice * $item['quantity'];
+                    $totalPrice = ($unitPrice * $item['quantity']) - $specialDiscount;
 
                     if ($item['quantity'] <= 0) {
                         Log::warning('Invalid quantity for product ' . $item['product_name'] . ': ' . $item['quantity']);
@@ -293,6 +299,7 @@ class SaleController extends Controller
                         'mrp' => $item['mrp'],
                         'unit_price' => $unitPrice,
                         'discount' => $discountAmount,
+                        'special_discount' => $specialDiscount,
                         'total' => $totalPrice,
                     ]);
                 } else {
@@ -305,6 +312,7 @@ class SaleController extends Controller
                         'mrp' => $item['mrp'],
                         'unit_price' => $item['unit_price'],
                         'discount' => $item['discount'],
+                        'special_discount' => $item['special_discount'] ?? 0,
                         'total' => $item['total'],
                     ]);
                 }
