@@ -342,8 +342,8 @@ const POSForm = ({
         const productMatch =
           scheme.applies_to === "product" &&
           target ===
-            (product.product_name?.trim().toLowerCase() ||
-              product.description?.trim().toLowerCase());
+          (product.product_name?.trim().toLowerCase() ||
+            product.description?.trim().toLowerCase());
         const categoryMatch =
           scheme.applies_to === "category" &&
           categoryName &&
@@ -376,8 +376,7 @@ const POSForm = ({
       }
 
       console.log(
-        `Applied ${applicableScheme.applies_to} discount for ${
-          product.product_name
+        `Applied ${applicableScheme.applies_to} discount for ${product.product_name
         }: Target=${applicableScheme.target}, Discount=${discount.toFixed(2)}`
       );
       return discount >= 0 ? discount : 0;
@@ -529,10 +528,8 @@ const POSForm = ({
 
       if (newQuantity > availableStock) {
         alert(
-          `Insufficient stock for ${
-            selectedProduct.product_name
-          }! Only ${availableStock} available. You already have ${
-            existingProduct.qty || 0
+          `Insufficient stock for ${selectedProduct.product_name
+          }! Only ${availableStock} available. You already have ${existingProduct.qty || 0
           } in the bill.`
         );
         quantityInputRef.current?.focus();
@@ -818,7 +815,7 @@ const POSForm = ({
       } else {
         alert(
           "Failed to load held sales: " +
-            (response.data.message || "Unknown error")
+          (response.data.message || "Unknown error")
         );
         setHeldSales([]);
       }
@@ -881,7 +878,7 @@ const POSForm = ({
       } else {
         alert(
           "Failed to delete held sale: " +
-            (response.data.message || "Unknown error")
+          (response.data.message || "Unknown error")
         );
       }
     } catch (error) {
@@ -954,12 +951,17 @@ const POSForm = ({
       alert("Cannot proceed to payment with an empty bill.");
       return;
     }
+    if (!registerStatus.isOpen) {
+      // If register is closed, show register modal to prompt opening
+      setShowRegisterModal(true);
+      return;
+    }
     setCustomerInfo((prevState) => ({
       ...prevState,
       bill_number: billNumber,
     }));
     setShowBillModal(true);
-  }, [products, billNumber]);
+  }, [products, billNumber, registerStatus.isOpen]);
 
   const closeBillModal = useCallback(
     (saleSaved = false) => {
@@ -1110,29 +1112,27 @@ const POSForm = ({
         scheme.active &&
         scheme.applies_to === "product" &&
         scheme.target?.trim().toLowerCase() ===
-          (item.product_name?.trim().toLowerCase() ||
-            item.description?.trim().toLowerCase())
+        (item.product_name?.trim().toLowerCase() ||
+          item.description?.trim().toLowerCase())
     );
     const categoryScheme = activeSchemes.find(
       (scheme) =>
         scheme.active &&
         scheme.applies_to === "category" &&
         scheme.target?.trim().toLowerCase() ===
-          item.category_name?.trim().toLowerCase()
+        item.category_name?.trim().toLowerCase()
     );
     let discountInfo = "";
     if (productScheme) {
-      discountInfo = `, Discount: Product ${productScheme.target} (${
-        productScheme.type === "percentage"
-          ? `${productScheme.value}%`
-          : `Rs. ${productScheme.value}`
-      })`;
+      discountInfo = `, Discount: Product ${productScheme.target} (${productScheme.type === "percentage"
+        ? `${productScheme.value}%`
+        : `Rs. ${productScheme.value}`
+        })`;
     } else if (categoryScheme) {
-      discountInfo = `, Discount: Category ${categoryScheme.target} (${
-        categoryScheme.type === "percentage"
-          ? `${categoryScheme.value}%`
-          : `Rs. ${categoryScheme.value}`
-      })`;
+      discountInfo = `, Discount: Category ${categoryScheme.target} (${categoryScheme.type === "percentage"
+        ? `${categoryScheme.value}%`
+        : `Rs. ${categoryScheme.value}`
+        })`;
     }
     return discountInfo;
   };
@@ -1149,9 +1149,8 @@ const POSForm = ({
 
   return (
     <div
-      className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${
-        isFullScreen ? "fullscreen-mode" : ""
-      }`}
+      className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""
+        }`}
     >
       <div className="p-2 mb-4 rounded-lg shadow-xl bg-gradient-to-r from-slate-700 to-slate-600 dark:from-slate-800 dark:to-slate-700">
         <div className="flex flex-wrap items-center justify-between w-full gap-2 p-3 rounded-lg shadow-md md:gap-4 bg-slate-500 dark:bg-slate-600">
@@ -1242,7 +1241,7 @@ const POSForm = ({
                 onChange={(e) => handleSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={
-                  loadingItems || loadingSchemes || !registerStatus.isOpen
+                  loadingItems || loadingSchemes
                 }
                 autoComplete="off"
               />
@@ -1256,11 +1255,10 @@ const POSForm = ({
                   {searchResults.map((item, index) => (
                     <li
                       key={item.product_id || index}
-                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${
-                        index === selectedSearchIndex
-                          ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white"
-                          : "text-black dark:text-gray-200"
-                      }`}
+                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${index === selectedSearchIndex
+                        ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white"
+                        : "text-black dark:text-gray-200"
+                        }`}
                       onClick={() => handleItemSelection(item)}
                       onMouseEnter={() => setSelectedSearchIndex(index)}
                     >
@@ -1293,8 +1291,7 @@ const POSForm = ({
                 disabled={
                   !selectedProduct ||
                   loadingItems ||
-                  loadingSchemes ||
-                  !registerStatus.isOpen
+                  loadingSchemes
                 }
               />
             </div>
@@ -1309,8 +1306,7 @@ const POSForm = ({
                   !selectedProduct ||
                   parseFloat(quantity || 0) <= 0 ||
                   loadingItems ||
-                  loadingSchemes ||
-                  !registerStatus.isOpen
+                  loadingSchemes
                 }
               >
                 Add
@@ -1469,9 +1465,8 @@ const POSForm = ({
           </div>
           {showNotification && (
             <Notification
-              message={`Delete item "${
-                products[pendingDeleteIndex]?.product_name ?? "this item"
-              }"?`}
+              message={`Delete item "${products[pendingDeleteIndex]?.product_name ?? "this item"
+                }"?`}
               onClose={cancelDelete}
             >
               <div className="flex justify-end gap-4 mt-4">
@@ -1647,9 +1642,7 @@ const POSForm = ({
           onClose={() => {
             setShowRegisterModal(false);
             setIsClosingRegister(false);
-            if (!registerStatus.isOpen) {
-              navigate("/dashboard");
-            }
+
           }}
           onConfirm={handleRegisterConfirm}
           cashOnHand={registerStatus.cashOnHand}
