@@ -1062,6 +1062,10 @@ const POSForm = ({
     if (isClosingRegister) {
       const closingDetails = calculateClosingDetails();
       try {
+        if (!amount || typeof amount.inCashierAmount !== 'number') {
+          alert('Invalid amount provided for closing register.');
+          return;
+        }
         await closeRegister({
           ...closingDetails,
           inCashierAmount: amount.inCashierAmount,

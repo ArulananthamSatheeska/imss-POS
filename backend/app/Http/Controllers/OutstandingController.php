@@ -4,102 +4,149 @@ namespace App\Http\Controllers;
 
 use App\Models\Sale;
 use App\Models\Invoice;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 
 class OutstandingController extends Controller
 {
     public function index(Request $request)
     {
-        // Fetch sales with balance_amount > 0 (pending payments)
-        $sales = Sale::where('balance_amount', '>', 0)
-            ->select('id', 'customer_id', 'customer_name', 'total', 'balance_amount', 'created_at', 'payment_type')
-            ->get()
-            ->map(function ($sale) {
-                return [
-                    'id' => $sale->id,
-                    'type' => 'sale',
-                    'customer_id' => $sale->customer_id,
-                    'customer_name' => $sale->customer_name,
-                    'total_amount' => (float) $sale->total,
-                    'pending_amount' => (float) $sale->balance_amount,
-                    'paid_amount' => (float) $sale->total - (float) $sale->balance_amount,
-                    'previous_outstanding_balance' => 0.0,
-                    'total_credits' => 0.0,
-                    'final_outstanding_amount' => (float) $sale->balance_amount,
-                    'date' => $sale->created_at->toDateString(),
-                    'payment_type' => $sale->payment_type,
-                    'status' => $sale->balance_amount > 0 ? 'Pending' : 'Paid',
-                ];
-            });
+        try {
+            // Fetch sales and calculate pending amount as total - received_amount
+            $sales = Sale::select('id', 'customer_id', 'customer_name', 'total', 'received_amount', 'created_at', 'payment_type')
+                ->get()
+                ->map(function ($sale) {
+                    $pendingAmount = (float) $sale->total - (float) $sale->received_amount;
 
-        // Fetch invoices with balance > 0 (pending payments)
-        $invoices = Invoice::where('balance', '>', 0)
-            ->select('id', 'customer_name', 'total_amount', 'balance', 'invoice_date', 'payment_method')
-            ->get()
-            ->map(function ($invoice) {
-                return [
-                    'id' => $invoice->id,
-                    'type' => 'invoice',
-                    'customer_id' => null,
-                    'customer_name' => $invoice->customer_name,
-                    'total_amount' => (float) $invoice->total_amount,
-                    'pending_amount' => (float) $invoice->balance,
-                    'paid_amount' => (float) $invoice->total_amount - (float) $invoice->balance,
-                    'previous_outstanding_balance' => 0.0,
-                    'total_credits' => 0.0,
-                    'final_outstanding_amount' => (float) $invoice->balance,
-                    'date' => $invoice->invoice_date->toDateString(),
-                    'payment_type' => $invoice->payment_method,
-                    'status' => $invoice->balance > 0 ? 'Pending' : 'Paid',
-                ];
-            });
+                    // Fetch payment history for this sale
+                    $paymentHistory = Payment::where('transaction_type', 'sale')
+                        ->where('transaction_id', $sale->id)
+                        ->orderBy('payment_date', 'asc')
+                        ->get(['amount', 'payment_date', 'payment_method'])
+                        ->map(function ($payment) {
+                            return [
+                                'amount' => (float) $payment->amount,
+                                'payment_date' => $payment->payment_date ? $payment->payment_date->toDateString() : null,
+                                'payment_method' => $payment->payment_method,
+                            ];
+                        });
 
-        // Combine sales and invoices
-        $outstanding = $sales->merge($invoices)->sortByDesc('date')->values();
+                    return [
+                        'id' => $sale->id,
+                        'type' => 'sale',
+                        'customer_id' => $sale->customer_id,
+                        'customer_name' => $sale->customer_name ?: 'Unknown Customer',
+                        'total_amount' => (float) $sale->total,
+                        'final_outstanding_amount' => $pendingAmount,
+                        'paid_amount' => (float) $sale->received_amount,
+                        'payment_history' => $paymentHistory,
+                        'previous_outstanding_balance' => 0.0,
+                        'total_credits' => 0.0,
+                        'date' => $sale->created_at ? $sale->created_at->toDateString() : null,
+                        'payment_type' => $sale->payment_type,
+                        'status' => $pendingAmount > 0 ? 'Pending' : 'Paid',
+                    ];
+                })->filter(function ($sale) {
+                    return $sale['final_outstanding_amount'] > 0;
+                });
 
-        return response()->json($outstanding);
+            // Fetch invoices with balance > 0 (pending payments)
+            $invoices = Invoice::where('balance', '>', 0)
+                ->select('id', 'customer_name', 'total_amount', 'balance', 'invoice_date', 'payment_method')
+                ->get()
+                ->map(function ($invoice) {
+
+                    // Fetch payment history for this invoice
+                    $paymentHistory = Payment::where('transaction_type', 'invoice')
+                        ->where('transaction_id', $invoice->id)
+                        ->orderBy('payment_date', 'asc')
+                        ->get(['amount', 'payment_date', 'payment_method'])
+                        ->map(function ($payment) {
+                            return [
+                                'amount' => (float) $payment->amount,
+                                'payment_date' => $payment->payment_date ? $payment->payment_date->toDateString() : null,
+                                'payment_method' => $payment->payment_method,
+                            ];
+                        });
+
+                    return [
+                        'id' => $invoice->id,
+                        'type' => 'invoice',
+                        'customer_name' => $invoice->customer_name ?: 'Unknown Customer',
+                        'total_amount' => (float) $invoice->total_amount,
+                        'final_outstanding_amount' => (float) $invoice->balance,
+                        'paid_amount' => (float) $invoice->total_amount - (float) $invoice->balance,
+                        'payment_history' => $paymentHistory,
+                        'previous_outstanding_balance' => 0.0,
+                        'total_credits' => 0.0,
+                        'date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                        'payment_type' => $invoice->payment_method,
+                        'status' => $invoice->balance > 0 ? 'Pending' : 'Paid',
+                    ];
+                });
+
+            // Combine sales and invoices
+            $outstanding = $sales->merge($invoices)->sortByDesc('created_at')->values();
+
+            return response()->json($outstanding);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching outstanding transactions: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json(['error' => 'Failed to fetch outstanding transactions.'], 500);
+        }
     }
+
     public function update(Request $request, $id)
-{
-    $status = $request->input('status');
-    $paidAmount = $request->input('paid_amount');
+    {
+        $paidAmount = $request->input('paid_amount');
+        $paymentDate = $request->input('payment_date');
 
-    // Try to find the sale by id
-    $sale = Sale::find($id);
-    if ($sale) {
-        if ($status === 'Paid') {
-            $sale->balance_amount = 0;
-            $sale->status = 'Paid';
-            // Assuming there is a paid_amount field, update it
-            if (property_exists($sale, 'paid_amount')) {
-                $sale->paid_amount = $sale->total;
-            }
+        // Try to find the sale by id
+        $sale = Sale::find($id);
+        if ($sale) {
+            $newPaidAmount = $paidAmount;
+            $total = (float) $sale->total;
+            $currentPaid = (float) $sale->received_amount;
+            $updatedPaid = $currentPaid + $newPaidAmount;
+            $balance = $total - $updatedPaid;
+
+            $sale->received_amount = $updatedPaid;
+            $sale->balance_amount = $balance;
+            // Removed status update on Sale due to missing column in sales table
+            // Removed payment_date update on Sale due to missing column in sales table
+            $sale->updated_at = now();
+
             $sale->save();
-            return response()->json(['message' => 'Sale marked as paid successfully.']);
-        }
-        // Handle other status updates if needed
-        return response()->json(['message' => 'No changes made to sale.']);
-    }
 
-    // Try to find the invoice by id
-    $invoice = Invoice::find($id);
-    if ($invoice) {
-        if ($status === 'Paid') {
-            $invoice->balance = 0;
-            $invoice->status = 'Paid';
-            // Assuming there is a paid_amount field, update it
-            if (property_exists($invoice, 'paid_amount')) {
-                $invoice->paid_amount = $invoice->total_amount;
+            return response()->json(['message' => 'Sale payment updated successfully.', 'status' => $sale->status, 'balance' => $balance]);
+        }
+
+        // Try to find the invoice by id
+        $invoice = Invoice::find($id);
+        if ($invoice) {
+            $newPaidAmount = $paidAmount;
+            $total = (float) $invoice->total_amount;
+            $currentPaid = $total - (float) $invoice->balance;
+            $updatedPaid = $currentPaid + $newPaidAmount;
+            $balance = $total - $updatedPaid;
+
+            $invoice->balance = $balance;
+            $invoice->status = $balance <= 0 ? 'Paid' : 'Pending';
+            if ($paymentDate) {
+                try {
+                    $invoice->payment_date = $paymentDate;
+                } catch (\Exception $e) {
+                    \Log::error('Error setting payment_date on Invoice: ' . $e->getMessage());
+                }
             }
-            $invoice->save();
-            return response()->json(['message' => 'Invoice marked as paid successfully.']);
-        }
-        // Handle other status updates if needed
-        return response()->json(['message' => 'No changes made to invoice.']);
-    }
+            $invoice->updated_at = now();
 
-    return response()->json(['error' => 'Record not found.'], 404);
-}
+            $invoice->save();
+
+            return response()->json(['message' => 'Invoice payment updated successfully.', 'status' => $invoice->status, 'balance' => $balance]);
+        }
+
+        return response()->json(['error' => 'Record not found.'], 404);
+    }
 
 }
 

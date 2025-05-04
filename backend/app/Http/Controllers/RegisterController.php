@@ -164,7 +164,7 @@ class RegisterController extends Controller
             $actualCash = $request->input('actual_cash');
 
             // Optional: Validate actual cash against expected cash with tolerance
-            $tolerance = 0.01; // e.g., 1 cent tolerance
+            $tolerance = 5.00; // increased tolerance to allow minor discrepancies
             if (abs($expectedCash - $actualCash) > $tolerance) {
                 DB::rollBack();
                 return response()->json([

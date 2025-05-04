@@ -215,7 +215,7 @@ export const RegisterProvider = ({ children }) => {
             const response = await axios.post('/api/register/close', {
                 register_id: registerStatus.registerId,
                 closing_balance: closingDetails.inCashierAmount,
-                actual_cash: closingDetails.inCashierAmount,
+                actual_cash: closingDetails.inCashierAmount + (closingDetails.otherAmount || 0),
             }, getAuthHeaders());
 
             if (response.status === 200) {
@@ -248,7 +248,11 @@ export const RegisterProvider = ({ children }) => {
 
             if (error.response) {
                 if (error.response.status === 422) {
-                    errorMessage = Object.values(error.response.data.errors).join(' ');
+                    if (error.response.data.errors) {
+                        errorMessage = Object.values(error.response.data.errors).join(' ');
+                    } else if (error.response.data.message) {
+                        errorMessage = error.response.data.message;
+                    }
                 } else if (error.response.data?.message) {
                     errorMessage = error.response.data.message;
                 }
