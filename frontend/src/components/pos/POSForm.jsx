@@ -1130,9 +1130,7 @@ const POSForm = ({
           isOpen={showRegisterModal}
           onClose={() => {
             // Remove navigation to dashboard to prevent unwanted redirect
-            if (!registerStatus.isOpen) {
-              navigate('/dashboard'); // Redirect if they cancel opening register
-            }
+
             setShowRegisterModal(false);
             setIsClosingRegister(false);
           }}
