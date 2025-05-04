@@ -98,6 +98,37 @@ const BillPrintModal = ({
     }
   };
 
+  const [companyDetails, setCompanyDetails] = useState({
+    company_name: "Company Name ",
+    business_address: "Address",
+    contact_number: "0771234567"
+  });
+
+  useEffect(() => {
+    const fetchCompanyDetails = async () => {
+      try {
+        const response = await axios.get("http://localhost:8000/api/company-details");
+        if (response.data) {
+          setCompanyDetails({
+            company_name: response.data.company_name || "",
+            business_address: response.data.business_address || "",
+            contact_number: response.data.contact_number || ""
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching company details:", error);
+        // Fallback to default values if API fails
+        setCompanyDetails({
+          company_name: "SHARVAKSHA FOOD CITY",
+          business_address: "Main Street Thambiluvil-01",
+          contact_number: "0750296343"
+        });
+      }
+    };
+
+    fetchCompanyDetails();
+  }, []);
+
   // Handle received amount change
   const handleReceivedAmountChange = (e) => {
     const amount = parseFloat(e.target.value) || 0;
@@ -445,18 +476,6 @@ const BillPrintModal = ({
               <p>
                 <strong>Item Discounts:</strong> {formatCurrency(totals.totalItemDiscounts)}
               </p>
-              <p>
-                <strong>Special Discounts:</strong> {formatCurrency(totals.totalSpecialDiscounts)}
-              </p>
-              <p>
-                <strong>Bill Discount:</strong> {formatCurrency(totals.totalBillDiscount)}
-              </p>
-              <p>
-                <strong>Tax ({initialTax}%):</strong> {formatCurrency(totals.taxAmount)}
-              </p>
-              <p>
-                <strong>Shipping:</strong> {formatCurrency(initialShipping)}
-              </p>
               <p className="text-lg font-bold">
                 <strong>Grand Total:</strong> {formatCurrency(totals.finalTotal)}
               </p>
@@ -468,9 +487,12 @@ const BillPrintModal = ({
         <div className="hidden">
           <div ref={printRef} className="print-container">
             <div className="text-center bill-header">
-              <div className="shop-name">MUNSI TEX</div>
-              <div className="shop-address">MOSQUE BUILDING, POLICE ROAD</div>
-              <div className="shop-contact">Mob: 0769859513</div>
+              <div className="text-center bill-header">
+                <div className="shop-name">{companyDetails.company_name}</div>
+                <div className="shop-address">{companyDetails.business_address}</div>
+                <div className="shop-contact">Mob: {companyDetails.contact_number}</div>
+                <hr className="my-1 border-t border-black" />
+              </div>
               <hr className="my-1 border-t border-black" />
             </div>
 
@@ -551,18 +573,7 @@ const BillPrintModal = ({
               <p>
                 <strong>Item Discounts:</strong> {totals.totalItemDiscounts.toFixed(2)}
               </p>
-              <p>
-                <strong>Special Discounts:</strong> {totals.totalSpecialDiscounts.toFixed(2)}
-              </p>
-              <p>
-                <strong>Bill Discount:</strong> {totals.totalBillDiscount.toFixed(2)}
-              </p>
-              <p>
-                <strong>Tax ({initialTax}%):</strong> {totals.taxAmount.toFixed(2)}
-              </p>
-              <p>
-                <strong>Shipping:</strong> {initialShipping.toFixed(2)}
-              </p>
+
               <p className="total-amount">
                 <strong>Grand Total:</strong> {totals.finalTotal.toFixed(2)}
               </p>

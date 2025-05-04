@@ -123,6 +123,9 @@ export const RegisterProvider = ({ children }) => {
                     userId: register.user_id,
                     registerId: register.id,
                     terminalId: register.terminal_id,
+                    totalSales: Number(register.total_sales) || 0,
+                    totalSalesQty: Number(register.total_sales_qty) || 0,
+                    openingCash: Number(register.opening_cash) || 0,
                 };
 
                 setRegisterStatus(newStatus);
@@ -218,21 +221,26 @@ export const RegisterProvider = ({ children }) => {
             if (response.status === 200) {
                 const register = response.data.register;
                 const totalSales = response.data.total_sales;
+                const totalSalesQty = response.data.total_sales_qty;
                 const openingCash = response.data.opening_cash;
+                const closingTime = response.data.closing_time;
+                const notes = response.data.notes;
 
                 setRegisterStatus({
                     isOpen: false,
                     cashOnHand: 0,
                     openedAt: null,
-                    closedAt: new Date(),
+                    closedAt: closingTime ? new Date(closingTime) : null,
                     userId: null,
                     registerId: null,
                     terminalId: null,
                     totalSales: totalSales,
+                    totalSalesQty: totalSalesQty,
                     openingCash: openingCash,
+                    notes: notes,
                 });
                 localStorage.removeItem('registerStatus');
-                return { success: true, totalSales, openingCash };
+                return { success: true, totalSales, totalSalesQty, openingCash, closingTime, notes };
             }
             return { success: false };
         } catch (error) {

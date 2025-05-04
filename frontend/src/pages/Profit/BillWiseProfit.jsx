@@ -98,7 +98,7 @@ const BillWiseProfitReport = () => {
     // State management
     const [fromDate, setFromDate] = useState(getOneMonthBeforeDate());
     const [toDate, setToDate] = useState(getCurrentDate());
-    const [paymentMethodFilter, setPaymentMethodFilter] = useState('cash'); // Default to 'cash'
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState('all'); // Default to 'all' to show all types
     const [searchQuery, setSearchQuery] = useState('');
     const [reportData, setReportData] = useState([]);
     const [summary, setSummary] = useState({});
@@ -113,7 +113,7 @@ const BillWiseProfitReport = () => {
         try {
             setIsLoading(true);
             const response = await axios.get("http://127.0.0.1:8000/api/sales/bill-wise-profit-report", {
-                params: { fromDate, toDate, paymentMethod: paymentMethodFilter },
+                params: { fromDate, toDate, paymentMethod: paymentMethodFilter === 'all' ? '' : paymentMethodFilter },
             });
             console.log("Fetched report data:", response.data); // Log the entire response data
             console.log("Report data structure:", response.data.reportData); // Log the structure of reportData
@@ -279,6 +279,7 @@ const BillWiseProfitReport = () => {
                         onChange={(e) => setPaymentMethodFilter(e.target.value)}
                         className="border text-black border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                        <option value="all">All</option>
                         <option value="cash">Cash</option>
                         <option value="card">Card</option>
                         <option value="online">Online</option>

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import debounce from "lodash/debounce";
 import CloseRegisterModal from "../models/CloseRegisterModal";
 import HeldSalesList from "./HeldSalesList";
+import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import RegisterModal from "../models/registerModel.jsx";
 import {
   ClipboardList,
@@ -183,7 +184,7 @@ const POSForm = ({
   const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
-
+  const [stockWarning, setStockWarning] = useState('');
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
   const payButtonRef = useRef(null);
@@ -526,15 +527,13 @@ const POSForm = ({
       const existingProduct = updatedProducts[existingProductIndex];
       const newQuantity = (existingProduct.qty || 0) + currentQuantity;
 
+      // Show warning but don't block the sale
       if (newQuantity > availableStock) {
-        alert(
-          `Insufficient stock for ${selectedProduct.product_name
-          }! Only ${availableStock} available. You already have ${existingProduct.qty || 0
-          } in the bill.`
+        setStockWarning(
+          `Warning: Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available. You're adding ${newQuantity} (including ${existingProduct.qty || 0} already in bill).`
         );
-        quantityInputRef.current?.focus();
-        quantityInputRef.current?.select();
-        return;
+      } else {
+        setStockWarning('');
       }
 
       const updatedProductWithQty = { ...existingProduct, qty: newQuantity };
@@ -555,13 +554,13 @@ const POSForm = ({
       };
       setProducts(updatedProducts);
     } else {
+      // Show warning for new product but don't block the sale
       if (currentQuantity > availableStock) {
-        alert(
-          `Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available.`
+        setStockWarning(
+          `Warning: Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available. You're adding ${currentQuantity}.`
         );
-        quantityInputRef.current?.focus();
-        quantityInputRef.current?.select();
-        return;
+      } else {
+        setStockWarning('');
       }
 
       const newProduct = {
@@ -601,10 +600,11 @@ const POSForm = ({
       const availableStock = parseFloat(productToUpdate.stock || 0);
 
       if (!isNaN(availableStock) && newQty > availableStock) {
-        alert(
-          `Quantity exceeds stock! Only ${availableStock} available for ${productToUpdate.product_name}.`
+        setStockWarning(
+          `Warning: Insufficient stock for ${productToUpdate.product_name}! Only ${availableStock} available. You're setting quantity to ${newQty}.`
         );
-        return prevProducts;
+      } else {
+        setStockWarning('');
       }
 
       const updatedProductWithQty = { ...productToUpdate, qty: newQty };
@@ -1040,11 +1040,14 @@ const POSForm = ({
   }, [registerStatus.isOpen]);
 
   const calculateClosingDetails = () => {
-    const totalSales = products.reduce((sum, p) => sum + (p.total || 0), 0);
-    const cashInRegister = registerStatus.cashOnHand || 0;
+    // Use totalSales and openingCash from registerStatus if available, ensure numbers
+    const totalSales = Number(registerStatus.totalSales) || products.reduce((sum, p) => sum + (p.total || 0), 0);
+    const totalSalesQty = Number(registerStatus.totalSalesQty) || products.reduce((sum, p) => sum + (p.qty || 0), 0);
+    const openingCash = Number(registerStatus.openingCash ?? registerStatus.cashOnHand) || 0;
     return {
       totalSales,
-      cashInRegister,
+      totalSalesQty,
+      openingCash,
       inCashierAmount: 0,
       otherAmount: 0,
     };
@@ -1651,7 +1654,13 @@ const POSForm = ({
           closingDetails={calculateClosingDetails()}
         />
       )}
-
+      {stockWarning && (
+        <div className="p-2 my-2 text-sm text-yellow-700 bg-yellow-100 rounded-md flex items-center">
+          <ExclamationTriangleIcon className="w-5 h-5 mr-2" />
+          {stockWarning}
+          <span className="ml-2 text-yellow-800">(Sale will proceed)</span>
+        </div>
+      )}
       {showBillModal && (
         <BillPrintModal
           initialProducts={products}
