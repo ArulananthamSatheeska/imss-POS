@@ -159,18 +159,25 @@ class RegisterController extends Controller
                 ], 422);
             }
 
+            // Fetch total sales amount between opened_at and now
+            $totalSales = \App\Models\Sale::where('created_at', '>=', $register->opened_at)
+                ->where('created_at', '<=', now())
+                ->sum('total');
+
             $register->update([
                 'status' => 'closed',
                 'closed_at' => now(),
                 'closing_balance' => $request->input('closing_balance'),
                 'actual_cash' => $actualCash,
+                'total_sales' => $totalSales, // Assuming this column exists in cash_registries table
             ]);
 
             DB::commit();
 
             return response()->json([
                 'message' => 'Cash registry closed successfully',
-                'register' => $register
+                'register' => $register,
+                'total_sales' => $totalSales,
             ]);
 
         } catch (\Exception $e) {

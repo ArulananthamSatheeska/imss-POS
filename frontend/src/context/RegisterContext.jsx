@@ -175,6 +175,10 @@ export const RegisterProvider = ({ children }) => {
             }, getAuthHeaders());
 
             if (response.status === 200) {
+                const register = response.data.register;
+                const totalSales = response.data.total_sales;
+                const openingCash = response.data.opening_cash;
+
                 setRegisterStatus({
                     isOpen: false,
                     cashOnHand: 0,
@@ -183,9 +187,11 @@ export const RegisterProvider = ({ children }) => {
                     userId: null,
                     registerId: null,
                     terminalId: null,
+                    totalSales: totalSales,
+                    openingCash: openingCash,
                 });
                 localStorage.removeItem('registerStatus');
-                return { success: true };
+                return { success: true, totalSales, openingCash };
             }
             return { success: false };
         } catch (error) {
