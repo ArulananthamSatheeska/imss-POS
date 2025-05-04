@@ -15,6 +15,7 @@ class CreateSaleItemsTable extends Migration
         $table->decimal('mrp', 10, 2);
         $table->decimal('unit_price', 10, 2);
         $table->decimal('discount', 10, 2);
+        $table->decimal('special_discount', 10, 2)->nullable();
         $table->decimal('total', 10, 2);
         $table->decimal('cost_price', 10, 2)->nullable();
         $table->timestamps();
