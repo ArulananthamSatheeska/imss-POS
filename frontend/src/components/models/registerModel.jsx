@@ -177,11 +177,11 @@ const RegisterModal = ({
                                             </h3>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div className="text-gray-600 dark:text-gray-400">Total Sales:</div>
-                                                <div className="font-medium text-right dark:text-white">LKR {closingDetails.salesAmount?.toFixed(2) || '0.00'}</div>
+                                                <div className="font-medium text-right dark:text-white">LKR {closingDetails.totalSales?.toFixed(2) || '0.00'}</div>
                                                 <div className="text-gray-600 dark:text-gray-400">Total Quantity:</div>
                                                 <div className="font-medium text-right dark:text-white">{closingDetails.totalSalesQty || '0'}</div>
                                                 <div className="text-gray-600 dark:text-gray-400">Opening Cash:</div>
-                                                <div className="font-medium text-right dark:text-white">LKR {closingDetails.cashOnHand?.toFixed(2) || '0.00'}</div>
+                                                <div className="font-medium text-right dark:text-white">LKR {closingDetails.openingCash?.toFixed(2) || '0.00'}</div>
                                             </div>
                                         </motion.div>
 
@@ -203,6 +203,12 @@ const RegisterModal = ({
                                                 className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:focus:ring-blue-400 transition-all bg-white dark:bg-gray-800 dark:text-white"
                                                 placeholder="Enter cash amount"
                                             />
+                                            <button
+                                                onClick={() => window.print()}
+                                                className="mt-2 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                            >
+                                                Print Mini Report
+                                            </button>
                                         </motion.div>
 
                                         <motion.div

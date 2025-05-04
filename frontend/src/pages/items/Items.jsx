@@ -10,6 +10,93 @@ import ProductDetailsModal from "./ProductDetailsModal";
 import ConfirmationModal from "./ConfirmationModal";
 import { useAuth } from "../../context/NewAuthContext";
 
+const Pagination = ({
+  currentPage,
+  totalItems,
+  itemsPerPage,
+  paginate,
+  maxVisiblePages = 5,
+}) => {
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  if (totalPages <= 1) return null;
+
+  const getPageNumbers = () => {
+    const halfVisible = Math.floor(maxVisiblePages / 2);
+    let startPage = Math.max(1, currentPage - halfVisible);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    const pages = [];
+
+    if (startPage > 1) {
+      pages.push(1);
+      if (startPage > 2) {
+        pages.push("...");
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      if (i >= 1 && i <= totalPages) {
+        pages.push(i);
+      }
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pages.push("...");
+      }
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1 p-2">
+      <button
+        onClick={() => paginate(Math.max(1, currentPage - 1))}
+        disabled={currentPage === 1}
+        className={`px-3 py-1 rounded-md ${currentPage === 1
+          ? "text-gray-400 cursor-not-allowed"
+          : "text-gray-700 hover:bg-gray-200"
+          }`}
+      >
+        Prev
+      </button>
+
+      {getPageNumbers().map((page, index) => (
+        <button
+          key={index}
+          onClick={() => (typeof page === "number" ? paginate(page) : null)}
+          className={`px-3 py-1 rounded-md min-w-[2.5rem] ${page === currentPage
+            ? "bg-blue-600 text-white"
+            : typeof page === "number"
+              ? "text-gray-700 hover:bg-gray-200"
+              : "text-gray-500 cursor-default"
+            }`}
+          disabled={page === "..." || page === currentPage}
+        >
+          {page}
+        </button>
+      ))}
+
+      <button
+        onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+        disabled={currentPage === totalPages}
+        className={`px-3 py-1 rounded-md ${currentPage === totalPages
+          ? "text-gray-400 cursor-not-allowed"
+          : "text-gray-700 hover:bg-gray-200"
+          }`}
+      >
+        Next
+      </button>
+    </div>
+  );
+};
+
 const Items = () => {
   const { currentUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
@@ -93,7 +180,7 @@ const Items = () => {
       console.error("Error importing items:", error);
       toast.error(
         "Error importing items: " +
-          (error.response?.data?.message || error.message)
+        (error.response?.data?.message || error.message)
       );
     }
   };
@@ -222,13 +309,10 @@ const Items = () => {
           <button
             onClick={handleImport}
             disabled={!selectedFile}
-
-            className={`flex items-center gap-2 px-6 py-2 text-white rounded-lg ${
-              selectedFile
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-gray-400 cursor-not-allowed"
-            }`}
-
+            className={`flex items-center gap-2 px-6 py-2 text-white rounded-lg ${selectedFile
+              ? "bg-green-600 hover:bg-green-700"
+              : "bg-gray-400 cursor-not-allowed"
+              }`}
           >
             Import Selected File
           </button>
@@ -376,22 +460,12 @@ const Items = () => {
         </table>
       </div>
 
-      <div className="flex justify-center gap-2">
-        {Array.from(
-          { length: Math.ceil(filteredItems.length / itemsPerPage) },
-          (_, i) => (
-            <button
-              key={i + 1}
-              onClick={() => paginate(i + 1)}
-              className={`px-4 py-2 ${
-                currentPage === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200"
-              } rounded-lg`}
-            >
-              {i + 1}
-            </button>
-          )
-        )}
-      </div>
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredItems.length}
+        itemsPerPage={itemsPerPage}
+        paginate={paginate}
+      />
 
       <div className="p-4 mt-4 text-center bg-transparent rounded-lg shadow-lg">
         <h2 className="mb-4 text-xl font-bold">Summary</h2>
