@@ -302,6 +302,7 @@ class SalesInvoiceController extends Controller
     public function getBillWiseProfitReport(Request $request)
     {
         try {
+            \Log::info('getBillWiseProfitReport called with paymentMethod: ' . $request->input('paymentMethod'));
             $query = Invoice::with('items')
                 ->select('id', 'invoice_no', 'invoice_date', 'customer_name', 'payment_method');
 
@@ -314,9 +315,11 @@ class SalesInvoiceController extends Controller
             }
 
             // Apply payment method filter
-            if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '') {
+            if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '' && $request->input('paymentMethod') !== 'all') {
                 $query->where('payment_method', $request->input('paymentMethod'));
             }
+
+            \Log::info('Generated SQL query: ' . $query->toSql());
 
             $invoices = $query->get();
 

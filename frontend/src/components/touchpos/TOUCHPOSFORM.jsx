@@ -703,13 +703,13 @@ const TOUCHPOSFORM = () => {
   // Increment/Decrement Quantity
   const incrementQuantity = (index) => {
     const product = products[index];
-    const newQty = (product.qty || 0) + 1;
+    const newQty = (product.qty || 0) + 0.1;
     updateProductQuantity(index, newQty);
   };
 
   const decrementQuantity = (index) => {
     const product = products[index];
-    const newQty = Math.max((product.qty || 0) - 1, 0);
+    const newQty = Math.max((product.qty || 0) - 0.1, 0);
     updateProductQuantity(index, newQty);
   };
 
@@ -1066,7 +1066,20 @@ const TOUCHPOSFORM = () => {
                           >
                             <Minus size={16} className="sm:w-5 sm:h-5" />
                           </button>
-                          <span className="text-sm sm:text-lg">{product.qty}</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="w-16 p-1 text-center text-sm border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                            value={product.qty}
+                            onChange={(e) => updateProductQuantity(index, e.target.value)}
+                            onBlur={(e) => {
+                              // Ensure value is not empty or negative on blur
+                              if (e.target.value === "" || parseFloat(e.target.value) < 0) {
+                                updateProductQuantity(index, 0);
+                              }
+                            }}
+                          />
                           <button
                             onClick={() => incrementQuantity(index)}
                             className="p-1 bg-gray-300 rounded-lg sm:p-2 dark:bg-slate-800"
