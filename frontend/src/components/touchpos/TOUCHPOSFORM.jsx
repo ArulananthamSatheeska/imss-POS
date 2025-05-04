@@ -163,9 +163,10 @@ const TOUCHPOSFORM = () => {
   }, [auth]);
   const terminalId = "T-1"; // Default terminal ID
   const userId = 1; // Default user ID
-  const { registerStatus, openRegister, closeRegister, isRegisterOpen, handleLogoutClick, cashOnHand, setCashOnHand } = useRegister();
+  const { registerStatus, openRegister, closeRegister, isRegisterOpen, handleLogoutClick, cashOnHand, setCashOnHand, loading } = useRegister();
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isClosingRegister, setIsClosingRegister] = useState(false);
+  const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
 
   const handleLogout = () => {
     const canLogout = handleLogoutClick();
@@ -197,11 +198,22 @@ const TOUCHPOSFORM = () => {
   }, [terminalId]);
 
   useEffect(() => {
-    // Check register status when component mounts
-    if (!registerStatus.isOpen) {
+    // Check register status when component mounts and loading is false
+    const registerModalDismissed = localStorage.getItem('registerModalDismissed');
+    if (!loading && !registerStatus.isOpen && !registerModalDismissed) {
       setShowRegisterModal(true);
+    } else {
+      setShowRegisterModal(false);
     }
-  }, [registerStatus.isOpen]);
+    setCheckedRegisterModal(true);
+  }, [registerStatus.isOpen, loading]);
+
+  // When register modal is confirmed or closed, set localStorage flag
+  const handleRegisterModalClose = () => {
+    localStorage.setItem('registerModalDismissed', 'true');
+    setShowRegisterModal(false);
+    setIsClosingRegister(false);
+  };
 
   const handleCloseRegister = () => {
     setIsClosingRegister(true);
@@ -230,7 +242,7 @@ const TOUCHPOSFORM = () => {
       }
     } else {
       try {
-        await openRegister(amount, user.id);
+        await openRegister({ user_id: user.id, terminal_id: terminalId, opening_cash: amount });
         setShowRegisterModal(false);
       } catch (error) {
         console.error('Failed to open register:', error);
@@ -331,8 +343,11 @@ const TOUCHPOSFORM = () => {
   useEffect(() => {
     const fetchNextBillNumber = async () => {
       try {
+        const token = auth?.user?.token;
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const response = await axios.get(
-          "http://127.0.0.1:8000/api/next-bill-number"
+          "http://127.0.0.1:8000/api/next-bill-number",
+          { headers }
         );
         if (response.data && response.data.next_bill_number) {
           setBillNumber(response.data.next_bill_number);
@@ -1456,17 +1471,19 @@ const TOUCHPOSFORM = () => {
         </Notification>
       )}
 
-      {showRegisterModal && (
+      {checkedRegisterModal && showRegisterModal && (
         <RegisterModal
           isOpen={showRegisterModal}
           onClose={() => {
             if (!registerStatus.isOpen) {
               navigate('/dashboard'); // Redirect if they cancel opening register
             }
-            setShowRegisterModal(false);
-            setIsClosingRegister(false);
+            handleRegisterModalClose();
           }}
-          onConfirm={handleRegisterConfirm}
+          onConfirm={(amount) => {
+            handleRegisterConfirm(amount);
+            handleRegisterModalClose();
+          }}
           cashOnHand={registerStatus.cashOnHand}
           setCashOnHand={(amount) => setCashOnHand(amount)}
           user={user}

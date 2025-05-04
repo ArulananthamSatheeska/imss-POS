@@ -153,6 +153,7 @@ const POSForm = ({
   const { openRegister, closeRegister, refreshRegisterStatus } = useRegister();
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isClosingRegister, setIsClosingRegister] = useState(false);
+  const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
 
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
@@ -162,7 +163,9 @@ const POSForm = ({
     if (!isEditMode) {
       const fetchNextBillNumber = async () => {
         try {
-          const response = await axios.get("http://127.0.0.1:8000/api/next-bill-number");
+          const token = user?.token;
+          const headers = token ? { Authorization: `Bearer ${token}` } : {};
+          const response = await axios.get("http://127.0.0.1:8000/api/next-bill-number", { headers });
           setBillNumber(response.data.next_bill_number);
           setCustomerInfo(prev => ({ ...prev, bill_number: response.data.next_bill_number }));
         } catch (error) {
@@ -760,10 +763,14 @@ const POSForm = ({
   };
 
   useEffect(() => {
-    // Check register status when component mounts
-    if (!registerStatus.isOpen) {
+    // Check register status when component mounts and loading is false
+    const registerModalDismissed = localStorage.getItem('registerModalDismissed');
+    if (!registerStatus.isOpen && !registerModalDismissed) {
       setShowRegisterModal(true);
+    } else {
+      setShowRegisterModal(false);
     }
+    setCheckedRegisterModal(true);
   }, [registerStatus.isOpen]);
 
   const calculateClosingDetails = () => {
@@ -819,7 +826,7 @@ const POSForm = ({
           alert("Invalid amount provided for opening register.");
           return;
         }
-        const success = await openRegister(openingCash, user.id);
+        const success = await openRegister({ user_id: user.id, terminal_id: terminalId, opening_cash: openingCash });
         if (success) {
           refreshRegisterStatus();
           setShowRegisterModal(false);
@@ -1118,14 +1125,12 @@ const POSForm = ({
         </div>
       </div>
 
-      {showRegisterModal && (
+      {checkedRegisterModal && showRegisterModal && (
         <RegisterModal
           isOpen={showRegisterModal}
           onClose={() => {
             // Remove navigation to dashboard to prevent unwanted redirect
-            if (!registerStatus.isOpen) {
-              navigate('/dashboard'); // Redirect if they cancel opening register
-            }
+
             setShowRegisterModal(false);
             setIsClosingRegister(false);
           }}

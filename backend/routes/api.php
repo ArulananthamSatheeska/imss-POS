@@ -2,8 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\{
+    DashboardController,
     UnitController,
     ProductController,
     CategoryController,
@@ -25,24 +25,25 @@ use App\Http\Controllers\{
     PurchaseReturnController,
     RawMaterialController,
     SalesInvoiceController,
-    SalesReturnController
+    SalesReturnController,
+    RegisterController
 };
-use App\Http\Controllers\RegisterController;
 
+use App\Http\Middleware\EnsureRegisterIsOpen;
 
-// Authentication routes (no permission middleware)
-Route::middleware(['api'])->group(function() {
+// Authentication routes
+Route::middleware(['api'])->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
 });
 
-// Global OPTIONS route to handle CORS preflight requests
+// Global OPTIONS route for CORS
 Route::options('{any}', function () {
     return response()->json([], 200);
 })->where('any', '.*');
 
-// Test route without permission middleware
-Route::get('/test-auth', function() {
+// Auth test route
+Route::middleware('auth:api')->get('/test-auth', function () {
     try {
         $user = auth()->user();
         return response()->json([
@@ -56,22 +57,32 @@ Route::get('/test-auth', function() {
             'error' => $e->getMessage()
         ], 401);
     }
-})->middleware('auth:api');
+});
 
-// Routes without authentication middleware
-Route::middleware(['api'])->group(function () {
+// Authenticated routes with role-permission middleware
+Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddleware::class])->group(function () {
+    // Auth
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/add-default-user', [AuthController::class, 'addDefaultUser']);
+    Route::get('/verify-token', [AuthController::class, 'verifyToken']);
+    Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
 
-    Route::get('/products/check-names', [ProductController::class, 'checkNames']);
-    Route::apiResource('products', ProductController::class);
-    Route::post('/products/import', [ProductController::class, 'import']);
-    Route::get('/roles', [RoleController::class, 'index']);
-    Route::post('/roles', [RoleController::class, 'store']);
-    Route::get('/roles/{role}', [RoleController::class, 'show']);
-    Route::put('/roles/{role}', [RoleController::class, 'update']);
-    Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+    // Register
+    Route::get('/register/status', [RegisterController::class, 'getStatus']);
+    Route::post('/register/open', [RegisterController::class, 'openShift']);
+    Route::post('/register/close', [RegisterController::class, 'closeShift']);
+    Route::post('/register/cash-in', [RegisterController::class, 'addCash'])->middleware(EnsureRegisterIsOpen::class);
+    Route::post('/register/cash-out', [RegisterController::class, 'removeCash'])->middleware(EnsureRegisterIsOpen::class);
+    Route::get('/register/current', [RegisterController::class, 'getCurrentRegistry'])->middleware(EnsureRegisterIsOpen::class);
+    Route::get('/register/report', [RegisterController::class, 'getRegistryReport'])->middleware(EnsureRegisterIsOpen::class);
+
+    // Roles & Permissions
+    Route::apiResource('permissions', PermissionController::class)->except(['update']);
+    Route::apiResource('roles', RoleController::class);
     Route::post('/roles/{role}/permissions', [RoleController::class, 'assignPermissions']);
 
-    // User routes
+    // Users
     Route::apiResource('users', UserController::class)->except(['create', 'edit']);
     Route::get('users/deleted', [UserController::class, 'getDeletedUsers']);
     Route::post('users/{id}/restore', [UserController::class, 'restoreUser']);
@@ -83,128 +94,82 @@ Route::middleware(['api'])->group(function () {
     Route::post('users/{user}/enable-2fa', [UserController::class, 'enable2FA']);
     Route::post('users/{user}/activate', [UserController::class, 'activateUser']);
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
-    // Permission routes
-    Route::apiResource('permissions', PermissionController::class)->except(['update']);
+});
 
+    // Discount Schemes
+    Route::prefix('discount-schemes')->group(function () {
+        Route::get('/', [DiscountSchemeController::class, 'index']);
+        Route::post('/', [DiscountSchemeController::class, 'store']);
+        Route::get('/{scheme}', [DiscountSchemeController::class, 'show']);
+        Route::put('/{scheme}', [DiscountSchemeController::class, 'update']);
+        Route::delete('/{scheme}', [DiscountSchemeController::class, 'destroy']);
+    });
     
-    // Other resource routes
+    // Master data
+    Route::apiResource('products', ProductController::class);
+    Route::post('/products/import', [ProductController::class, 'import']);
+    Route::get('/products/check-names', [ProductController::class, 'checkNames']);
+    Route::get('/product/{id}', [ProductController::class, 'barcode']);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('store-locations', StoreLocationController::class);
     Route::apiResource('suppliers', SupplierController::class);
     Route::apiResource('units', UnitController::class);
     Route::apiResource('customers', CustomerController::class);
+    Route::apiResource('production-categories', ProductionCategoryController::class);
+    Route::apiResource('production-items', ProductionItemController::class);
+    Route::apiResource('raw-materials', RawMaterialController::class);
+    Route::get('suppliers', [RawMaterialController::class, 'getSuppliers']);
+    Route::get('units', [RawMaterialController::class, 'getUnits']);
+
+    // Sales
     Route::get('/next-bill-number', [SaleController::class, 'getLastBillNumber']);
     Route::get('/sales/daily-profit-report', [SaleController::class, 'getDailyProfitReport']);
     Route::get('/sales/bill-wise-profit-report', [SaleController::class, 'getBillWiseProfitReport']);
     Route::get('/sales/company-wise-profit-report', [SaleController::class, 'getCompanyWiseProfitReport']);
     Route::get('/sales/supplier-wise-profit-report', [SaleController::class, 'getSupplierWiseProfitReport']);
     Route::apiResource('sales', SaleController::class);
+
+    // Stock reports
     Route::get('/stock-reports', [StockReportController::class, 'index']);
     Route::get('/detailed-stock-reports', [StockReportController::class, 'detailedReport']);
-Route::get('/product/{id}', [ProductController::class, 'barcode']);
 
-Route::get('/dashboard', [DashboardController::class, 'dashboard']);
-});
-
-
-// Protected routes (requires authentication)
-Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddleware::class])->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/me', [AuthController::class, 'me']);
-    Route::post('/add-default-user', [AuthController::class, 'addDefaultUser']);
-    Route::get('/verify-token', [AuthController::class, 'verifyToken']);
-    Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
-
-    // Register routes
-    
+    // Held Sales
+    Route::prefix('holds')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\HeldSaleController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Api\HeldSaleController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\HeldSaleController::class, 'show']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\HeldSaleController::class, 'destroy']);
+        Route::post('/{id}/recall', [\App\Http\Controllers\Api\HeldSaleController::class, 'recall']);
     });
 
-    Route::get('/register/status', [RegisterController::class, 'getStatus']);
-    Route::post('/register/open', [RegisterController::class, 'openRegister']);
-    Route::post('/register/close', [RegisterController::class, 'closeRegister']);
+    // Purchases
+    Route::apiResource('purchases', PurchaseController::class);
 
-Route::prefix('discount-schemes')->group(function () {
-    Route::get('/', [DiscountSchemeController::class, 'index']);
-    Route::post('/', [DiscountSchemeController::class, 'store']);
-    Route::get('/{scheme}', [DiscountSchemeController::class, 'show']);
-    Route::put('/{scheme}', [DiscountSchemeController::class, 'update']);
-    Route::delete('/{scheme}', [DiscountSchemeController::class, 'destroy']);
-});
-
-
-// Held Sales Routes
-    Route::get('/holds', [\App\Http\Controllers\Api\HeldSaleController::class, 'index']);
-    Route::post('/holds', [\App\Http\Controllers\Api\HeldSaleController::class, 'store']);
-    Route::get('/holds/{id}', [\App\Http\Controllers\Api\HeldSaleController::class, 'show']);
-    Route::delete('/holds/{id}', [\App\Http\Controllers\Api\HeldSaleController::class, 'destroy']);
-    Route::post('/holds/{id}/recall', [\App\Http\Controllers\Api\HeldSaleController::class, 'recall']);
-
-
-// Route::middleware('auth:sanctum')->group(function () {
-//     Route::get('/purchases', [PurchaseController::class, 'index']);
-//     Route::post('/purchases', [PurchaseController::class, 'store']);
-//     Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
-//     Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
-//     Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
-
-//     // Route::get('/suppliers', [SupplierController::class, 'index']);
-//     // Route::get('/store-locations', [StoreLocationController::class, 'index']);
-//     // Route::get('/products', [ProductController::class, 'index']);
-// });
-
-Route::get('/purchases', [PurchaseController::class, 'index']);
-Route::post('/purchases', [PurchaseController::class, 'store']);
-  
-    Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
-    Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
-    Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
-
-    Route::prefix('companies')->group(function () {
-        Route::get('/', [CompanyController::class, 'index']);          // Get all companies
-        Route::post('/', [CompanyController::class, 'store']);         // Create a new company (Uses POST)
-        Route::get('/{company_name}', [CompanyController::class, 'show']); // Get a specific company by name (Uses GET)
-        Route::put('/{company_name}', [CompanyController::class, 'update']); // Update a company (Uses PUT, handled via _method)
-        Route::delete('/{company_name}', [CompanyController::class, 'destroy']); // Correct: DELETE api/companies/{company_name}
-    });
-    
-Route::apiResource('invoices', SalesInvoiceController::class);
-Route::get('/invoices/check-invoice-no', [SalesInvoiceController::class, 'checkInvoiceNo']);
-
-
-//     Route::get('/suppliers', [SupplierController::class, 'index']);
-//     Route::get('/store-locations', [StoreLocationController::class, 'index']);
-//     Route::get('/products', [ProductController::class, 'index']);
-// });
-
-Route::apiResource('production-categories', ProductionCategoryController::class);
-
-Route::apiResource('raw-materials', RawMaterialController::class);
-Route::get('suppliers', [RawMaterialController::class, 'getSuppliers']);
-Route::get('units', [RawMaterialController::class, 'getUnits']);
-
-
-Route::apiResource('production-items', ProductionItemController::class);
-
-
-Route::post('/purchase-returns', [PurchaseReturnController::class, 'createPurchaseReturn']);
+    // Purchase Returns
+    Route::post('/purchase-returns', [PurchaseReturnController::class, 'createPurchaseReturn']);
     Route::get('/purchase-returns', [PurchaseReturnController::class, 'getPurchaseReturns']);
-    // routes/api.php
-Route::get('/purchase-returns/{id}', [PurchaseReturnController::class, 'show']);
-// routes/api.php
-Route::put('/purchase-returns/{id}', [PurchaseReturnController::class, 'update']);
-// routes/api.php
-Route::delete('/purchase-returns/{id}', [PurchaseReturnController::class, 'destroy']);
+    Route::get('/purchase-returns/{id}', [PurchaseReturnController::class, 'show']);
+    Route::put('/purchase-returns/{id}', [PurchaseReturnController::class, 'update']);
+    Route::delete('/purchase-returns/{id}', [PurchaseReturnController::class, 'destroy']);
 
-Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
-Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
-Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
-Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update']);
-Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy']);
+    // Purchase Orders
+    Route::apiResource('purchase-orders', PurchaseOrderController::class);
 
-Route::get('/products', [ProductController::class, 'index']);
+    // Companies
+    Route::prefix('companies')->group(function () {
+        Route::get('/', [CompanyController::class, 'index']);
+        Route::post('/', [CompanyController::class, 'store']);
+        Route::get('/{company_name}', [CompanyController::class, 'show']);
+        Route::put('/{company_name}', [CompanyController::class, 'update']);
+        Route::delete('/{company_name}', [CompanyController::class, 'destroy']);
+    });
 
-// Invoices endpoint
-Route::get('/invoices', [SalesInvoiceController::class, 'index']);
+    // Sales Invoice
+    Route::apiResource('invoices', SalesInvoiceController::class);
+    Route::get('/invoices/check-invoice-no', [SalesInvoiceController::class, 'checkInvoiceNo']);
 
-// Sales Returns resource routes
-Route::resource('sales-returns', SalesReturnController::class)->except(['create', 'edit']);
+    // Sales Returns
+    Route::resource('sales-returns', SalesReturnController::class)->except(['create', 'edit']);
+
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'dashboard']);
