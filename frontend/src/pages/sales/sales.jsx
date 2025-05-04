@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   FiSearch,
-  FiDownload,
   FiRefreshCw,
   FiChevronDown,
   FiChevronUp,
@@ -33,7 +32,6 @@ const SalesReport = () => {
   const [expandedRow, setExpandedRow] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [invoiceDataForPreview, setInvoiceDataForPreview] = useState(null);
-  const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [invoiceToEdit, setInvoiceToEdit] = useState(null);
@@ -54,9 +52,6 @@ const SalesReport = () => {
         params: { from: fromDate, to: toDate },
         headers: { Accept: "application/json" },
       });
-
-      console.log("Fetched Invoices Response:", invoiceResponse);
-      console.log("Fetched Sales Response:", salesResponse);
 
       let invoices = [];
       if (invoiceResponse.data && Array.isArray(invoiceResponse.data.data)) {
@@ -165,7 +160,6 @@ const SalesReport = () => {
     type = "invoice"
   ) => {
     const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"}`;
-    console.log(`POST to: ${url}`, JSON.stringify(newInvoiceData, null, 2));
     try {
       const response = await axios.post(url, newInvoiceData, {
         headers: {
@@ -173,10 +167,6 @@ const SalesReport = () => {
           Accept: "application/json",
         },
       });
-      console.log(
-        `API Success (${type === "invoice" ? "Invoice" : "Sale"} Creation):`,
-        response.data
-      );
       fetchReportData();
       setShowInvoiceModal(false);
       alert(`${type === "invoice" ? "Invoice" : "Sale"} created successfully!`);
@@ -201,14 +191,12 @@ const SalesReport = () => {
     type = "invoice"
   ) => {
     if (!id) {
-      console.error(`${type} ID missing for update`);
       alert(`Cannot update ${type}: ID is missing.`);
       return;
     }
     const url = `${API_BASE_URL}/${
       type === "invoice" ? "invoices" : "sales"
     }/${id}`;
-    console.log(`PUT to: ${url}`, JSON.stringify(updatedInvoiceData, null, 2));
     try {
       const response = await axios.put(url, updatedInvoiceData, {
         headers: {
@@ -216,10 +204,6 @@ const SalesReport = () => {
           Accept: "application/json",
         },
       });
-      console.log(
-        `API Success (${type === "invoice" ? "Invoice" : "Sale"} Update):`,
-        response.data
-      );
       fetchReportData();
       setShowEditInvoiceModal(false);
       setShowEditSaleModal(false);
@@ -242,7 +226,6 @@ const SalesReport = () => {
   };
 
   const handleDeleteSale = async (id, type = "invoice") => {
-    console.log(`Attempting to delete ${type} ID:`, id);
     if (
       window.confirm(
         `Are you sure you want to delete ${type} ID: ${id}? This action cannot be undone.`
@@ -263,7 +246,6 @@ const SalesReport = () => {
         );
         fetchReportData();
       } catch (error) {
-        console.error(`Error deleting ${type} ${id}:`, error.response || error);
         alert(
           `Failed to delete ${type} ${id}. ${
             error.response?.data?.message || error.message
@@ -318,8 +300,6 @@ const SalesReport = () => {
   };
 
   const handleViewInvoice = (row) => {
-    console.log("Row data for preview:", row);
-
     if (!row.customer_name) {
       row.customer_name =
         row.type === "sale" ? "Walk-in Customer" : "Unknown Customer";
@@ -457,6 +437,73 @@ const SalesReport = () => {
     setBillPrintData(null);
   };
 
+  const handlePrintInvoice = () => {
+    const printContent = document.getElementById(
+      "printable-invoice-area"
+    ).innerHTML;
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Invoice</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <!-- Include Tailwind CSS for consistent styling -->
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @page {
+              size: A4;
+              margin: 10mm;
+            }
+            body {
+              margin: 0;
+              font-family: Arial, sans-serif;
+              background-color: #ffffff;
+            }
+            .printable-invoice {
+              width: 190mm;
+              min-height: 277mm;
+              margin: 0 auto;
+              padding: 20px;
+              box-sizing: border-box;
+              background-color: #ffffff;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+              .printable-invoice {
+                width: 100%;
+                margin: 0;
+                padding: 10mm;
+              }
+              .no-print {
+                display: none !important;
+              }
+              /* Ensure Tailwind classes are preserved */
+              .bg-blue-600 { background-color: #2563eb !important; }
+              .text-blue-600 { color: #2563eb !important; }
+              .border-blue-600 { border-color: #2563eb !important; }
+              .bg-blue-50 { background-color: #eff6ff !important; }
+              .text-gray-900 { color: #1f2937 !important; }
+              .text-gray-600 { color: #4b5563 !important; }
+              .border-gray-200 { border-color: #e5e7eb !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="printable-invoice">${printContent}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    // Delay print to ensure styles are applied
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
+
   const handleEditSale = (row) => {
     if (row.type === "sale") {
       const products = (Array.isArray(row.items) ? row.items : []).map(
@@ -588,10 +635,6 @@ const SalesReport = () => {
         },
         status: row.status || (row.type === "sale" ? "Completed" : "Pending"),
       };
-      console.log(
-        "Mapped Data for Edit (Invoice):",
-        JSON.stringify(mappedDataForEdit, null, 2)
-      );
       setInvoiceToEdit(mappedDataForEdit);
       setShowEditInvoiceModal(true);
     }
@@ -629,14 +672,6 @@ const SalesReport = () => {
 
   const handleCancelCreateInvoice = () => {
     setShowInvoiceModal(false);
-  };
-
-  const handleGenerateQuotation = () => {
-    setIsQuotationFormOpen(false);
-  };
-
-  const handleCancelQuotation = () => {
-    setIsQuotationFormOpen(false);
   };
 
   const formatCurrency = (amount) => {
@@ -681,12 +716,6 @@ const SalesReport = () => {
             className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
           >
             Create Sales Entry
-          </button>
-          <button
-            onClick={() => setIsQuotationFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-          >
-            Create Quotation
           </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -755,13 +784,6 @@ const SalesReport = () => {
           }
           onCancel={handleCancelEditSale}
           isEditMode={true}
-        />
-      )}
-
-      {isQuotationFormOpen && (
-        <Quotation
-          onGenerateQuotation={handleGenerateQuotation}
-          onCancel={handleCancelQuotation}
         />
       )}
 
@@ -1070,7 +1092,8 @@ const SalesReport = () => {
                                     Discount:
                                   </div>
                                   <div className="font-medium text-right text-red-600 dark:text-red-400">
-                                    -{formatCurrency(
+                                    -
+                                    {formatCurrency(
                                       row.items.reduce(
                                         (sum, item) =>
                                           sum +
@@ -1245,7 +1268,7 @@ const SalesReport = () => {
       {invoiceDataForPreview && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-sm animate-fade-in">
           <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-lg shadow-xl dark:bg-gray-800 flex flex-col">
-            <div className="flex items-center justify-between flex-shrink-0 p-4 border-bed dark:border-gray-700">
+            <div className="flex items-center justify-between flex-shrink-0 p-4 border-b dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Invoice Preview (#{invoiceDataForPreview?.invoice?.no})
               </h3>
@@ -1278,9 +1301,7 @@ const SalesReport = () => {
             </div>
             <div className="flex justify-end flex-shrink-0 p-4 border-t dark:border-gray-700">
               <button
-                onClick={() => {
-                  window.print();
-                }}
+                onClick={handlePrintInvoice}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
               >
                 <FiPrinter /> Print
