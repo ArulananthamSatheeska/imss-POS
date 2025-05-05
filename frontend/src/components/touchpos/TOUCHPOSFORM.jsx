@@ -163,9 +163,8 @@ const TOUCHPOSFORM = () => {
   const [filterError, setFilterError] = useState(null);
   const [user, setUser] = useState(null);
   const auth = useAuth();
-  const terminalId = "T-1";
-  const userId = 1;
-  const { registerStatus, openRegister, closeRegister, isRegisterOpen, handleLogoutClick, cashOnHand, setCashOnHand, loading } = useRegister();
+  const { registerStatus, openRegister, closeRegister, loading, refreshRegisterStatus, terminalId } = useRegister();
+  const userId = auth?.user?.id || 1;
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isClosingRegister, setIsClosingRegister] = useState(false);
   const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
@@ -176,7 +175,7 @@ const TOUCHPOSFORM = () => {
   const [brands, setBrands] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedBrand, setSelectedBrand] = useState("All Brands");
-
+  const [lowStockWarning, setLowStockWarning] = useState(null);
   useEffect(() => {
     if (auth && auth.user) {
       setUser(auth.user);
@@ -230,26 +229,38 @@ const TOUCHPOSFORM = () => {
     if (isClosingRegister) {
       const closingDetails = calculateClosingDetails();
       try {
-        await closeRegister({
+        const result = await closeRegister({
           ...closingDetails,
           inCashierAmount: amount.inCashierAmount,
           otherAmount: amount.otherAmount,
         });
+        if (!result.success) {
+          alert(result.error || 'Failed to close register.');
+          return;
+        }
+        refreshRegisterStatus();
         setIsClosingRegister(false);
         setShowRegisterModal(false);
       } catch (error) {
         console.error('Failed to close register:', error);
+        alert('Failed to close register. Check console for details.');
       }
     } else {
       try {
-        await openRegister({
-          user_id: user.id,
+        const result = await openRegister({
+          user_id: user?.id || userId,
           terminal_id: terminalId,
           opening_cash: amount,
         });
+        if (!result.success) {
+          alert(result.error || 'Failed to open register.');
+          return;
+        }
+        refreshRegisterStatus();
         setShowRegisterModal(false);
       } catch (error) {
         console.error('Failed to open register:', error);
+        alert('Failed to open register. Check console for details.');
       }
     }
   };
@@ -261,7 +272,7 @@ const TOUCHPOSFORM = () => {
         const token = auth?.user?.token;
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const response = await axios.get(
-          "http://127.0.0.1:8000/api/next-bill-number",
+          "https://imssposerp.com/backend/public/api/next-bill-number",
           { headers }
         );
         if (response.data && response.data.next_bill_number) {
@@ -285,7 +296,7 @@ const TOUCHPOSFORM = () => {
       try {
         setLoadingCategories(true);
         const response = await axios.get(
-          "http://127.0.0.1:8000/api/categories"
+          "https://imssposerp.com/backend/public/api/categories"
         );
         const fetchedCategories = Array.isArray(response.data)
           ? response.data
@@ -313,7 +324,7 @@ const TOUCHPOSFORM = () => {
     setLoadingItems(true);
     setLoadingBrands(true);
     axios
-      .get("http://127.0.0.1:8000/api/products")
+      .get("https://imssposerp.com/backend/public/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => ({
@@ -383,7 +394,7 @@ const TOUCHPOSFORM = () => {
   useEffect(() => {
     setLoadingSchemes(true);
     axios
-      .get("http://127.0.0.1:8000/api/discount-schemes")
+      .get("https://imssposerp.com/backend/public/api/discount-schemes")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const formattedSchemes = response.data.data.map((s) => ({
@@ -558,8 +569,18 @@ const TOUCHPOSFORM = () => {
     }
 
     const availableStock = parseFloat(item.stock || 0);
-    if (isNaN(availableStock) || availableStock <= 0) {
-      alert(`No opening stock available for ${item.product_name}.`);
+    if (isNaN(availableStock)) {
+      alert(`Invalid stock quantity for ${item.product_name}.`);
+      return;
+    }
+
+    // Check if stock is critically low (less than 3)
+    if (availableStock < 3) {
+      setLowStockWarning({
+        productName: item.product_name,
+        remainingStock: availableStock,
+        productId: item.id
+      });
       return;
     }
 
@@ -572,7 +593,7 @@ const TOUCHPOSFORM = () => {
 
     if (newTotalQty > availableStock) {
       alert(
-        `Insufficient opening stock for ${item.product_name}! Only ${availableStock} available.`
+        `Insufficient stock for ${item.product_name}! Only ${availableStock} available.`
       );
       return;
     }
@@ -584,15 +605,15 @@ const TOUCHPOSFORM = () => {
     const productWithQty = { ...item, qty: newTotalQty };
     const specialDiscount = existingProductIndex >= 0
       ? calculateSpecialDiscount(
-          productWithQty,
-          saleType,
-          new Date().toISOString().split("T")[0]
-        )
+        productWithQty,
+        saleType,
+        new Date().toISOString().split("T")[0]
+      )
       : calculateSpecialDiscount(
-          { ...item, qty: qtyToAdd },
-          saleType,
-          new Date().toISOString().split("T")[0]
-        );
+        { ...item, qty: qtyToAdd },
+        saleType,
+        new Date().toISOString().split("T")[0]
+      );
 
     let updatedProducts = [...products];
 
@@ -631,7 +652,6 @@ const TOUCHPOSFORM = () => {
 
     setSearchQuery("");
   };
-
   // Update Product Quantity
   const updateProductQuantity = (index, newQty) => {
     const parsedQty = parseFloat(newQty) || 0;
@@ -661,11 +681,11 @@ const TOUCHPOSFORM = () => {
       prevProducts.map((p, i) =>
         i === index
           ? {
-              ...p,
-              qty: parsedQty,
-              specialDiscount: newSpecialDiscount,
-              total: p.price * parsedQty - newSpecialDiscount,
-            }
+            ...p,
+            qty: parsedQty,
+            specialDiscount: newSpecialDiscount,
+            total: p.price * parsedQty - newSpecialDiscount,
+          }
           : p
       )
     );
@@ -683,13 +703,13 @@ const TOUCHPOSFORM = () => {
   // Increment/Decrement Quantity
   const incrementQuantity = (index) => {
     const product = products[index];
-    const newQty = (product.qty || 0) + 1;
+    const newQty = (product.qty || 0) + 0.1;
     updateProductQuantity(index, newQty);
   };
 
   const decrementQuantity = (index) => {
     const product = products[index];
-    const newQty = Math.max((product.qty || 0) - 1, 0);
+    const newQty = Math.max((product.qty || 0) - 0.1, 0);
     updateProductQuantity(index, newQty);
   };
 
@@ -778,9 +798,9 @@ const TOUCHPOSFORM = () => {
   const calculateClosingDetails = () => {
     const totals = calculateTotals();
     return {
-      salesAmount: totals.finalTotal,
-      totalSalesQty: totals.totalQty,
-      cashOnHand: cashOnHand,
+      salesAmount: registerStatus.totalSales !== undefined ? registerStatus.totalSales : totals.finalTotal,
+      totalSalesQty: registerStatus.totalSalesQty !== undefined ? registerStatus.totalSalesQty : totals.totalQty,
+      cashOnHand: registerStatus.openingCash !== undefined ? registerStatus.openingCash : registerStatus.cashOnHand,
       inCashierAmount: 0,
       otherAmount: 0,
     };
@@ -864,7 +884,7 @@ const TOUCHPOSFORM = () => {
         const fetchNextBillNumber = async () => {
           try {
             const response = await axios.get(
-              "http://127.0.0.1:8000/api/next-bill-number"
+              "https://imssposerp.com/backend/public/api/next-bill-number"
             );
             setBillNumber(response.data.next_bill_number);
           } catch (error) {
@@ -986,21 +1006,19 @@ const TOUCHPOSFORM = () => {
             <h2 className="text-lg font-bold sm:text-xl">Billing</h2>
             <div className="flex gap-1 sm:gap-2">
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
-                  saleType === "Retail"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Retail"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-800"
+                  }`}
                 onClick={() => setSaleType("Retail")}
               >
                 Retail
               </button>
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
-                  saleType === "Wholesale"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Wholesale"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-800"
+                  }`}
                 onClick={() => setSaleType("Wholesale")}
               >
                 Wholesale
@@ -1048,7 +1066,20 @@ const TOUCHPOSFORM = () => {
                           >
                             <Minus size={16} className="sm:w-5 sm:h-5" />
                           </button>
-                          <span className="text-sm sm:text-lg">{product.qty}</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="w-16 p-1 text-center text-sm border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                            value={product.qty}
+                            onChange={(e) => updateProductQuantity(index, e.target.value)}
+                            onBlur={(e) => {
+                              // Ensure value is not empty or negative on blur
+                              if (e.target.value === "" || parseFloat(e.target.value) < 0) {
+                                updateProductQuantity(index, 0);
+                              }
+                            }}
+                          />
                           <button
                             onClick={() => incrementQuantity(index)}
                             className="p-1 bg-gray-300 rounded-lg sm:p-2 dark:bg-slate-800"
@@ -1089,7 +1120,7 @@ const TOUCHPOSFORM = () => {
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm font-semibold sm:text-lg">
                 <span>Total Quantity:</span>
-                <span>{formatNumberWithCommas(totals.totalQty.toFixed(1))}</span>
+                <span>{formatNumberWithCommas((registerStatus.totalSalesQty !== undefined ? registerStatus.totalSalesQty : totals.totalQty).toFixed(1))}</span>
               </div>
             </div>
             <div className="flex-1 space-y-2 sm:space-y-3">
@@ -1193,7 +1224,7 @@ const TOUCHPOSFORM = () => {
                   </div>
                   <div className="flex justify-between text-sm font-bold sm:text-lg">
                     <span>Grand Total:</span>
-                    <span>Rs. {formatNumberWithCommas(totals.finalTotal.toFixed(2))}</span>
+                    <span>Rs. {formatNumberWithCommas((registerStatus.totalSales !== undefined ? registerStatus.totalSales : totals.finalTotal).toFixed(2))}</span>
                   </div>
                 </div>
               </div>
@@ -1282,73 +1313,92 @@ const TOUCHPOSFORM = () => {
             </button>
           </div>
 
-          {/* Category Filter */}
+          {/* Category Filter - Modified */}
           <div className="mb-2 sm:mb-4">
-            <div className="flex flex-wrap gap-1 sm:gap-2">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
-                    selectedCategory === category.name
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium dark:text-white">Categories:</span>
+              {categories.length > 8 && (
+                <select
+                  className="p-1 text-sm border rounded-lg dark:bg-slate-700 dark:text-white"
+                  value={selectedCategory}
+                  onChange={(e) => {
+                    setSelectedCategory(e.target.value);
+                    debouncedSearch(searchQuery, e.target.value, selectedBrand);
+                  }}
+                >
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {categories.length <= 8 && (
+              <div className="flex overflow-x-auto pb-2 gap-1 sm:gap-2">
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    className={`flex-shrink-0 p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category.name
                       ? "bg-blue-500 text-white dark:text-slate-800"
                       : "bg-gray-200 dark:bg-slate-700 dark:text-white"
-                  }`}
-                  onClick={() => {
-                    setSelectedCategory(category.name);
-                    debouncedSearch(searchQuery, category.name, selectedBrand);
-                  }}
-                  disabled={loadingCategories}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
-            {loadingCategories && (
-              <span className="text-xs text-gray-500 dark:text-white">
-                Loading categories...
-              </span>
+                      }`}
+                    onClick={() => {
+                      setSelectedCategory(category.name);
+                      debouncedSearch(searchQuery, category.name, selectedBrand);
+                    }}
+                    disabled={loadingCategories}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Brand Filter */}
+          {/* Brand Filter - Modified */}
           <div className="mb-2 sm:mb-4">
-            <div className="flex flex-wrap gap-1 sm:gap-2">
-              {brands.map((brand) => (
-                <button
-                  key={brand.id}
-                  className={`p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
-                    selectedBrand === brand.name
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium dark:text-white">Brands:</span>
+              {brands.length > 8 && (
+                <select
+                  className="p-1 text-sm border rounded-lg dark:bg-slate-700 dark:text-white"
+                  value={selectedBrand}
+                  onChange={(e) => {
+                    setSelectedBrand(e.target.value);
+                    debouncedSearch(searchQuery, selectedCategory, e.target.value);
+                  }}
+                >
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.name}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {brands.length <= 8 && (
+              <div className="flex overflow-x-auto pb-2 gap-1 sm:gap-2">
+                {brands.map((brand) => (
+                  <button
+                    key={brand.id}
+                    className={`flex-shrink-0 p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand.name
                       ? "bg-blue-500 text-white dark:text-slate-800"
                       : "bg-gray-200 dark:bg-slate-700 dark:text-white"
-                  }`}
-                  onClick={() => {
-                    setSelectedBrand(brand.name);
-                    debouncedSearch(searchQuery, selectedCategory, brand.name);
-                  }}
-                  disabled={loadingBrands}
-                >
-                  {brand.name}
-                </button>
-              ))}
-            </div>
-            {loadingBrands && (
-              <span className="text-xs text-gray-500 dark:text-white">Loading brands...</span>
+                      }`}
+                    onClick={() => {
+                      setSelectedBrand(brand.name);
+                      debouncedSearch(searchQuery, selectedCategory, brand.name);
+                    }}
+                    disabled={loadingBrands}
+                  >
+                    {brand.name}
+                  </button>
+                ))}
+              </div>
             )}
-          </div>
-
-          {/* Reset Filters Button */}
-          <div className="mb-2 sm:mb-4">
-            <button
-              className="p-2 text-sm text-white bg-gray-500 rounded-lg sm:p-3 dark:text-slate-800 sm:text-lg"
-              onClick={() => {
-                setSelectedCategory("All Categories");
-                setSelectedBrand("All Brands");
-                setSearchQuery("");
-                debouncedSearch("", "All Categories", "All Brands");
-              }}
-            >
-              Reset Filters
-            </button>
           </div>
 
           {/* Error Message */}
@@ -1369,9 +1419,8 @@ const TOUCHPOSFORM = () => {
                   className={`
                     relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer
                     border-4 border-black
-                    ${
-                      categoryColors[item.category_name] ||
-                      "bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-slate-700 dark:text-white"
+                    ${categoryColors[item.category_name] ||
+                    "bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-slate-700 dark:text-white"
                     }
                     hover:shadow-xl hover:border-purple-800
                     active:scale-95 transition-all duration-200
@@ -1461,9 +1510,6 @@ const TOUCHPOSFORM = () => {
         <RegisterModal
           isOpen={showRegisterModal}
           onClose={() => {
-            if (!registerStatus.isOpen) {
-              navigate('/dashboard');
-            }
             handleRegisterModalClose();
           }}
           onConfirm={(amount) => {
@@ -1471,12 +1517,13 @@ const TOUCHPOSFORM = () => {
             handleRegisterModalClose();
           }}
           cashOnHand={registerStatus.cashOnHand}
-          setCashOnHand={(amount) => setCashOnHand(amount)}
           user={user}
           isClosing={isClosingRegister}
           closingDetails={calculateClosingDetails()}
         />
       )}
+
+
       {showHeldSalesList && (
         <HeldSalesList
           heldSales={heldSales}
@@ -1485,6 +1532,99 @@ const TOUCHPOSFORM = () => {
           onDelete={deleteHeldSale}
           onClose={closeHeldSalesList}
         />
+      )}
+
+      {lowStockWarning && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full dark:bg-slate-800">
+            <h3 className="text-lg font-bold mb-4 dark:text-white">Low Stock Warning</h3>
+            <p className="mb-4 dark:text-white">
+              Only {lowStockWarning.remainingStock} units of {lowStockWarning.productName} remaining!
+              Do you want to proceed anyway?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  // Find the product again in case it changed
+                  const item = items.find(i => i.id === lowStockWarning.productId);
+                  if (item) {
+                    const availableStock = parseFloat(item.stock || 0);
+                    const qtyToAdd = 1;
+                    const existingProductIndex = products.findIndex((p) => p.id === item.id);
+                    const newTotalQty =
+                      existingProductIndex >= 0
+                        ? products[existingProductIndex].qty + qtyToAdd
+                        : qtyToAdd;
+
+                    const salesPrice = parseFloat(item.sales_price || 0);
+                    const mrp = parseFloat(item.mrp || 0);
+                    const discountPerUnit = Math.max(0, mrp - salesPrice);
+                    const { schemeName } = applyDiscountScheme(item, saleType, activeSchemes);
+                    const productWithQty = { ...item, qty: newTotalQty };
+                    const specialDiscount = existingProductIndex >= 0
+                      ? calculateSpecialDiscount(
+                        productWithQty,
+                        saleType,
+                        new Date().toISOString().split("T")[0]
+                      )
+                      : calculateSpecialDiscount(
+                        { ...item, qty: qtyToAdd },
+                        saleType,
+                        new Date().toISOString().split("T")[0]
+                      );
+
+                    let updatedProducts = [...products];
+
+                    if (existingProductIndex >= 0) {
+                      updatedProducts[existingProductIndex] = {
+                        ...updatedProducts[existingProductIndex],
+                        qty: newTotalQty,
+                        price: salesPrice,
+                        discount: discountPerUnit,
+                        schemeName: schemeName,
+                        specialDiscount: specialDiscount,
+                        total: salesPrice * newTotalQty - specialDiscount,
+                      };
+                    } else {
+                      const newProduct = {
+                        ...item,
+                        qty: qtyToAdd,
+                        price: salesPrice,
+                        discount: discountPerUnit,
+                        schemeName: schemeName,
+                        specialDiscount: specialDiscount,
+                        total: salesPrice * qtyToAdd - specialDiscount,
+                        serialNumber: products.length + 1,
+                      };
+                      updatedProducts = [...products, newProduct];
+                    }
+
+                    setProducts(updatedProducts);
+
+                    const updateStock = (list) =>
+                      list.map((i) =>
+                        i.id === item.id ? { ...i, stock: i.stock - qtyToAdd } : i
+                      );
+                    setItems(updateStock);
+                    setSearchResults(updateStock);
+
+                    setSearchQuery("");
+                  }
+                  setLowStockWarning(null);
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Proceed
+              </button>
+              <button
+                onClick={() => setLowStockWarning(null)}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 dark:bg-slate-700 dark:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

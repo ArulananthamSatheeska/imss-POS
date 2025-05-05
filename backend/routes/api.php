@@ -26,7 +26,8 @@ use App\Http\Controllers\{
     RawMaterialController,
     SalesInvoiceController,
     SalesReturnController,
-    RegisterController
+    RegisterController,
+    OutstandingController
 };
 
 use App\Http\Middleware\EnsureRegisterIsOpen;
@@ -58,6 +59,7 @@ Route::middleware('auth:api')->get('/test-auth', function () {
         ], 401);
     }
 });
+
 
 // Authenticated routes with role-permission middleware
 Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddleware::class])->group(function () {
@@ -94,7 +96,12 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::post('users/{user}/enable-2fa', [UserController::class, 'enable2FA']);
     Route::post('users/{user}/activate', [UserController::class, 'activateUser']);
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
+
+    // Outstanding
 });
+
+    Route::get('/outstanding', [OutstandingController::class, 'index']);
+    Route::patch('/outstanding/{id}', [OutstandingController::class, 'update']);
 
     // Discount Schemes
     Route::prefix('discount-schemes')->group(function () {
@@ -124,7 +131,7 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     // Sales
     Route::get('/next-bill-number', [SaleController::class, 'getLastBillNumber']);
     Route::get('/sales/daily-profit-report', [SaleController::class, 'getDailyProfitReport']);
-    Route::get('/sales/bill-wise-profit-report', [SaleController::class, 'getBillWiseProfitReport']);
+    Route::get('/sales/bill-wise-profit-report', [SaleController::class, 'getCombinedBillWiseProfitReport']);
     Route::get('/sales/company-wise-profit-report', [SaleController::class, 'getCompanyWiseProfitReport']);
     Route::get('/sales/supplier-wise-profit-report', [SaleController::class, 'getSupplierWiseProfitReport']);
     Route::apiResource('sales', SaleController::class);

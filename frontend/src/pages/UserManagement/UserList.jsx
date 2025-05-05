@@ -9,7 +9,7 @@ import { PERMISSIONS } from '../../constants/permissions';
 import { FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight, FiPlus, FiSearch } from 'react-icons/fi';
 import { BsFilter } from 'react-icons/bs';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'https://imssposerp.com/backend/public/api';
 const USERS_PER_PAGE = 10;
 const DEBOUNCE_DELAY = 300;
 

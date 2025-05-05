@@ -298,4 +298,94 @@ class SalesInvoiceController extends Controller
             ], 500);
         }
     }
+
+    public function getBillWiseProfitReport(Request $request)
+    {
+        try {
+            \Log::info('getBillWiseProfitReport called with paymentMethod: ' . $request->input('paymentMethod'));
+            $query = Invoice::with('items')
+                ->select('id', 'invoice_no', 'invoice_date', 'customer_name', 'payment_method');
+
+            // Apply date filter
+            if ($request->has('fromDate') && $request->has('toDate')) {
+                $query->whereBetween('invoice_date', [
+                    $request->input('fromDate') . ' 00:00:00',
+                    $request->input('toDate') . ' 23:59:59'
+                ]);
+            }
+
+            // Apply payment method filter
+            if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '' && $request->input('paymentMethod') !== 'all') {
+                $query->where('payment_method', $request->input('paymentMethod'));
+            }
+
+            \Log::info('Generated SQL query: ' . $query->toSql());
+
+            $invoices = $query->get();
+
+            $reportData = [];
+            $totalCostPriceAll = 0;
+            $totalSellingPriceAll = 0;
+            $totalProfitAll = 0;
+
+            foreach ($invoices as $invoice) {
+                $totalCostPrice = 0;
+                $totalSellingPrice = 0;
+                $items = [];
+
+                foreach ($invoice->items as $item) {
+                    $costPrice = $item->total_buying_cost ?? 0;
+                    $sellingPrice = $item->sales_price * $item->quantity;
+                    $profit = $sellingPrice - $costPrice;
+                    $profitPercentage = ($sellingPrice > 0) ? ($profit / $sellingPrice) * 100 : 0;
+
+                    $items[] = [
+                        'product_name' => $item->description,
+                        'quantity' => $item->quantity,
+                        'costPrice' => number_format($costPrice, 2),
+                        'sellingPrice' => number_format($sellingPrice, 2),
+                        'profit' => number_format($profit, 2),
+                        'profitPercentage' => number_format($profitPercentage, 2) . '%',
+                    ];
+
+                    $totalCostPrice += $costPrice;
+                    $totalSellingPrice += $sellingPrice;
+                }
+
+                $totalProfit = $totalSellingPrice - $totalCostPrice;
+                $profitPercentage = ($totalSellingPrice > 0) ? ($totalProfit / $totalSellingPrice) * 100 : 0;
+
+                $reportData[] = [
+                    'bill_number' => $invoice->invoice_no,
+                    'date' => $invoice->invoice_date->format('d-m-Y'),
+                    'customer_name' => $invoice->customer_name ?: 'Walk-in Customer',
+                    'payment_type' => $invoice->payment_method,
+                    'items' => $items,
+                    'totalCostPrice' => number_format($totalCostPrice, 2),
+                    'totalSellingPrice' => number_format($totalSellingPrice, 2),
+                    'totalProfit' => number_format($totalProfit, 2),
+                    'profitPercentage' => number_format($profitPercentage, 2) . '%',
+                ];
+
+                $totalCostPriceAll += $totalCostPrice;
+                $totalSellingPriceAll += $totalSellingPrice;
+                $totalProfitAll += $totalProfit;
+            }
+
+            $summary = [
+                'totalCostPriceAll' => number_format($totalCostPriceAll, 2),
+                'totalSellingPriceAll' => number_format($totalSellingPriceAll, 2),
+                'totalProfitAll' => number_format($totalProfitAll, 2),
+                'averageProfitPercentageAll' => ($totalSellingPriceAll > 0) ? number_format(($totalProfitAll / $totalSellingPriceAll) * 100, 2) . '%' : '0.00%',
+            ];
+
+            return response()->json([
+                'reportData' => $reportData,
+                'summary' => $summary,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in getBillWiseProfitReport (Invoice): ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch invoice report.'], 500);
+        }
+    }
 }

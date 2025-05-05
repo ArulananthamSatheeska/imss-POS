@@ -26,7 +26,7 @@ const PurchaseInvoice = () => {
     try {
       const timestamp = new Date().getTime(); // Cache-busting
       const response = await axios.get(
-        `http://127.0.0.1:8000/api/purchases?_t=${timestamp}`,
+        `https://imssposerp.com/backend/public/api/purchases?_t=${timestamp}`,
         {
           headers: {
             Authorization: `Bearer ${currentUser.token}`,
@@ -88,7 +88,7 @@ const PurchaseInvoice = () => {
       if (newInvoice.id) {
         // Update existing invoice
         response = await axios.put(
-          `http://127.0.0.1:8000/api/purchases/${newInvoice.id}`,
+          `https://imssposerp.com/backend/public/api/purchases/${newInvoice.id}`,
           invoiceData,
           {
             headers: {
@@ -101,7 +101,7 @@ const PurchaseInvoice = () => {
       } else {
         // Create new invoice
         response = await axios.post(
-          "http://127.0.0.1:8000/api/purchases",
+          "https://imssposerp.com/backend/public/api/purchases",
           invoiceData,
           {
             headers: {
@@ -161,7 +161,7 @@ const PurchaseInvoice = () => {
       return;
     try {
       setLoading(true);
-      await axios.delete(`http://127.0.0.1:8000/api/purchases/${id}`, {
+      await axios.delete(`https://imssposerp.com/backend/public/api/purchases/${id}`, {
         headers: {
           Authorization: `Bearer ${currentUser.token}`,
           "Content-Type": "application/json",
@@ -306,13 +306,12 @@ const PurchaseInvoice = () => {
                       </td>
                       <td className="p-3 text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            invoice.status === "paid"
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${invoice.status === "paid"
                               ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
                               : invoice.status === "pending"
-                              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-                          }`}
+                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+                            }`}
                         >
                           {invoice.status}
                         </span>

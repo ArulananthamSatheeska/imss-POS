@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import debounce from "lodash/debounce";
 import CloseRegisterModal from "../models/CloseRegisterModal";
 import HeldSalesList from "./HeldSalesList";
+import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import RegisterModal from "../models/registerModel.jsx";
 import {
   ClipboardList,
@@ -183,7 +184,7 @@ const POSForm = ({
   const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
-
+  const [stockWarning, setStockWarning] = useState('');
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
   const payButtonRef = useRef(null);
@@ -195,7 +196,7 @@ const POSForm = ({
         try {
           const token = user?.token;
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
-          const response = await axios.get("http://127.0.0.1:8000/api/next-bill-number", { headers });
+          const response = await axios.get("https://imssposerp.com/backend/public/api/next-bill-number", { headers });
           setBillNumber(response.data.next_bill_number);
           setCustomerInfo(prev => ({ ...prev, bill_number: response.data.next_bill_number }));
         } catch (error) {
@@ -211,7 +212,7 @@ const POSForm = ({
   useEffect(() => {
     setLoadingItems(true);
     axios
-      .get("http://127.0.0.1:8000/api/products")
+      .get("https://imssposerp.com/backend/public/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => {
@@ -247,7 +248,7 @@ const POSForm = ({
   useEffect(() => {
     setLoadingSchemes(true);
     axios
-      .get("http://127.0.0.1:8000/api/discount-schemes")
+      .get("https://imssposerp.com/backend/public/api/discount-schemes")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const formattedSchemes = response.data.data.map((s) => ({
@@ -342,8 +343,8 @@ const POSForm = ({
         const productMatch =
           scheme.applies_to === "product" &&
           target ===
-            (product.product_name?.trim().toLowerCase() ||
-              product.description?.trim().toLowerCase());
+          (product.product_name?.trim().toLowerCase() ||
+            product.description?.trim().toLowerCase());
         const categoryMatch =
           scheme.applies_to === "category" &&
           categoryName &&
@@ -376,8 +377,7 @@ const POSForm = ({
       }
 
       console.log(
-        `Applied ${applicableScheme.applies_to} discount for ${
-          product.product_name
+        `Applied ${applicableScheme.applies_to} discount for ${product.product_name
         }: Target=${applicableScheme.target}, Discount=${discount.toFixed(2)}`
       );
       return discount >= 0 ? discount : 0;
@@ -527,17 +527,13 @@ const POSForm = ({
       const existingProduct = updatedProducts[existingProductIndex];
       const newQuantity = (existingProduct.qty || 0) + currentQuantity;
 
+      // Show warning but don't block the sale
       if (newQuantity > availableStock) {
-        alert(
-          `Insufficient stock for ${
-            selectedProduct.product_name
-          }! Only ${availableStock} available. You already have ${
-            existingProduct.qty || 0
-          } in the bill.`
+        setStockWarning(
+          `Warning: Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available. You're adding ${newQuantity} (including ${existingProduct.qty || 0} already in bill).`
         );
-        quantityInputRef.current?.focus();
-        quantityInputRef.current?.select();
-        return;
+      } else {
+        setStockWarning('');
       }
 
       const updatedProductWithQty = { ...existingProduct, qty: newQuantity };
@@ -558,13 +554,13 @@ const POSForm = ({
       };
       setProducts(updatedProducts);
     } else {
+      // Show warning for new product but don't block the sale
       if (currentQuantity > availableStock) {
-        alert(
-          `Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available.`
+        setStockWarning(
+          `Warning: Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available. You're adding ${currentQuantity}.`
         );
-        quantityInputRef.current?.focus();
-        quantityInputRef.current?.select();
-        return;
+      } else {
+        setStockWarning('');
       }
 
       const newProduct = {
@@ -604,10 +600,11 @@ const POSForm = ({
       const availableStock = parseFloat(productToUpdate.stock || 0);
 
       if (!isNaN(availableStock) && newQty > availableStock) {
-        alert(
-          `Quantity exceeds stock! Only ${availableStock} available for ${productToUpdate.product_name}.`
+        setStockWarning(
+          `Warning: Insufficient stock for ${productToUpdate.product_name}! Only ${availableStock} available. You're setting quantity to ${newQty}.`
         );
-        return prevProducts;
+      } else {
+        setStockWarning('');
       }
 
       const updatedProductWithQty = { ...productToUpdate, qty: newQty };
@@ -818,7 +815,7 @@ const POSForm = ({
       } else {
         alert(
           "Failed to load held sales: " +
-            (response.data.message || "Unknown error")
+          (response.data.message || "Unknown error")
         );
         setHeldSales([]);
       }
@@ -881,7 +878,7 @@ const POSForm = ({
       } else {
         alert(
           "Failed to delete held sale: " +
-            (response.data.message || "Unknown error")
+          (response.data.message || "Unknown error")
         );
       }
     } catch (error) {
@@ -909,7 +906,7 @@ const POSForm = ({
             const token = user?.token;
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             const response = await axios.get(
-              "http://127.0.0.1:8000/api/next-bill-number",
+              "https://imssposerp.com/backend/public/api/next-bill-number",
               { headers }
             );
             setBillNumber(response.data.next_bill_number);
@@ -954,12 +951,17 @@ const POSForm = ({
       alert("Cannot proceed to payment with an empty bill.");
       return;
     }
+    if (!registerStatus.isOpen) {
+      // If register is closed, show register modal to prompt opening
+      setShowRegisterModal(true);
+      return;
+    }
     setCustomerInfo((prevState) => ({
       ...prevState,
       bill_number: billNumber,
     }));
     setShowBillModal(true);
-  }, [products, billNumber]);
+  }, [products, billNumber, registerStatus.isOpen]);
 
   const closeBillModal = useCallback(
     (saleSaved = false) => {
@@ -1038,11 +1040,14 @@ const POSForm = ({
   }, [registerStatus.isOpen]);
 
   const calculateClosingDetails = () => {
-    const totalSales = products.reduce((sum, p) => sum + (p.total || 0), 0);
-    const cashInRegister = registerStatus.cashOnHand || 0;
+    // Use totalSales and openingCash from registerStatus if available, ensure numbers
+    const totalSales = Number(registerStatus.totalSales) || products.reduce((sum, p) => sum + (p.total || 0), 0);
+    const totalSalesQty = Number(registerStatus.totalSalesQty) || products.reduce((sum, p) => sum + (p.qty || 0), 0);
+    const openingCash = Number(registerStatus.openingCash ?? registerStatus.cashOnHand) || 0;
     return {
       totalSales,
-      cashInRegister,
+      totalSalesQty,
+      openingCash,
       inCashierAmount: 0,
       otherAmount: 0,
     };
@@ -1057,6 +1062,10 @@ const POSForm = ({
     if (isClosingRegister) {
       const closingDetails = calculateClosingDetails();
       try {
+        if (!amount || typeof amount.inCashierAmount !== 'number') {
+          alert('Invalid amount provided for closing register.');
+          return;
+        }
         await closeRegister({
           ...closingDetails,
           inCashierAmount: amount.inCashierAmount,
@@ -1110,29 +1119,27 @@ const POSForm = ({
         scheme.active &&
         scheme.applies_to === "product" &&
         scheme.target?.trim().toLowerCase() ===
-          (item.product_name?.trim().toLowerCase() ||
-            item.description?.trim().toLowerCase())
+        (item.product_name?.trim().toLowerCase() ||
+          item.description?.trim().toLowerCase())
     );
     const categoryScheme = activeSchemes.find(
       (scheme) =>
         scheme.active &&
         scheme.applies_to === "category" &&
         scheme.target?.trim().toLowerCase() ===
-          item.category_name?.trim().toLowerCase()
+        item.category_name?.trim().toLowerCase()
     );
     let discountInfo = "";
     if (productScheme) {
-      discountInfo = `, Discount: Product ${productScheme.target} (${
-        productScheme.type === "percentage"
-          ? `${productScheme.value}%`
-          : `Rs. ${productScheme.value}`
-      })`;
+      discountInfo = `, Discount: Product ${productScheme.target} (${productScheme.type === "percentage"
+        ? `${productScheme.value}%`
+        : `Rs. ${productScheme.value}`
+        })`;
     } else if (categoryScheme) {
-      discountInfo = `, Discount: Category ${categoryScheme.target} (${
-        categoryScheme.type === "percentage"
-          ? `${categoryScheme.value}%`
-          : `Rs. ${categoryScheme.value}`
-      })`;
+      discountInfo = `, Discount: Category ${categoryScheme.target} (${categoryScheme.type === "percentage"
+        ? `${categoryScheme.value}%`
+        : `Rs. ${categoryScheme.value}`
+        })`;
     }
     return discountInfo;
   };
@@ -1149,9 +1156,8 @@ const POSForm = ({
 
   return (
     <div
-      className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${
-        isFullScreen ? "fullscreen-mode" : ""
-      }`}
+      className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""
+        }`}
     >
       <div className="p-2 mb-4 rounded-lg shadow-xl bg-gradient-to-r from-slate-700 to-slate-600 dark:from-slate-800 dark:to-slate-700">
         <div className="flex flex-wrap items-center justify-between w-full gap-2 p-3 rounded-lg shadow-md md:gap-4 bg-slate-500 dark:bg-slate-600">
@@ -1242,7 +1248,7 @@ const POSForm = ({
                 onChange={(e) => handleSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={
-                  loadingItems || loadingSchemes || !registerStatus.isOpen
+                  loadingItems || loadingSchemes
                 }
                 autoComplete="off"
               />
@@ -1256,11 +1262,10 @@ const POSForm = ({
                   {searchResults.map((item, index) => (
                     <li
                       key={item.product_id || index}
-                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${
-                        index === selectedSearchIndex
-                          ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white"
-                          : "text-black dark:text-gray-200"
-                      }`}
+                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${index === selectedSearchIndex
+                        ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white"
+                        : "text-black dark:text-gray-200"
+                        }`}
                       onClick={() => handleItemSelection(item)}
                       onMouseEnter={() => setSelectedSearchIndex(index)}
                     >
@@ -1293,8 +1298,7 @@ const POSForm = ({
                 disabled={
                   !selectedProduct ||
                   loadingItems ||
-                  loadingSchemes ||
-                  !registerStatus.isOpen
+                  loadingSchemes
                 }
               />
             </div>
@@ -1309,8 +1313,7 @@ const POSForm = ({
                   !selectedProduct ||
                   parseFloat(quantity || 0) <= 0 ||
                   loadingItems ||
-                  loadingSchemes ||
-                  !registerStatus.isOpen
+                  loadingSchemes
                 }
               >
                 Add
@@ -1469,9 +1472,8 @@ const POSForm = ({
           </div>
           {showNotification && (
             <Notification
-              message={`Delete item "${
-                products[pendingDeleteIndex]?.product_name ?? "this item"
-              }"?`}
+              message={`Delete item "${products[pendingDeleteIndex]?.product_name ?? "this item"
+                }"?`}
               onClose={cancelDelete}
             >
               <div className="flex justify-end gap-4 mt-4">
@@ -1647,9 +1649,7 @@ const POSForm = ({
           onClose={() => {
             setShowRegisterModal(false);
             setIsClosingRegister(false);
-            if (!registerStatus.isOpen) {
-              navigate("/dashboard");
-            }
+
           }}
           onConfirm={handleRegisterConfirm}
           cashOnHand={registerStatus.cashOnHand}
@@ -1658,7 +1658,13 @@ const POSForm = ({
           closingDetails={calculateClosingDetails()}
         />
       )}
-
+      {stockWarning && (
+        <div className="p-2 my-2 text-sm text-yellow-700 bg-yellow-100 rounded-md flex items-center">
+          <ExclamationTriangleIcon className="w-5 h-5 mr-2" />
+          {stockWarning}
+          <span className="ml-2 text-yellow-800">(Sale will proceed)</span>
+        </div>
+      )}
       {showBillModal && (
         <BillPrintModal
           initialProducts={products}

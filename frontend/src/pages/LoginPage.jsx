@@ -24,6 +24,10 @@ const Login = () => {
 
     const { loadPermissions } = usePermissions() || {};  // Added fallback
 
+    // New state variables for company details
+    const [companyName, setCompanyName] = useState("Loading...");
+    const [companyType, setCompanyType] = useState("");
+
     useEffect(() => {
         // Ensure that user and user.permissions exist before calling loadPermissions
         if (user && user.permissions && loadPermissions) {
@@ -39,6 +43,32 @@ const Login = () => {
             setRememberMe(true);
         }
         emailRef.current.focus();
+
+        // Fetch company details on mount
+        const fetchCompanyDetails = async () => {
+            try {
+                // Fetch list of companies with id and company_name
+                const listResponse = await axios.get("https://imssposerp.com/backend/public/api/companies?fields=id,company_name");
+                const companies = listResponse.data;
+                if (companies.length > 0) {
+                    // Fetch details of the first company
+                    const firstCompanyName = companies[0].company_name;
+                    const detailResponse = await axios.get(`https://imssposerp.com/backend/public/api/companies/${firstCompanyName}`);
+                    const companyData = detailResponse.data;
+                    setCompanyName(companyData.company_name || "Company");
+                    setCompanyType(companyData.company_type || "");
+                } else {
+                    setCompanyName("Company");
+                    setCompanyType("");
+                }
+            } catch (error) {
+                console.error("Error fetching company details:", error);
+                setCompanyName("Company");
+                setCompanyType("");
+            }
+        };
+
+        fetchCompanyDetails();
     }, []);
 
     const handleLogin = async () => {
@@ -94,8 +124,8 @@ const Login = () => {
                     transition={{ duration: 0.5 }}
                 >
                     <div className="login-header">
-                        <h2 className="login-title">SK- JEELAN</h2>
-                        <h3 className="login-subtitle">PVT (LTD)</h3>
+                        <h2 className="login-title">{companyName}</h2>
+                        <h3 className="login-subtitle">{companyType}</h3>
                         <p className="login-subtitle">Sign in to your account</p>
                     </div>
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   FiSearch,
-  FiDownload,
   FiRefreshCw,
   FiChevronDown,
   FiChevronUp,
@@ -17,7 +16,7 @@ import PrintableInvoice from "./PrintableInvoice";
 import BillPrintModal from "../../components/models/BillPrintModel";
 import POSForm from "../../components/pos/POSForm";
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = "https://imssposerp.com/backend/public/api";
 
 const SalesReport = () => {
   const today = new Date().toISOString().split("T")[0];
@@ -33,7 +32,6 @@ const SalesReport = () => {
   const [expandedRow, setExpandedRow] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [invoiceDataForPreview, setInvoiceDataForPreview] = useState(null);
-  const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [invoiceToEdit, setInvoiceToEdit] = useState(null);
@@ -54,9 +52,6 @@ const SalesReport = () => {
         params: { from: fromDate, to: toDate },
         headers: { Accept: "application/json" },
       });
-
-      console.log("Fetched Invoices Response:", invoiceResponse);
-      console.log("Fetched Sales Response:", salesResponse);
 
       let invoices = [];
       if (invoiceResponse.data && Array.isArray(invoiceResponse.data.data)) {
@@ -117,14 +112,14 @@ const SalesReport = () => {
         customer_email: sale.customer_email || "",
         items: Array.isArray(sale.items)
           ? sale.items.map((item) => ({
-              ...item,
-              product_name: item.product_name || "Unknown Product",
-              quantity: item.quantity || 0,
-              unit_price: parseFloat(item.unit_price) || 0,
-              discount: parseFloat(item.discount) || 0,
-              total: parseFloat(item.total) || 0,
-              mrp: parseFloat(item.mrp) || 0,
-            }))
+            ...item,
+            product_name: item.product_name || "Unknown Product",
+            quantity: item.quantity || 0,
+            unit_price: parseFloat(item.unit_price) || 0,
+            discount: parseFloat(item.discount) || 0,
+            total: parseFloat(item.total) || 0,
+            mrp: parseFloat(item.mrp) || 0,
+          }))
           : [],
         total_amount: parseFloat(sale.total) || 0,
         subtotal: parseFloat(sale.subtotal) || 0,
@@ -165,7 +160,6 @@ const SalesReport = () => {
     type = "invoice"
   ) => {
     const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"}`;
-    console.log(`POST to: ${url}`, JSON.stringify(newInvoiceData, null, 2));
     try {
       const response = await axios.post(url, newInvoiceData, {
         headers: {
@@ -173,10 +167,6 @@ const SalesReport = () => {
           Accept: "application/json",
         },
       });
-      console.log(
-        `API Success (${type === "invoice" ? "Invoice" : "Sale"} Creation):`,
-        response.data
-      );
       fetchReportData();
       setShowInvoiceModal(false);
       alert(`${type === "invoice" ? "Invoice" : "Sale"} created successfully!`);
@@ -187,8 +177,8 @@ const SalesReport = () => {
         error.response?.data?.message || `Failed to create ${type}.`;
       const errorDetails = error.response?.data?.errors
         ? Object.entries(error.response.data.errors)
-            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-            .join("\n")
+          .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+          .join("\n")
         : error.message;
       alert(`Error: ${errorMessage}\nDetails: ${errorDetails}`);
       throw error;
@@ -201,14 +191,11 @@ const SalesReport = () => {
     type = "invoice"
   ) => {
     if (!id) {
-      console.error(`${type} ID missing for update`);
       alert(`Cannot update ${type}: ID is missing.`);
       return;
     }
-    const url = `${API_BASE_URL}/${
-      type === "invoice" ? "invoices" : "sales"
-    }/${id}`;
-    console.log(`PUT to: ${url}`, JSON.stringify(updatedInvoiceData, null, 2));
+    const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"
+      }/${id}`;
     try {
       const response = await axios.put(url, updatedInvoiceData, {
         headers: {
@@ -216,10 +203,6 @@ const SalesReport = () => {
           Accept: "application/json",
         },
       });
-      console.log(
-        `API Success (${type === "invoice" ? "Invoice" : "Sale"} Update):`,
-        response.data
-      );
       fetchReportData();
       setShowEditInvoiceModal(false);
       setShowEditSaleModal(false);
@@ -233,8 +216,8 @@ const SalesReport = () => {
         error.response?.data?.message || `Failed to update ${type}.`;
       const errorDetails = error.response?.data?.errors
         ? Object.entries(error.response.data.errors)
-            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-            .join("\n")
+          .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+          .join("\n")
         : error.message;
       alert(`Error: ${errorMessage}\nDetails: ${errorDetails}`);
       throw error;
@@ -242,31 +225,26 @@ const SalesReport = () => {
   };
 
   const handleDeleteSale = async (id, type = "invoice") => {
-    console.log(`Attempting to delete ${type} ID:`, id);
     if (
       window.confirm(
         `Are you sure you want to delete ${type} ID: ${id}? This action cannot be undone.`
       )
     ) {
       setLoading(true);
-      const url = `${API_BASE_URL}/${
-        type === "invoice" ? "invoices" : "sales"
-      }/${id}`;
+      const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"
+        }/${id}`;
       try {
         await axios.delete(url, {
           headers: { Accept: "application/json" },
         });
         alert(
-          `${
-            type === "invoice" ? "Invoice" : "Sale"
+          `${type === "invoice" ? "Invoice" : "Sale"
           } ID: ${id} deleted successfully.`
         );
         fetchReportData();
       } catch (error) {
-        console.error(`Error deleting ${type} ${id}:`, error.response || error);
         alert(
-          `Failed to delete ${type} ${id}. ${
-            error.response?.data?.message || error.message
+          `Failed to delete ${type} ${id}. ${error.response?.data?.message || error.message
           }`
         );
       } finally {
@@ -318,8 +296,6 @@ const SalesReport = () => {
   };
 
   const handleViewInvoice = (row) => {
-    console.log("Row data for preview:", row);
-
     if (!row.customer_name) {
       row.customer_name =
         row.type === "sale" ? "Walk-in Customer" : "Unknown Customer";
@@ -346,7 +322,7 @@ const SalesReport = () => {
           total:
             parseFloat(item.total) ||
             (parseFloat(item.unit_price) || 0) *
-              (parseFloat(item.quantity) || 1),
+            (parseFloat(item.quantity) || 1),
           serialNumber: index + 1,
         })
       );
@@ -457,6 +433,73 @@ const SalesReport = () => {
     setBillPrintData(null);
   };
 
+  const handlePrintInvoice = () => {
+    const printContent = document.getElementById(
+      "printable-invoice-area"
+    ).innerHTML;
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Invoice</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <!-- Include Tailwind CSS for consistent styling -->
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @page {
+              size: A4;
+              margin: 10mm;
+            }
+            body {
+              margin: 0;
+              font-family: Arial, sans-serif;
+              background-color: #ffffff;
+            }
+            .printable-invoice {
+              width: 190mm;
+              min-height: 277mm;
+              margin: 0 auto;
+              padding: 20px;
+              box-sizing: border-box;
+              background-color: #ffffff;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+              .printable-invoice {
+                width: 100%;
+                margin: 0;
+                padding: 10mm;
+              }
+              .no-print {
+                display: none !important;
+              }
+              /* Ensure Tailwind classes are preserved */
+              .bg-blue-600 { background-color: #2563eb !important; }
+              .text-blue-600 { color: #2563eb !important; }
+              .border-blue-600 { border-color: #2563eb !important; }
+              .bg-blue-50 { background-color: #eff6ff !important; }
+              .text-gray-900 { color: #1f2937 !important; }
+              .text-gray-600 { color: #4b5563 !important; }
+              .border-gray-200 { border-color: #e5e7eb !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="printable-invoice">${printContent}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    // Delay print to ensure styles are applied
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
+
   const handleEditSale = (row) => {
     if (row.type === "sale") {
       const products = (Array.isArray(row.items) ? row.items : []).map(
@@ -479,7 +522,7 @@ const SalesReport = () => {
           total:
             parseFloat(item.total) ||
             (parseFloat(item.unit_price) || 0) *
-              (parseFloat(item.quantity) || 1),
+            (parseFloat(item.quantity) || 1),
           serialNumber: index + 1,
         })
       );
@@ -588,10 +631,6 @@ const SalesReport = () => {
         },
         status: row.status || (row.type === "sale" ? "Completed" : "Pending"),
       };
-      console.log(
-        "Mapped Data for Edit (Invoice):",
-        JSON.stringify(mappedDataForEdit, null, 2)
-      );
       setInvoiceToEdit(mappedDataForEdit);
       setShowEditInvoiceModal(true);
     }
@@ -629,14 +668,6 @@ const SalesReport = () => {
 
   const handleCancelCreateInvoice = () => {
     setShowInvoiceModal(false);
-  };
-
-  const handleGenerateQuotation = () => {
-    setIsQuotationFormOpen(false);
-  };
-
-  const handleCancelQuotation = () => {
-    setIsQuotationFormOpen(false);
   };
 
   const formatCurrency = (amount) => {
@@ -683,12 +714,6 @@ const SalesReport = () => {
             Create Sales Entry
           </button>
           <button
-            onClick={() => setIsQuotationFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-          >
-            Create Quotation
-          </button>
-          <button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm dark:bg-slate-800 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
           >
@@ -698,9 +723,8 @@ const SalesReport = () => {
             onClick={fetchReportData}
             disabled={loading}
             title="Refresh Data"
-            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-              loading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
           >
             <FiRefreshCw className={`${loading ? "animate-spin" : ""}`} />{" "}
             Refresh
@@ -709,11 +733,10 @@ const SalesReport = () => {
             onClick={exportToExcel}
             disabled={filteredData.length === 0 || loading}
             title="Export to Excel"
-            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-              filteredData.length === 0 || loading
+            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${filteredData.length === 0 || loading
                 ? "opacity-50 cursor-not-allowed"
                 : ""
-            }`}
+              }`}
           >
             <FaFileExcel /> Export
           </button>
@@ -758,13 +781,6 @@ const SalesReport = () => {
         />
       )}
 
-      {isQuotationFormOpen && (
-        <Quotation
-          onGenerateQuotation={handleGenerateQuotation}
-          onCancel={handleCancelQuotation}
-        />
-      )}
-
       {showFilters && (
         <div className="p-4 mb-6 bg-white border border-gray-200 rounded-lg shadow-md dark:bg-slate-800 dark:border-gray-600 dark:text-gray-300 animate-fade-in">
           <h3 className="flex items-center gap-2 mb-3 text-base font-medium">
@@ -806,9 +822,8 @@ const SalesReport = () => {
               <button
                 onClick={fetchReportData}
                 disabled={loading}
-                className={`w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                  loading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className={`w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${loading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
               >
                 {loading ? "Applying..." : "Apply Filters"}
               </button>
@@ -846,11 +861,11 @@ const SalesReport = () => {
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {filteredData.length > 0
               ? formatCurrency(
-                  filteredData.reduce(
-                    (sum, row) => sum + (parseFloat(row.total_amount) || 0),
-                    0
-                  ) / filteredData.length
-                )
+                filteredData.reduce(
+                  (sum, row) => sum + (parseFloat(row.total_amount) || 0),
+                  0
+                ) / filteredData.length
+              )
               : formatCurrency(0)}
           </p>
         </div>
@@ -916,11 +931,10 @@ const SalesReport = () => {
                   filteredData.map((row, index) => (
                     <React.Fragment key={`${row.type}-${row.id}`}>
                       <tr
-                        className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${
-                          expandedRow === index
+                        className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${expandedRow === index
                             ? "bg-blue-50 dark:bg-slate-700"
                             : ""
-                        }`}
+                          }`}
                       >
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
                           {row.type === "invoice" ? "Invoice" : "Sale"}
@@ -961,27 +975,26 @@ const SalesReport = () => {
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-1 inline-flex text-xs font-semibold leading-tight rounded-full
-                            ${
-                              row.payment_method.toLowerCase() === "cash"
+                            ${row.payment_method.toLowerCase() === "cash"
                                 ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
                                 : row.payment_method
-                                    .toLowerCase()
-                                    .includes("card")
-                                ? "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300"
-                                : row.payment_method
+                                  .toLowerCase()
+                                  .includes("card")
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300"
+                                  : row.payment_method
                                     .toLowerCase()
                                     .includes("online")
-                                ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
-                                : row.payment_method
-                                    .toLowerCase()
-                                    .includes("cheque")
-                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300"
-                                : row.payment_method
-                                    .toLowerCase()
-                                    .includes("credit")
-                                ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
-                                : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200"
-                            }`}
+                                    ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
+                                    : row.payment_method
+                                      .toLowerCase()
+                                      .includes("cheque")
+                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300"
+                                      : row.payment_method
+                                        .toLowerCase()
+                                        .includes("credit")
+                                        ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
+                                        : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200"
+                              }`}
                           >
                             {row.payment_method}
                           </span>
@@ -1003,9 +1016,8 @@ const SalesReport = () => {
                                 e.stopPropagation();
                                 handleEditSale(row);
                               }}
-                              title={`Edit ${
-                                row.type === "invoice" ? "Invoice" : "Sale"
-                              }`}
+                              title={`Edit ${row.type === "invoice" ? "Invoice" : "Sale"
+                                }`}
                               className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 focus:outline-none"
                             >
                               <FiEdit size={16} />
@@ -1015,9 +1027,8 @@ const SalesReport = () => {
                                 e.stopPropagation();
                                 handleDeleteSale(row.id, row.type);
                               }}
-                              title={`Delete ${
-                                row.type === "invoice" ? "Invoice" : "Sale"
-                              }`}
+                              title={`Delete ${row.type === "invoice" ? "Invoice" : "Sale"
+                                }`}
                               className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 focus:outline-none"
                             >
                               <FiTrash2 size={16} />
@@ -1070,14 +1081,15 @@ const SalesReport = () => {
                                     Discount:
                                   </div>
                                   <div className="font-medium text-right text-red-600 dark:text-red-400">
-                                    -{formatCurrency(
+                                    -
+                                    {formatCurrency(
                                       row.items.reduce(
                                         (sum, item) =>
                                           sum +
                                           (parseFloat(
                                             item.discount ||
-                                              item.discount_amount ||
-                                              0
+                                            item.discount_amount ||
+                                            0
                                           ) +
                                             parseFloat(
                                               item.special_discount || 0
@@ -1103,11 +1115,10 @@ const SalesReport = () => {
                                     Balance:
                                   </div>
                                   <div
-                                    className={`font-medium text-right ${
-                                      parseFloat(row.balance) < 0
+                                    className={`font-medium text-right ${parseFloat(row.balance) < 0
                                         ? "text-red-600 dark:text-red-400"
                                         : "text-blue-600 dark:text-blue-400"
-                                    }`}
+                                      }`}
                                   >
                                     {formatCurrency(row.balance)}
                                   </div>
@@ -1151,7 +1162,7 @@ const SalesReport = () => {
                                   Items Purchased ({row.items?.length || 0})
                                 </h4>
                                 {Array.isArray(row.items) &&
-                                row.items.length > 0 ? (
+                                  row.items.length > 0 ? (
                                   <div className="overflow-x-auto max-h-60">
                                     <table className="min-w-full text-xs divide-y divide-gray-200 dark:divide-slate-600">
                                       <thead className="sticky top-0 text-gray-700 bg-gray-100 dark:bg-slate-700 dark:text-gray-300">
@@ -1185,7 +1196,7 @@ const SalesReport = () => {
                                             <td className="px-2 py-1 font-medium text-gray-900 dark:text-white">
                                               {row.type === "sale"
                                                 ? item.product_name ||
-                                                  "Unknown Product"
+                                                "Unknown Product"
                                                 : item.description || "N/A"}
                                             </td>
                                             <td className="px-2 py-1 text-center text-gray-600 dark:text-gray-300">
@@ -1194,15 +1205,15 @@ const SalesReport = () => {
                                             <td className="px-2 py-1 text-right text-gray-600 dark:text-gray-300">
                                               {formatCurrency(
                                                 item.unit_price ||
-                                                  item.sales_price ||
-                                                  0
+                                                item.sales_price ||
+                                                0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
                                               {formatCurrency(
                                                 item.discount ||
-                                                  item.discount_amount ||
-                                                  0
+                                                item.discount_amount ||
+                                                0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
@@ -1245,7 +1256,7 @@ const SalesReport = () => {
       {invoiceDataForPreview && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-sm animate-fade-in">
           <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-lg shadow-xl dark:bg-gray-800 flex flex-col">
-            <div className="flex items-center justify-between flex-shrink-0 p-4 border-bed dark:border-gray-700">
+            <div className="flex items-center justify-between flex-shrink-0 p-4 border-b dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Invoice Preview (#{invoiceDataForPreview?.invoice?.no})
               </h3>
@@ -1278,9 +1289,7 @@ const SalesReport = () => {
             </div>
             <div className="flex justify-end flex-shrink-0 p-4 border-t dark:border-gray-700">
               <button
-                onClick={() => {
-                  window.print();
-                }}
+                onClick={handlePrintInvoice}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
               >
                 <FiPrinter /> Print

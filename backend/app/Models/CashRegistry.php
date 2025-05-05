@@ -19,6 +19,8 @@ class CashRegistry extends Model
         'actual_cash',
         'closed_at',
         'status',
+        'total_sales',
+        'total_sales_qty',
     ];
 
     protected $dates = [

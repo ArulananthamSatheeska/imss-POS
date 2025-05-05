@@ -34,6 +34,21 @@ class RegisterController extends Controller
                 $registerArray = $openRegister->toArray();
                 // Add cash_on_hand field for frontend compatibility
                 $registerArray['cash_on_hand'] = $openRegister->opening_balance;
+
+                // Calculate total sales amount between opened_at and now
+                $totalSales = \App\Models\Sale::where('created_at', '>=', $openRegister->opened_at)
+                    ->where('created_at', '<=', now())
+                    ->sum('total');
+
+                // Calculate total sales quantity between opened_at and now
+                $totalSalesQty = \App\Models\SaleItem::whereHas('sale', function ($query) use ($openRegister) {
+                    $query->where('created_at', '>=', $openRegister->opened_at)
+                          ->where('created_at', '<=', now());
+                })->sum('quantity');
+
+                $registerArray['total_sales'] = $totalSales;
+                $registerArray['total_sales_qty'] = $totalSalesQty;
+                $registerArray['opening_cash'] = $openRegister->opening_balance;
             } else {
                 $registerArray = null;
             }
@@ -149,7 +164,7 @@ class RegisterController extends Controller
             $actualCash = $request->input('actual_cash');
 
             // Optional: Validate actual cash against expected cash with tolerance
-            $tolerance = 0.01; // e.g., 1 cent tolerance
+            $tolerance = 5.00; // increased tolerance to allow minor discrepancies
             if (abs($expectedCash - $actualCash) > $tolerance) {
                 DB::rollBack();
                 return response()->json([
@@ -164,12 +179,19 @@ class RegisterController extends Controller
                 ->where('created_at', '<=', now())
                 ->sum('total');
 
+            // Fetch total sales quantity between opened_at and now
+            $totalSalesQty = \App\Models\SaleItem::whereHas('sale', function ($query) use ($register) {
+                $query->where('created_at', '>=', $register->opened_at)
+                      ->where('created_at', '<=', now());
+            })->sum('quantity');
+
             $register->update([
                 'status' => 'closed',
                 'closed_at' => now(),
                 'closing_balance' => $request->input('closing_balance'),
                 'actual_cash' => $actualCash,
                 'total_sales' => $totalSales, // Assuming this column exists in cash_registries table
+                'total_sales_qty' => $totalSalesQty, // Add this column to cash_registries table
             ]);
 
             DB::commit();
@@ -178,6 +200,10 @@ class RegisterController extends Controller
                 'message' => 'Cash registry closed successfully',
                 'register' => $register,
                 'total_sales' => $totalSales,
+                'total_sales_qty' => $totalSalesQty,
+                'opening_cash' => $register->opening_balance,
+                'closing_time' => $register->closed_at,
+                'notes' => $register->notes ?? '',
             ]);
 
         } catch (\Exception $e) {
