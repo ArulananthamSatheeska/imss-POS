@@ -91,7 +91,7 @@ const Expiry = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await axios.get('https://imssposerp.com/backend/public/api/products');
+        const response = await axios.get('http://127.0.0.1:8000/api/products');
         setItems(Array.isArray(response.data.data) ? response.data.data : []);
       } catch (e) {
         console.error('Failed to fetch items:', e);

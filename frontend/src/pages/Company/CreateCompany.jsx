@@ -108,7 +108,7 @@ function CreateCompany() {
 
     const fetchCompanies = async () => {
         try {
-            const response = await axios.get('https://imssposerp.com/backend/public/api/companies?fields=id,company_name');
+            const response = await axios.get('http://127.0.0.1:8000/api/companies?fields=id,company_name');
             setCompanies(response.data);
         } catch (error) {
             console.error('Error fetching companies:', error);
@@ -118,7 +118,7 @@ function CreateCompany() {
 
     const fetchCompanyDetails = async (companyName) => {
         try {
-            const response = await axios.get(`https://imssposerp.com/backend/public/api/companies/${companyName}`);
+            const response = await axios.get(`http://127.0.0.1:8000/api/companies/${companyName}`);
             const data = response.data;
 
             const preparedData = {
@@ -231,8 +231,8 @@ function CreateCompany() {
         }
 
         const url = isEditing
-            ? `https://imssposerp.com/backend/public/api/companies/${selectedCompany}`
-            : 'https://imssposerp.com/backend/public/api/companies';
+            ? `http://127.0.0.1:8000/api/companies/${selectedCompany}`
+            : 'http://127.0.0.1:8000/api/companies';
         const method = 'post';
 
         try {
@@ -288,7 +288,7 @@ function CreateCompany() {
         }
 
         try {
-            const response = await axios.delete(`https://imssposerp.com/backend/public/api/companies/${companyNameToDelete}`);
+            const response = await axios.delete(`http://127.0.0.1:8000/api/companies/${companyNameToDelete}`);
             alert(response.data.message || 'Company deleted successfully!');
             fetchCompanies();
             if (selectedCompany === companyNameToDelete) {
