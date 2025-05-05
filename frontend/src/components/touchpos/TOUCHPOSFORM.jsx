@@ -800,7 +800,7 @@ const TOUCHPOSFORM = () => {
     return {
       salesAmount: registerStatus.totalSales !== undefined ? registerStatus.totalSales : totals.finalTotal,
       totalSalesQty: registerStatus.totalSalesQty !== undefined ? registerStatus.totalSalesQty : totals.totalQty,
-      cashOnHand: registerStatus.openingCash !== undefined ? registerStatus.openingCash : cashOnHand,
+      cashOnHand: registerStatus.openingCash !== undefined ? registerStatus.openingCash : registerStatus.cashOnHand,
       inCashierAmount: 0,
       otherAmount: 0,
     };
