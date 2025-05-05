@@ -7,7 +7,7 @@ const Product = ({ match }) => {
     useEffect(() => {
         const fetchProduct = async () => {
             try {
-                const response = await axios.get(`http://127.0.0.1:8000/product/${match.params.id}`);
+                const response = await axios.get(`https://imssposerp.com/backend/public/product/${match.params.id}`);
                 setProduct(response.data);
             } catch (error) {
                 console.error('Error fetching product:', error);
@@ -41,7 +41,7 @@ const Product = ({ match }) => {
             <p>Store Location: {product.store_location}</p>
             <p>Cabinet: {product.cabinet}</p>
             <p>Row: {product.row}</p>
-            <img src={`http://127.0.0.1:8000/barcode/${product.product_id}`} alt="Barcode" />
+            <img src={`https://imssposerp.com/backend/public/barcode/${product.product_id}`} alt="Barcode" />
         </div>
     );
 };

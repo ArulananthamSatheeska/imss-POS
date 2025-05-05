@@ -136,13 +136,13 @@ const SalesInvoice = ({
           const unitPrice = parseFloat(item.unitPrice || item.unit_price || 0);
           const discountAmount = parseFloat(
             item.discountAmount ||
-              item.discount_amount ||
-              unitPrice * qty - salesPrice * qty
+            item.discount_amount ||
+            unitPrice * qty - salesPrice * qty
           );
           const discountPercentage = parseFloat(
             item.discountPercentage ||
-              item.discount_percentage ||
-              (unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0)
+            item.discount_percentage ||
+            (unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0)
           );
           return {
             ...item,
@@ -199,7 +199,7 @@ const SalesInvoice = ({
           );
           const discountPercentage = parseFloat(
             item.discountPercentage ||
-              (unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0)
+            (unitPrice > 0 ? ((unitPrice - salesPrice) / unitPrice) * 100 : 0)
           );
           return {
             ...item,
@@ -257,13 +257,13 @@ const SalesInvoice = ({
           categoriesResponse,
           schemesResponse,
         ] = await Promise.all([
-          axios.get("http://127.0.0.1:8000/api/detailed-stock-reports", {
+          axios.get("https://imssposerp.com/backend/public/api/detailed-stock-reports", {
             params: { toDate: today },
           }),
-          axios.get("http://127.0.0.1:8000/api/products"),
-          axios.get("http://127.0.0.1:8000/api/customers"),
-          axios.get("http://127.0.0.1:8000/api/categories"),
-          axios.get("http://127.0.0.1:8000/api/discount-schemes"),
+          axios.get("https://imssposerp.com/backend/public/api/products"),
+          axios.get("https://imssposerp.com/backend/public/api/customers"),
+          axios.get("https://imssposerp.com/backend/public/api/categories"),
+          axios.get("https://imssposerp.com/backend/public/api/discount-schemes"),
         ]);
 
         // Process products with stock and category_name
@@ -320,7 +320,7 @@ const SalesInvoice = ({
         toast.error("Failed to load data. Check console for details.");
         try {
           const fallbackResponse = await axios.get(
-            "http://127.0.0.1:8000/api/products"
+            "https://imssposerp.com/backend/public/api/products"
           );
           setProducts(
             fallbackResponse.data.data.map((product) => ({
@@ -409,8 +409,8 @@ const SalesInvoice = ({
         const productMatch =
           scheme.applies_to === "product" &&
           target ===
-            (product.description?.trim().toLowerCase() ||
-              product.product_name?.trim().toLowerCase());
+          (product.description?.trim().toLowerCase() ||
+            product.product_name?.trim().toLowerCase());
         const categoryMatch =
           scheme.applies_to === "category" &&
           categoryName &&
@@ -567,15 +567,12 @@ const SalesInvoice = ({
 
     setErrors((prev) => ({
       ...prev,
-      [`${
-        section === "items"
-          ? `item${
-              targetName.charAt(0).toUpperCase() + targetName.slice(1)
-            }${index}`
-          : `${section}${
-              targetName.charAt(0).toUpperCase() + targetName.slice(1)
-            }`
-      }`]: undefined,
+      [`${section === "items"
+          ? `item${targetName.charAt(0).toUpperCase() + targetName.slice(1)
+          }${index}`
+          : `${section}${targetName.charAt(0).toUpperCase() + targetName.slice(1)
+          }`
+        }`]: undefined,
       items: undefined,
       purchaseAmount: undefined, // Clear purchaseAmount error on input change
     }));
@@ -874,8 +871,8 @@ const SalesInvoice = ({
           error.response?.data?.message || "Failed to save invoice.";
         const details = error.response?.data?.errors
           ? Object.entries(error.response.data.errors)
-              .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-              .join("\n")
+            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+            .join("\n")
           : "No detailed errors provided.";
         console.error("API Error Details:", {
           message,
@@ -1018,23 +1015,20 @@ const SalesInvoice = ({
       });
       let discountInfo = "";
       if (productScheme) {
-        discountInfo = `, Discount: Product ${productScheme.target} (${
-          productScheme.type === "percentage"
+        discountInfo = `, Discount: Product ${productScheme.target} (${productScheme.type === "percentage"
             ? `${productScheme.value}%`
             : `LKR ${productScheme.value}`
-        })`;
+          })`;
       } else if (categoryScheme) {
-        discountInfo = `, Discount: Category ${categoryScheme.target} (${
-          categoryScheme.type === "percentage"
+        discountInfo = `, Discount: Category ${categoryScheme.target} (${categoryScheme.type === "percentage"
             ? `${categoryScheme.value}%`
             : `LKR ${categoryScheme.value}`
-        })`;
+          })`;
       }
       return {
         value: p.product_id,
-        label: `${p.product_name} (Stock: ${
-          p.opening_stock_quantity ?? "N/A"
-        }, Category: ${categoryName}${discountInfo})`,
+        label: `${p.product_name} (Stock: ${p.opening_stock_quantity ?? "N/A"
+          }, Category: ${categoryName}${discountInfo})`,
       };
     });
   }, [products, discountSchemes]);
@@ -1045,13 +1039,13 @@ const SalesInvoice = ({
       borderColor: hasError
         ? "#ef4444"
         : state.isFocused
-        ? "#3b82f6"
-        : "#d1d5db",
+          ? "#3b82f6"
+          : "#d1d5db",
       boxShadow: state.isFocused
         ? "0 0 0 1px #3b82f6"
         : hasError
-        ? "0 0 0 1px #ef4444"
-        : "none",
+          ? "0 0 0 1px #ef4444"
+          : "none",
       "&:hover": { borderColor: hasError ? "#ef4444" : "#9ca3af" },
       minHeight: "42px",
     }),
@@ -1061,8 +1055,8 @@ const SalesInvoice = ({
       backgroundColor: state.isSelected
         ? "#dbeafe"
         : state.isFocused
-        ? "#eff6ff"
-        : "white",
+          ? "#eff6ff"
+          : "white",
     }),
     indicatorSeparator: () => ({ display: "none" }),
   });
@@ -1109,11 +1103,10 @@ const SalesInvoice = ({
                     value={formData.invoice.no}
                     onChange={(e) => handleInputChange(e, "invoice", "no")}
                     onKeyDown={(e) => handleEnterKey(e, invoiceNoRef)}
-                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                      errors.invoiceNo
+                    className={`w-full p-2.5 border rounded-md focus:outline-none ${errors.invoiceNo
                         ? "border-red-500"
                         : "border-gray-300 focus:border-blue-500"
-                    }`}
+                      }`}
                     placeholder="INV-2024-001"
                     readOnly
                   />
@@ -1132,11 +1125,10 @@ const SalesInvoice = ({
                     value={formData.invoice.date}
                     onChange={(e) => handleInputChange(e, "invoice", "date")}
                     onKeyDown={(e) => handleEnterKey(e, invoiceDateRef)}
-                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                      errors.invoiceDate
+                    className={`w-full p-2.5 border rounded-md focus:outline-none ${errors.invoiceDate
                         ? "border-red-500"
                         : "border-gray-300 focus:border-blue-500"
-                    }`}
+                      }`}
                     required
                   />
                   {errors.invoiceDate && (
@@ -1159,11 +1151,10 @@ const SalesInvoice = ({
                     value={formData.invoice.time}
                     onChange={(e) => handleInputChange(e, "invoice", "time")}
                     onKeyDown={(e) => handleEnterKey(e, invoiceTimeRef)}
-                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                      errors.invoiceTime
+                    className={`w-full p-2.5 border rounded-md focus:outline-none ${errors.invoiceTime
                         ? "border-red-500"
                         : "border-gray-300 focus:border-blue-500"
-                    }`}
+                      }`}
                     required
                   />
                   {errors.invoiceTime && (
@@ -1264,11 +1255,10 @@ const SalesInvoice = ({
                     value={formData.customer.email}
                     onChange={(e) => handleInputChange(e, "customer", "email")}
                     onKeyDown={(e) => handleEnterKey(e, customerEmailRef)}
-                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                      errors.customerEmail
+                    className={`w-full p-2.5 border rounded-md focus:outline-none ${errors.customerEmail
                         ? "border-red-500"
                         : "border-gray-300 focus:border-blue-500"
-                    }`}
+                      }`}
                     placeholder="customer@example.com"
                   />
                   {errors.customerEmail && (
@@ -1383,11 +1373,10 @@ const SalesInvoice = ({
                               index
                             )
                           }
-                          className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                            errors[`itemQty${index}`]
+                          className={`w-full p-2.5 border rounded-md focus:outline-none ${errors[`itemQty${index}`]
                               ? "border-red-500"
                               : "border-gray-300 focus:border-blue-500"
-                          }`}
+                            }`}
                           min="0.01"
                           step="any"
                           required
@@ -1409,11 +1398,10 @@ const SalesInvoice = ({
                           id={`itemUnitPrice${index}`}
                           type="number"
                           value={item.unitPrice}
-                          className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                            errors[`itemUnitPrice${index}`]
+                          className={`w-full p-2.5 border rounded-md focus:outline-none ${errors[`itemUnitPrice${index}`]
                               ? "border-red-500"
                               : "border-gray-300 focus:border-blue-500"
-                          }`}
+                            }`}
                           readOnly
                         />
                       </div>
@@ -1444,11 +1432,10 @@ const SalesInvoice = ({
                               index
                             )
                           }
-                          className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                            errors[`itemDiscountAmount${index}`]
+                          className={`w-full p-2.5 border rounded-md focus:outline-none ${errors[`itemDiscountAmount${index}`]
                               ? "border-red-500"
                               : "border-gray-300 focus:border-blue-500"
-                          }`}
+                            }`}
                           min="0"
                           step="0.01"
                         />
@@ -1487,11 +1474,10 @@ const SalesInvoice = ({
                               index
                             )
                           }
-                          className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                            errors[`itemDiscountPercentage${index}`]
+                          className={`w-full p-2.5 border rounded-md focus:outline-none ${errors[`itemDiscountPercentage${index}`]
                               ? "border-red-500"
                               : "border-gray-300 focus:border-blue-500"
-                          }`}
+                            }`}
                           min="0"
                           max="100"
                           step="0.1"
@@ -1513,32 +1499,27 @@ const SalesInvoice = ({
                           id={`itemSpecialDiscount${index}`}
                           type="number"
                           value={item.specialDiscount}
-                          className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                            errors[`itemSpecialDiscount${index}`]
+                          className={`w-full p-2.5 border rounded-md focus:outline-none ${errors[`itemSpecialDiscount${index}`]
                               ? "border-red-500"
                               : item.specialDiscount > 0
-                              ? item.discountSchemeType === "product"
-                                ? "border-purple-500 bg-purple-50"
-                                : "border-green-500 bg-green-50"
-                              : "border-gray-300 focus:border-blue-500"
-                          }`}
+                                ? item.discountSchemeType === "product"
+                                  ? "border-purple-500 bg-purple-50"
+                                  : "border-green-500 bg-green-50"
+                                : "border-gray-300 focus:border-blue-500"
+                            }`}
                           title={
                             item.discountScheme
                               ? item.discountSchemeType === "product"
-                                ? `Product Discount: ${
-                                    item.discountScheme.target
-                                  } (${
-                                    item.discountScheme.type === "percentage"
-                                      ? `${item.discountScheme.value}%`
-                                      : `LKR ${item.discountScheme.value}`
-                                  })`
-                                : `Category Discount: ${
-                                    item.discountScheme.target
-                                  } (${
-                                    item.discountScheme.type === "percentage"
-                                      ? `${item.discountScheme.value}%`
-                                      : `LKR ${item.discountScheme.value}`
-                                  })`
+                                ? `Product Discount: ${item.discountScheme.target
+                                } (${item.discountScheme.type === "percentage"
+                                  ? `${item.discountScheme.value}%`
+                                  : `LKR ${item.discountScheme.value}`
+                                })`
+                                : `Category Discount: ${item.discountScheme.target
+                                } (${item.discountScheme.type === "percentage"
+                                  ? `${item.discountScheme.value}%`
+                                  : `LKR ${item.discountScheme.value}`
+                                })`
                               : "No special discount available"
                           }
                           readOnly
@@ -1617,11 +1598,10 @@ const SalesInvoice = ({
                         handleInputChange(e, "purchaseDetails", "amount")
                       }
                       onKeyDown={(e) => handleEnterKey(e, purchaseAmountRef)}
-                      className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                        errors.purchaseAmount
+                      className={`w-full p-2.5 border rounded-md focus:outline-none ${errors.purchaseAmount
                           ? "border-red-500"
                           : "border-gray-300 focus:border-blue-500"
-                      }`}
+                        }`}
                       min="0"
                       step="0.01"
                     />
@@ -1647,11 +1627,10 @@ const SalesInvoice = ({
                         handleInputChange(e, "purchaseDetails", "taxPercentage")
                       }
                       onKeyDown={(e) => handleEnterKey(e, taxPercentageRef)}
-                      className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                        errors.purchaseTaxPercentage
+                      className={`w-full p-2.5 border rounded-md focus:outline-none ${errors.purchaseTaxPercentage
                           ? "border-red-500"
                           : "border-gray-300 focus:border-blue-500"
-                      }`}
+                        }`}
                       min="0"
                       step="0.1"
                     />
@@ -1715,15 +1694,14 @@ const SalesInvoice = ({
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 ${
-                    loading ? "opacity-70" : ""
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 ${loading ? "opacity-70" : ""
+                    }`}
                 >
                   {loading
                     ? "Processing..."
                     : isEditMode
-                    ? "Update Invoice (Ctrl+S)"
-                    : "Save Invoice (Ctrl+S)"}
+                      ? "Update Invoice (Ctrl+S)"
+                      : "Save Invoice (Ctrl+S)"}
                 </button>
               </div>
             </div>

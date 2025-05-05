@@ -12,7 +12,7 @@ const ProductDetailsModal = ({ productId, onClose }) => {
 
         const fetchProductDetails = async () => {
             try {
-                const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
+                const response = await axios.get(`https://imssposerp.com/backend/public/api/products/${productId}`);
                 setProduct(response.data.data);
                 setError(null);
             } catch (err) {
@@ -55,9 +55,9 @@ const ProductDetailsModal = ({ productId, onClose }) => {
     const wholesaleProfit = product.wholesale_price ? product.wholesale_price - product.buying_cost : 0;
 
     // Parse extra fields if they exist
-    const extraFields = product.extra_fields 
-        ? (typeof product.extra_fields === 'string' 
-            ? JSON.parse(product.extra_fields) 
+    const extraFields = product.extra_fields
+        ? (typeof product.extra_fields === 'string'
+            ? JSON.parse(product.extra_fields)
             : product.extra_fields)
         : [];
 
@@ -121,7 +121,7 @@ const ProductDetailsModal = ({ productId, onClose }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/80 backdrop-blur-sm p-4">
             <div className="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh] animate-slideUp">
-                
+
                 {/* Close Button */}
                 <button
                     onClick={onClose}
@@ -153,7 +153,7 @@ const ProductDetailsModal = ({ productId, onClose }) => {
                             <div><span className="font-semibold">Barcode:</span> {product.barcode || "N/A"}</div>
                             <div><span className="font-semibold">Batch:</span> {product.batch_number || "N/A"}</div>
                         </div>
-                        
+
                         {/* Price Highlights */}
                         <div className="mt-4 grid grid-cols-3 gap-2">
                             <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded-lg text-center border border-blue-100 dark:border-blue-900/50">

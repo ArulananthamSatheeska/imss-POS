@@ -112,7 +112,7 @@ const BillWiseProfitReport = () => {
 
         try {
             setIsLoading(true);
-            const response = await axios.get("http://127.0.0.1:8000/api/sales/bill-wise-profit-report", {
+            const response = await axios.get("https://imssposerp.com/backend/public/api/sales/bill-wise-profit-report", {
                 params: { fromDate, toDate, paymentMethod: paymentMethodFilter === 'all' ? '' : paymentMethodFilter },
             });
             console.log("Fetched report data:", response.data); // Log the entire response data

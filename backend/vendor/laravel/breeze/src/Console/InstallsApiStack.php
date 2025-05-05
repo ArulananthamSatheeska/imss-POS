@@ -54,7 +54,7 @@ trait InstallsApiStack
 
         file_put_contents(
             base_path('.env'),
-            preg_replace('/APP_URL=(.*)/', 'APP_URL=http://localhost:8000'.PHP_EOL.'FRONTEND_URL=http://localhost:3000', file_get_contents(base_path('.env')))
+            preg_replace('/APP_URL=(.*)/', 'APP_URL=https://imssposerp.com/backend/public'.PHP_EOL.'FRONTEND_URL=http://localhost:3000', file_get_contents(base_path('.env')))
         );
 
         // Tests...
