@@ -25,7 +25,7 @@ class ApiError extends Error {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
-const API_URL = "http://localhost:8000/api";
+const API_URL = "https://imssposerp.com/backend/public/api";
 const DEFAULT_TIMEOUT = 10000;
 
 console.log("API Configuration:", {
@@ -60,8 +60,8 @@ const createApiInstance = (refreshToken) => {
         storage: localStorage.getItem("user")
           ? "local"
           : sessionStorage.getItem("user")
-          ? "session"
-          : "none",
+            ? "session"
+            : "none",
       });
       if (userData?.token) {
         config.headers.Authorization = `Bearer ${userData.token}`;

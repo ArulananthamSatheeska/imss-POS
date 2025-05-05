@@ -79,7 +79,7 @@ const StockReport = () => {
     setError(null);
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/api/detailed-stock-reports",
+        "https://imssposerp.com/backend/public/api/detailed-stock-reports",
         {
           params: {
             fromDate,
@@ -152,8 +152,8 @@ const StockReport = () => {
       : true;
     const matchesLocation = locationFilter
       ? (item.location.type + " " + item.location.identifier)
-          .toLowerCase()
-          .includes(locationFilter.toLowerCase())
+        .toLowerCase()
+        .includes(locationFilter.toLowerCase())
       : true;
 
     return matchesSearch && matchesCategory && matchesLocation;
@@ -465,11 +465,10 @@ const StockReport = () => {
                 {filteredData.map((item, index) => (
                   <tr
                     key={index}
-                    className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-200 ${
-                      (item.closingStock ?? 0) < lowStockThreshold
+                    className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-200 ${(item.closingStock ?? 0) < lowStockThreshold
                         ? "bg-red-100 dark:bg-red-800 animate-pulse"
                         : ""
-                    }`}
+                      }`}
                   >
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {index + 1}

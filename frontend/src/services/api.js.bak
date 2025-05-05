@@ -27,7 +27,7 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
 // Configuration constants
-const API_URL = "http://localhost:8000/api"; // Explicitly set API URL
+const API_URL = "https://imssposerp.com/backend/public/api"; // Explicitly set API URL
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
 
 // Debug log API configuration

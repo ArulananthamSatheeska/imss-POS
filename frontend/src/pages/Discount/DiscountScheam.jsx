@@ -60,10 +60,10 @@ const DiscountScheam = () => {
       setLoading(true);
       try {
         const [productResponse, categoryResponse, customerResponse, schemeResponse] = await Promise.all([
-          axios.get('http://127.0.0.1:8000/api/products'),
-          axios.get('http://127.0.0.1:8000/api/categories'),
-          axios.get('http://127.0.0.1:8000/api/customers'), // Fetch customers
-          axios.get('http://127.0.0.1:8000/api/discount-schemes'),
+          axios.get('https://imssposerp.com/backend/public/api/products'),
+          axios.get('https://imssposerp.com/backend/public/api/categories'),
+          axios.get('https://imssposerp.com/backend/public/api/customers'), // Fetch customers
+          axios.get('https://imssposerp.com/backend/public/api/discount-schemes'),
         ]);
 
         setProducts(Array.isArray(productResponse.data.data) ? productResponse.data.data : []);
@@ -260,7 +260,7 @@ const DiscountScheam = () => {
     try {
       let response;
       if (editSchemeId) {
-        response = await axios.put(`http://127.0.0.1:8000/api/discount-schemes/${editSchemeId}`, payload);
+        response = await axios.put(`https://imssposerp.com/backend/public/api/discount-schemes/${editSchemeId}`, payload);
         const updatedScheme = {
           ...response.data.data,
           appliesTo: response.data.data.applies_to,
@@ -270,7 +270,7 @@ const DiscountScheam = () => {
         setSchemes(schemes.map((scheme) => (scheme.id === editSchemeId ? updatedScheme : scheme)));
         alert('Discount scheme updated successfully!');
       } else {
-        response = await axios.post('http://127.0.0.1:8000/api/discount-schemes', payload);
+        response = await axios.post('https://imssposerp.com/backend/public/api/discount-schemes', payload);
         const newScheme = {
           ...response.data.data,
           appliesTo: response.data.data.applies_to,
@@ -296,7 +296,7 @@ const DiscountScheam = () => {
   const confirmDelete = async () => {
     if (!schemeToDelete) return;
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/discount-schemes/${schemeToDelete}`);
+      await axios.delete(`https://imssposerp.com/backend/public/api/discount-schemes/${schemeToDelete}`);
       setSchemes(schemes.filter((scheme) => scheme.id !== schemeToDelete));
       setShowDeleteModal(false);
       setSchemeToDelete(null);
@@ -433,7 +433,7 @@ const DiscountScheam = () => {
           }
           if
 
- (filterType === 'customerGroup') {
+            (filterType === 'customerGroup') {
             return scheme.appliesTo === 'customerGroup' && scheme.target === filterValue;
           }
         } catch (e) {
@@ -800,8 +800,7 @@ const DiscountScheam = () => {
               <h2 className="text-xl font-semibold sm:text-2xl">
                 Discount Schemes List{' '}
                 {filterType &&
-                  `(Filtered by ${filterType}: ${
-                    filterType === 'status' ? (filterValue === 'true' ? 'Active' : 'Inactive') : filterValue
+                  `(Filtered by ${filterType}: ${filterType === 'status' ? (filterValue === 'true' ? 'Active' : 'Inactive') : filterValue
                   })`}
               </h2>
               <button
@@ -1000,11 +999,10 @@ const DiscountScheam = () => {
                             </td>
                             <td className="px-2 py-2 sm:px-4 sm:py-3">
                               <span
-                                className={`status-badge px-1 sm:px-2 py-1 rounded-full text-xs font-medium ${
-                                  isEffectivelyActive
+                                className={`status-badge px-1 sm:px-2 py-1 rounded-full text-xs font-medium ${isEffectivelyActive
                                     ? 'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100'
                                     : 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300'
-                                }`}
+                                  }`}
                               >
                                 {isEffectivelyActive ? 'Active' : 'Inactive'}
                               </span>

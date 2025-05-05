@@ -5,7 +5,7 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 // Set axios base URL (should be in environment variable)
-axios.defaults.baseURL = 'http://localhost:8000';
+axios.defaults.baseURL = 'https://imssposerp.com/backend/public';
 
 const RegisterContext = createContext();
 
@@ -247,6 +247,7 @@ export const RegisterProvider = ({ children }) => {
             let errorMessage = 'Failed to close register. Please try again.';
 
             if (error.response) {
+                console.error('Register close error response data:', error.response.data);
                 if (error.response.status === 422) {
                     if (error.response.data.errors) {
                         errorMessage = Object.values(error.response.data.errors).join(' ');
