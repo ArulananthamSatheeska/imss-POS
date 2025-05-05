@@ -257,13 +257,13 @@ const SalesInvoice = ({
           categoriesResponse,
           schemesResponse,
         ] = await Promise.all([
-          axios.get("https://imssposerp.com/backend/public/api/detailed-stock-reports", {
+          axios.get("http://127.0.0.1:8080/api/detailed-stock-reports", {
             params: { toDate: today },
           }),
-          axios.get("https://imssposerp.com/backend/public/api/products"),
-          axios.get("https://imssposerp.com/backend/public/api/customers"),
-          axios.get("https://imssposerp.com/backend/public/api/categories"),
-          axios.get("https://imssposerp.com/backend/public/api/discount-schemes"),
+          axios.get("http://127.0.0.1:8080/api/products"),
+          axios.get("http://127.0.0.1:8080/api/customers"),
+          axios.get("http://127.0.0.1:8080/api/categories"),
+          axios.get("http://127.0.0.1:8080/api/discount-schemes"),
         ]);
 
         // Process products with stock and category_name
@@ -320,7 +320,7 @@ const SalesInvoice = ({
         toast.error("Failed to load data. Check console for details.");
         try {
           const fallbackResponse = await axios.get(
-            "https://imssposerp.com/backend/public/api/products"
+            "http://127.0.0.1:8080/api/products"
           );
           setProducts(
             fallbackResponse.data.data.map((product) => ({

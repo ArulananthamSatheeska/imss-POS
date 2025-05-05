@@ -17,7 +17,7 @@ const DailyProfitReport = () => {
         try {
             setLoading(true);
             setError('');
-            const response = await axios.get("https://imssposerp.com/backend/public/api/sales/daily-profit-report", {
+            const response = await axios.get("http://127.0.0.1:8080/api/sales/daily-profit-report", {
                 params: { date },
             });
 

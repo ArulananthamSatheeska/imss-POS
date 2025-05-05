@@ -16,7 +16,7 @@ import PrintableInvoice from "./PrintableInvoice";
 import BillPrintModal from "../../components/models/BillPrintModel";
 import POSForm from "../../components/pos/POSForm";
 
-const API_BASE_URL = "https://imssposerp.com/backend/public/api";
+const API_BASE_URL = "http://127.0.0.1:8080/api";
 
 const SalesReport = () => {
   const today = new Date().toISOString().split("T")[0];

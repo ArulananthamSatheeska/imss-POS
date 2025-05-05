@@ -3,7 +3,7 @@ import axios from 'axios';
 import { FiChevronDown, FiChevronUp, FiEdit, FiTrash2, FiPrinter } from 'react-icons/fi';
 import PrintablePurchaseOrder from './PrintablePurchaseOrder';
 
-const API_BASE_URL = 'https://imssposerp.com/backend/public/api';
+const API_BASE_URL = 'http://127.0.0.1:8080/api';
 
 // New component for printing all orders
 const PrintableOrdersReport = ({ orders, formatCurrency }) => {

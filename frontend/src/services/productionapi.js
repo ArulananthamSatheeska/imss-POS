@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 
 // Create an Axios instance with base configuration
 const api = axios.create({
-  baseURL: "https://imssposerp.com/backend/public/api",
+  baseURL: "http://127.0.0.1:8080/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

@@ -272,7 +272,7 @@ const TOUCHPOSFORM = () => {
         const token = auth?.user?.token;
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const response = await axios.get(
-          "https://imssposerp.com/backend/public/api/next-bill-number",
+          "http://127.0.0.1:8080/api/next-bill-number",
           { headers }
         );
         if (response.data && response.data.next_bill_number) {
@@ -296,7 +296,7 @@ const TOUCHPOSFORM = () => {
       try {
         setLoadingCategories(true);
         const response = await axios.get(
-          "https://imssposerp.com/backend/public/api/categories"
+          "http://127.0.0.1:8080/api/categories"
         );
         const fetchedCategories = Array.isArray(response.data)
           ? response.data
@@ -324,7 +324,7 @@ const TOUCHPOSFORM = () => {
     setLoadingItems(true);
     setLoadingBrands(true);
     axios
-      .get("https://imssposerp.com/backend/public/api/products")
+      .get("http://127.0.0.1:8080/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => ({
@@ -394,7 +394,7 @@ const TOUCHPOSFORM = () => {
   useEffect(() => {
     setLoadingSchemes(true);
     axios
-      .get("https://imssposerp.com/backend/public/api/discount-schemes")
+      .get("http://127.0.0.1:8080/api/discount-schemes")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const formattedSchemes = response.data.data.map((s) => ({
@@ -884,7 +884,7 @@ const TOUCHPOSFORM = () => {
         const fetchNextBillNumber = async () => {
           try {
             const response = await axios.get(
-              "https://imssposerp.com/backend/public/api/next-bill-number"
+              "http://127.0.0.1:8080/api/next-bill-number"
             );
             setBillNumber(response.data.next_bill_number);
           } catch (error) {
@@ -1070,7 +1070,7 @@ const TOUCHPOSFORM = () => {
                             type="number"
                             step="0.01"
                             min="0"
-                            className="w-16 p-1 text-center text-sm border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                            className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
                             value={product.qty}
                             onChange={(e) => updateProductQuantity(index, e.target.value)}
                             onBlur={(e) => {
@@ -1336,7 +1336,7 @@ const TOUCHPOSFORM = () => {
             </div>
 
             {categories.length <= 8 && (
-              <div className="flex overflow-x-auto pb-2 gap-1 sm:gap-2">
+              <div className="flex gap-1 pb-2 overflow-x-auto sm:gap-2">
                 {categories.map((category) => (
                   <button
                     key={category.id}
@@ -1380,7 +1380,7 @@ const TOUCHPOSFORM = () => {
             </div>
 
             {brands.length <= 8 && (
-              <div className="flex overflow-x-auto pb-2 gap-1 sm:gap-2">
+              <div className="flex gap-1 pb-2 overflow-x-auto sm:gap-2">
                 {brands.map((brand) => (
                   <button
                     key={brand.id}
@@ -1535,9 +1535,9 @@ const TOUCHPOSFORM = () => {
       )}
 
       {lowStockWarning && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full dark:bg-slate-800">
-            <h3 className="text-lg font-bold mb-4 dark:text-white">Low Stock Warning</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl dark:bg-slate-800">
+            <h3 className="mb-4 text-lg font-bold dark:text-white">Low Stock Warning</h3>
             <p className="mb-4 dark:text-white">
               Only {lowStockWarning.remainingStock} units of {lowStockWarning.productName} remaining!
               Do you want to proceed anyway?
@@ -1612,7 +1612,7 @@ const TOUCHPOSFORM = () => {
                   }
                   setLowStockWarning(null);
                 }}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600"
               >
                 Proceed
               </button>

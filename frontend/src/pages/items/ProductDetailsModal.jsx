@@ -12,7 +12,7 @@ const ProductDetailsModal = ({ productId, onClose }) => {
 
         const fetchProductDetails = async () => {
             try {
-                const response = await axios.get(`https://imssposerp.com/backend/public/api/products/${productId}`);
+                const response = await axios.get(`http://127.0.0.1:8080/api/products/${productId}`);
                 setProduct(response.data.data);
                 setError(null);
             } catch (err) {

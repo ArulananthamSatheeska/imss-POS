@@ -30,7 +30,7 @@ const SupplierWiseProfit = () => {
     const fetchReportData = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get("https://imssposerp.com/backend/public/api/sales/supplier-wise-profit-report", {
+            const response = await axios.get("http://127.0.0.1:8080/api/sales/supplier-wise-profit-report", {
                 params: { fromDate, toDate, paymentMethod: paymentMethodFilter },
             });
             setReportData(response.data.reportData || []);

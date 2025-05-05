@@ -49,10 +49,10 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       try {
         const [categoriesRes, unitTypesRes, suppliersRes, storesRes] =
           await Promise.all([
-            axios.get("https://imssposerp.com/backend/public/api/categories"),
-            axios.get("https://imssposerp.com/backend/public/api/units"),
-            axios.get("https://imssposerp.com/backend/public/api/suppliers"),
-            axios.get("https://imssposerp.com/backend/public/api/store-locations"),
+            axios.get("http://127.0.0.1:8080/api/categories"),
+            axios.get("http://127.0.0.1:8080/api/units"),
+            axios.get("http://127.0.0.1:8080/api/suppliers"),
+            axios.get("http://127.0.0.1:8080/api/store-locations"),
           ]);
 
         setCategories(categoriesRes.data);

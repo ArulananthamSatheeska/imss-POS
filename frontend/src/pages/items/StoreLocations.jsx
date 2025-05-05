@@ -12,7 +12,7 @@ const StoreLocations = () => {
 
   const fetchStoreLocations = async () => {
     try {
-      const response = await axios.get("https://imssposerp.com/backend/public/api/store-locations");
+      const response = await axios.get("http://127.0.0.1:8080/api/store-locations");
       setStoreLocations(response.data);
     } catch (error) {
       console.error("Error fetching store locations:", error);

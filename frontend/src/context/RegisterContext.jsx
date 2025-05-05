@@ -5,7 +5,7 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 // Set axios base URL (should be in environment variable)
-axios.defaults.baseURL = 'https://imssposerp.com/backend/public';
+axios.defaults.baseURL = 'http://127.0.0.1:8080';
 
 const RegisterContext = createContext();
 

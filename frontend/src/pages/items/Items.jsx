@@ -112,7 +112,7 @@ const Items = () => {
   const [selectedFile, setSelectedFile] = useState(null);
 
   const api = axios.create({
-    baseURL: "https://imssposerp.com/backend/public/api",
+    baseURL: "http://127.0.0.1:8080/api",
     headers: {
       Authorization: `Bearer ${currentUser?.token}`,
       "Content-Type": "application/json",
