@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Set axios base URL to backend server
-axios.defaults.baseURL = 'https://imssposerp.com/backend/public';
+axios.defaults.baseURL = 'http://127.0.0.1:8000';
 
 const RoleList = () => {
     const navigate = useNavigate();

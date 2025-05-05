@@ -21,7 +21,7 @@ const UnitForm = () => {
 
   const fetchUnits = async () => {
     try {
-      const response = await axios.get("https://imssposerp.com/backend/public/api/units");
+      const response = await axios.get("http://127.0.0.1:8000/api/units");
       setUnits(response.data);
     } catch (error) {
       console.error("Error fetching units:", error);
@@ -34,13 +34,13 @@ const UnitForm = () => {
 
     try {
       if (selectedUnit) {
-        await axios.put(`https://imssposerp.com/backend/public/api/units/${selectedUnit.id}`, {
+        await axios.put(`http://127.0.0.1:8000/api/units/${selectedUnit.id}`, {
           unit_name: unitName,
         });
         setNotification({ message: "Unit updated successfully!", type: "success", visible: true });
         fetchUnits();
       } else {
-        await axios.post("https://imssposerp.com/backend/public/api/units", {
+        await axios.post("http://127.0.0.1:8000/api/units", {
           unit_name: unitName,
         });
         setNotification({ message: "Unit added successfully!", type: "success", visible: true });
@@ -71,7 +71,7 @@ const UnitForm = () => {
 
   const confirmDelete = async (id) => {
     try {
-      await axios.delete(`https://imssposerp.com/backend/public/api/units/${id}`);
+      await axios.delete(`http://127.0.0.1:8000/api/units/${id}`);
       fetchUnits(); // Re-fetch units after deletion
       setNotification({
         message: "Unit deleted successfully!",
