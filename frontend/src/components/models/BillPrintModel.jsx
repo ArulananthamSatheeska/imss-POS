@@ -52,10 +52,6 @@ const BillPrintModal = ({
   useEffect(() => {
     const fetchData = async () => {
       try {
-<<<<<<< HEAD
-        const response = await axios.get("http://127.0.0.1:8000/api/customers");
-        setCustomers(response.data.data);
-=======
         // Fetch customers
         const customersResponse = await axios.get(
           "http://127.0.0.1:8000/api/customers"
@@ -78,7 +74,6 @@ const BillPrintModal = ({
               companyDetails.contact_number,
           });
         }
->>>>>>> e20d5c6013ddc20b17d52a6918a610e125c804b5
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -104,43 +99,41 @@ const BillPrintModal = ({
   // Calculate totals
   const calculateTotals = () => {
     let totalQty = 0;
-    let subTotalMRP = 0;
+    let subTotal = 0; // Total of unit prices
     let totalItemDiscounts = 0;
     let totalSpecialDiscounts = 0;
-    let grandTotalBeforeAdjustments = 0;
+    let grandTotal = 0; // Total of item totals
 
     initialProducts.forEach((p) => {
       const qty = parseFloat(p.qty || 0);
-      const mrp = parseFloat(p.mrp || 0);
-      const unitDiscount = parseFloat(p.discount || 0);
       const unitPrice = parseFloat(p.price || 0);
+      const unitDiscount = parseFloat(p.discount || 0);
       const specialDiscount = parseFloat(p.specialDiscount || 0);
+      const itemTotal = parseFloat(p.total || 0);
 
       totalQty += qty;
-      subTotalMRP += mrp * qty;
+      subTotal += unitPrice * qty;
       totalItemDiscounts += unitDiscount * qty;
       totalSpecialDiscounts += specialDiscount;
-      grandTotalBeforeAdjustments += unitPrice * qty - specialDiscount;
+      grandTotal += itemTotal;
     });
 
     const taxRate = parseFloat(initialTax || 0);
     const billDiscount = parseFloat(initialBillDiscount || 0);
     const shipping = parseFloat(initialShipping || 0);
-    const taxAmount = grandTotalBeforeAdjustments * (taxRate / 100);
-    const finalTotalDiscount =
-      totalItemDiscounts + totalSpecialDiscounts + billDiscount;
-    const finalTotal =
-      grandTotalBeforeAdjustments + taxAmount - billDiscount + shipping;
+    const taxAmount = grandTotal * (taxRate / 100);
+    const finalTotalDiscount = totalItemDiscounts + totalSpecialDiscounts + billDiscount;
+    const finalTotal = grandTotal + taxAmount - billDiscount + shipping;
 
     return {
       totalQty,
-      subTotalMRP,
+      subTotal,
       totalItemDiscounts,
       totalSpecialDiscounts,
       totalBillDiscount: billDiscount,
       finalTotalDiscount,
       taxAmount,
-      grandTotalBeforeAdjustments,
+      grandTotal,
       finalTotal,
     };
   };
@@ -168,40 +161,6 @@ const BillPrintModal = ({
     }
   };
 
-<<<<<<< HEAD
-  const [companyDetails, setCompanyDetails] = useState({
-    company_name: "Company Name ",
-    business_address: "Address",
-    contact_number: "0771234567"
-  });
-
-  useEffect(() => {
-    const fetchCompanyDetails = async () => {
-      try {
-        const response = await axios.get("http://127.0.0.1:8000/api/company-details");
-        if (response.data) {
-          setCompanyDetails({
-            company_name: response.data.company_name || "",
-            business_address: response.data.business_address || "",
-            contact_number: response.data.contact_number || ""
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching company details:", error);
-        // Fallback to default values if API fails
-        setCompanyDetails({
-          company_name: "SHARVAKSHA FOOD CITY",
-          business_address: "Main Street Thambiluvil-01",
-          contact_number: "0750296343"
-        });
-      }
-    };
-
-    fetchCompanyDetails();
-  }, []);
-
-=======
->>>>>>> e20d5c6013ddc20b17d52a6918a610e125c804b5
   // Handle received amount change
   const handleReceivedAmountChange = (e) => {
     const amount = parseFloat(e.target.value) || 0;
@@ -236,7 +195,7 @@ const BillPrintModal = ({
       bill_number: billNumber,
       customer_id: selectedCustomer?.id || null,
       customer_name: selectedCustomer?.name || "Walk-in Customer",
-      subtotal: parseFloat(totals.subTotalMRP.toFixed(2)),
+      subtotal: parseFloat(totals.subTotal.toFixed(2)),
       discount: parseFloat(totals.finalTotalDiscount.toFixed(2)),
       tax: parseFloat(totals.taxAmount.toFixed(2)),
       shipping: parseFloat(initialShipping || 0),
@@ -253,25 +212,16 @@ const BillPrintModal = ({
         unit_price: parseFloat(product.price || 0),
         discount: parseFloat(product.discount || 0),
         special_discount: parseFloat(product.specialDiscount || 0),
-        total: parseFloat(
-          (
-            product.price * product.qty -
-            (product.specialDiscount || 0)
-          ).toFixed(2)
-        ),
+        total: parseFloat(product.total || 0),
       })),
     };
 
     try {
-<<<<<<< HEAD
-      const response = await axios.post("http://127.0.0.1:8000/api/sales", billData, getAuthHeaders());
-=======
       const response = await axios.post(
         "http://127.0.0.1:8000/api/sales",
         billData,
         getAuthHeaders()
       );
->>>>>>> e20d5c6013ddc20b17d52a6918a610e125c804b5
       console.log("Bill saved successfully:", response.data);
       setShowSuccessMessage(true);
       setTimeout(() => {
@@ -289,6 +239,7 @@ const BillPrintModal = ({
       );
     }
   };
+
   // Handle printing
   const handlePrint = () => {
     const printContent = printRef.current.innerHTML;
@@ -433,6 +384,7 @@ const BillPrintModal = ({
       document.body.removeChild(iframe);
     }, 500);
   };
+
   // Handle confirm actions
   const handleConfirmPrint = () => {
     if (paymentType === "credit") {
@@ -587,6 +539,7 @@ const BillPrintModal = ({
         break;
     }
   };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
       <div
@@ -613,7 +566,7 @@ const BillPrintModal = ({
           </svg>
         </button>
 
-        <div className="flex flex-col justify-between p-6 md:flex-row gap-6">
+        <div className="flex flex-col justify-between gap-6 p-6 md:flex-row">
           {/* Left Column - Customer Info */}
           <div className="w-full space-y-6 md:w-1/2">
             <div className="space-y-2">
@@ -637,7 +590,7 @@ const BillPrintModal = ({
               {showAddCustomerForm ? (
                 <form
                   onSubmit={handleAddCustomer}
-                  className="p-4 space-y-3 bg-gray-50 rounded-md"
+                  className="p-4 space-y-3 rounded-md bg-gray-50"
                 >
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
@@ -704,7 +657,7 @@ const BillPrintModal = ({
               )}
             </div>
 
-            <div className="p-4 space-y-2 bg-gray-50 rounded-md">
+            <div className="p-4 space-y-2 rounded-md bg-gray-50">
               <h2 className="text-xl font-bold text-gray-800">
                 Customer Information
               </h2>
@@ -734,7 +687,7 @@ const BillPrintModal = ({
               </div>
             </div>
 
-            <div className="p-4 space-y-3 bg-gray-50 rounded-md">
+            <div className="p-4 space-y-3 rounded-md bg-gray-50">
               <h3 className="text-lg font-semibold text-gray-800">
                 Payment Details
               </h3>
@@ -788,7 +741,7 @@ const BillPrintModal = ({
 
           {/* Right Column - Billing Items */}
           <div className="w-full space-y-6 md:w-1/2">
-            <div className="p-4 space-y-3 bg-gray-50 rounded-md">
+            <div className="p-4 space-y-3 rounded-md bg-gray-50">
               <h3 className="text-lg font-semibold text-gray-800">
                 Billing Items
               </h3>
@@ -857,18 +810,30 @@ const BillPrintModal = ({
               </div>
             </div>
 
-            <div className="p-4 space-y-2 bg-gray-50 rounded-md">
+            <div className="p-4 space-y-2 rounded-md bg-gray-50">
               <h3 className="text-lg font-semibold text-gray-800">
                 Billing Summary
               </h3>
               <div className="space-y-1">
                 <p className="flex justify-between text-sm">
-                  <span>Subtotal (MRP):</span>
-                  <span>{formatCurrency(totals.subTotalMRP)}</span>
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(totals.subTotal)}</span>
                 </p>
                 <p className="flex justify-between text-sm">
-                  <span>Item Discounts:</span>
-                  <span>{formatCurrency(totals.totalItemDiscounts)}</span>
+                  <span>Discounts (Item + Special):</span>
+                  <span>{formatCurrency(totals.totalItemDiscounts + totals.totalSpecialDiscounts)}</span>
+                </p>
+                <p className="flex justify-between text-sm">
+                  <span>Bill Discount:</span>
+                  <span>{formatCurrency(totals.totalBillDiscount)}</span>
+                </p>
+                <p className="flex justify-between text-sm">
+                  <span>Tax ({initialTax}%):</span>
+                  <span>{formatCurrency(totals.taxAmount)}</span>
+                </p>
+                <p className="flex justify-between text-sm">
+                  <span>Shipping:</span>
+                  <span>{formatCurrency(initialShipping)}</span>
                 </p>
                 <p className="flex justify-between pt-2 mt-2 text-base font-bold border-t border-gray-200">
                   <span>Grand Total:</span>
@@ -893,27 +858,25 @@ const BillPrintModal = ({
         </div>
 
         {/* Hidden Print Content */}
-
-        {/* Hidden Print Content */}
         <div className="hidden">
           <div ref={printRef} className="print-container">
             {/* Header */}
-            <div className="bill-header text-center">
-              <div className="shop-name font-bold text-xl uppercase">
+            <div className="text-center bill-header">
+              <div className="text-xl font-bold uppercase shop-name">
                 MUNSI TEX
               </div>
-              <div className="shop-address text-sm">
+              <div className="text-sm shop-address">
                 MOSQUE BUILDING, POLICE ROAD
               </div>
-              <div className="shop-contact text-sm">Mob: 0769859513</div>
-              <hr className="border-t border-black my-1" />
+              <div className="text-sm shop-contact">Mob: 0769859513</div>
+              <hr className="my-1 border-t border-black" />
             </div>
 
             {/* Bill Info */}
-            <div className="bill-info grid grid-cols-2 gap-2 text-xs mt-2">
+            <div className="grid grid-cols-2 gap-2 mt-2 text-xs bill-info">
               <div>
                 <strong>Bill No:</strong> {initialCustomerInfo.bill_number}
-              </div>{" "}
+              </div>
               <div>
                 <strong>Date:</strong> {new Date().toLocaleDateString()}
               </div>
@@ -939,28 +902,28 @@ const BillPrintModal = ({
             </div>
 
             {/* Items Table */}
-            <table className="bill-table w-full border-collapse mt-2">
+            <table className="w-full mt-2 border-collapse bill-table">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border border-black px-2 py-1 text-left">
+                  <th className="px-2 py-1 text-left border border-black">
                     S.No
                   </th>
-                  <th className="border border-black px-2 py-1 text-left">
+                  <th className="px-2 py-1 text-left border border-black">
                     Name
                   </th>
-                  <th className="border border-black px-2 py-1 text-center">
+                  <th className="px-2 py-1 text-center border border-black">
                     Qty
                   </th>
-                  <th className="border border-black px-2 py-1 text-right">
+                  <th className="px-2 py-1 text-right border border-black">
                     MRP
                   </th>
-                  <th className="border border-black px-2 py-1 text-right">
+                  <th className="px-2 py-1 text-right border border-black">
                     U.Price
                   </th>
-                  <th className="border border-black px-2 py-1 text-right">
+                  <th className="px-2 py-1 text-right border border-black">
                     U.Dis
                   </th>
-                  <th className="border border-black px-2 py-1 text-right">
+                  <th className="px-2 py-1 text-right border border-black">
                     Total
                   </th>
                 </tr>
@@ -970,11 +933,11 @@ const BillPrintModal = ({
                   <React.Fragment key={index}>
                     {/* Item Name Row */}
                     <tr className="tr-name">
-                      <td className="border border-black px-2 py-1 text-left">
+                      <td className="px-2 py-1 text-left border border-black">
                         {index + 1}
                       </td>
                       <td
-                        className="border border-black px-2 py-1 text-left font-bold"
+                        className="px-2 py-1 font-bold text-left border border-black"
                         colSpan="6"
                       >
                         {product.product_name}
@@ -982,22 +945,22 @@ const BillPrintModal = ({
                     </tr>
                     {/* Item Details Row */}
                     <tr className="tr-details">
-                      <td className="border border-black px-2 py-1 text-left"></td>
-                      <td className="border border-black px-2 py-1 text-left"></td>
-                      <td className="border border-black px-2 py-1 text-center">
+                      <td className="px-2 py-1 text-left border border-black"></td>
+                      <td className="px-2 py-1 text-left border border-black"></td>
+                      <td className="px-2 py-1 text-center border border-black">
                         {product.qty}
                       </td>
-                      <td className="border border-black px-2 py-1 text-right">
+                      <td className="px-2 py-1 text-right border border-black">
                         {product.mrp}
                       </td>
-                      <td className="border border-black px-2 py-1 text-right">
+                      <td className="px-2 py-1 text-right border border-black">
                         {product.price}
                       </td>
-                      <td className="border border-black px-2 py-1 text-right">
-                        {product.discount}
+                      <td className="px-2 py-1 text-right border border-black">
+                        {product.discount + (product.specialDiscount || 0)}
                       </td>
-                      <td className="border border-black px-2 py-1 text-right font-bold">
-                        {(product.mrp - product.discount) * product.qty}
+                      <td className="px-2 py-1 font-bold text-right border border-black">
+                        {product.total}
                       </td>
                     </tr>
                   </React.Fragment>
@@ -1006,17 +969,22 @@ const BillPrintModal = ({
             </table>
 
             {/* Summary Section */}
-            <div className="bill-summary text-right text-sm mt-2">
+            <div className="mt-2 text-sm text-right bill-summary">
               <p>
-                <strong>Subtotal:</strong>{" "}
-                {formatCurrency(grandTotal + initialBillDiscount)}
+                <strong>Subtotal:</strong> {formatCurrency(totals.subTotal)}
               </p>
               <p>
                 <strong>Discount:</strong>{" "}
-                {formatCurrency(totalItemDiscount + initialBillDiscount)}
+                {formatCurrency(totals.totalItemDiscounts + totals.totalSpecialDiscounts + totals.totalBillDiscount)}
               </p>
-              <p className="font-bold text-lg">
-                <strong>Grand Total:</strong> {formatCurrency(grandTotal)}
+              <p>
+                <strong>Tax ({initialTax}%):</strong> {formatCurrency(totals.taxAmount)}
+              </p>
+              <p>
+                <strong>Shipping:</strong> {formatCurrency(initialShipping)}
+              </p>
+              <p className="text-lg font-bold">
+                <strong>Grand Total:</strong> {formatCurrency(totals.finalTotal)}
               </p>
               <p>
                 <strong>Received:</strong> {formatCurrency(receivedAmount)}
@@ -1027,7 +995,7 @@ const BillPrintModal = ({
             </div>
 
             {/* Terms & Conditions */}
-            <div className="terms-conditions text-left text-xs mt-2">
+            <div className="mt-2 text-xs text-left terms-conditions">
               <h4 className="font-bold text-center">Terms and Conditions</h4>
               <p>
                 - Goods once sold cannot be returned. <br />
@@ -1038,13 +1006,13 @@ const BillPrintModal = ({
             </div>
 
             {/* Thank You Message */}
-            <p className="thanks text-center font-semibold mt-2">
+            <p className="mt-2 font-semibold text-center thanks">
               Thank You! Visit Again.
             </p>
 
             {/* Branding */}
             <p className="systemby">System by IMSS</p>
-            <p className="systemby-web ">visit🔗: www.imss.lk</p>
+            <p className="systemby-web">visit🔗: www.imss.lk</p>
           </div>
         </div>
 

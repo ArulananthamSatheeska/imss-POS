@@ -43,22 +43,22 @@ class SaleController extends Controller
 
     public function store(Request $request)
     {
-$request->validate([
-    'customer_name' => 'required|string',
-    'subtotal' => 'required|numeric',
-    'discount' => 'required|numeric',
-    'tax' => 'nullable|numeric',
-    'total' => 'required|numeric',
-    'payment_type' => 'required|string',
-    'received_amount' => 'required|numeric',
-    'balance_amount' => 'required|numeric',
-    'items.*.quantity' => 'required|numeric|min:0.01',
-    'items.*.mrp' => 'required|numeric|min:0',
-    'items.*.unit_price' => 'required|numeric|min:0',
-    'items.*.discount' => 'required|numeric|min:0',
-    'items.*.special_discount' => 'nullable|numeric|min:0',
-    'items.*.total' => 'required|numeric|min:0',
-]);
+        $request->validate([
+            'customer_name' => 'required|string',
+            'subtotal' => 'required|numeric',
+            'discount' => 'required|numeric',
+            'tax' => 'nullable|numeric',
+            'total' => 'required|numeric',
+            'payment_type' => 'required|string',
+            'received_amount' => 'required|numeric',
+            'balance_amount' => 'required|numeric',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.mrp' => 'required|numeric|min:0',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.discount' => 'required|numeric|min:0',
+            'items.*.special_discount' => 'nullable|numeric|min:0',
+            'items.*.total' => 'required|numeric|min:0',
+        ]);
 
         DB::beginTransaction();
         try {
@@ -101,7 +101,7 @@ $request->validate([
                 'balance_amount' => $request->balance_amount,
             ]);
 
-            // Helper function to calculate discount for a product
+            // Helper function to calculate discount for a product (for reference/validation)
             $calculateDiscount = function ($product, $schemes) {
                 $basePrice = $product->sales_price ?? 0;
                 $categoryName = $product->category_name ?? null;
@@ -142,12 +142,11 @@ $request->validate([
             foreach ($request->items as $item) {
                 $product = Product::where('product_name', $item['product_name'])->first();
                 if ($product) {
-                    // Calculate discount and adjust unit price and total
-                    $discountAmount = $calculateDiscount($product, $activeSchemes);
-                    $specialDiscount = $item['special_discount'] ?? 0;
-                    $unitPrice = $product->sales_price - $discountAmount;
-                    $unitPrice = max(0, $unitPrice);
-                    $totalPrice = ($unitPrice * $item['quantity']) - $specialDiscount;
+                    // Use the unit_price provided in the request
+                    $unitPrice = floatval($item['unit_price']);
+                    $specialDiscount = floatval($item['special_discount'] ?? 0);
+                    $discountAmount = floatval($item['discount'] ?? 0);
+                    $totalPrice = ($unitPrice * $item['quantity']) - ($discountAmount + $specialDiscount);
 
                     SaleItem::create([
                         'sale_id' => $sale->id,
@@ -158,20 +157,25 @@ $request->validate([
                         'unit_price' => $unitPrice,
                         'discount' => $discountAmount,
                         'special_discount' => $specialDiscount,
-                        'total' => $totalPrice,
+                        'total' => max(0, $totalPrice),
                     ]);
                 } else {
-                    // If product not found, save as is
+                    // If product not found, save as is with provided unit_price
+                    $unitPrice = floatval($item['unit_price']);
+                    $specialDiscount = floatval($item['special_discount'] ?? 0);
+                    $discountAmount = floatval($item['discount'] ?? 0);
+                    $totalPrice = ($unitPrice * $item['quantity']) - ($discountAmount + $specialDiscount);
+
                     SaleItem::create([
                         'sale_id' => $sale->id,
                         'product_id' => null,
                         'product_name' => $item['product_name'],
                         'quantity' => $item['quantity'],
                         'mrp' => $item['mrp'],
-                        'unit_price' => $item['unit_price'],
-                        'discount' => $item['discount'],
-                        'special_discount' => $item['special_discount'] ?? 0,
-                        'total' => $item['total'],
+                        'unit_price' => $unitPrice,
+                        'discount' => $discountAmount,
+                        'special_discount' => $specialDiscount,
+                        'total' => max(0, $totalPrice),
                     ]);
                 }
             }
@@ -192,22 +196,22 @@ $request->validate([
             return response()->json(['message' => 'Sale not found'], 404);
         }
 
-$request->validate([
-    'customer_name' => 'required|string',
-    'subtotal' => 'required|numeric',
-    'discount' => 'required|numeric',
-    'tax' => 'nullable|numeric',
-    'total' => 'required|numeric',
-    'payment_type' => 'required|string',
-    'received_amount' => 'required|numeric',
-    'balance_amount' => 'required|numeric',
-    'items.*.quantity' => 'required|numeric|min:0.01',
-    'items.*.mrp' => 'required|numeric|min:0',
-    'items.*.unit_price' => 'required|numeric|min:0',
-    'items.*.discount' => 'required|numeric|min:0',
-    'items.*.special_discount' => 'nullable|numeric|min:0',
-    'items.*.total' => 'required|numeric|min:0',
-]);
+        $request->validate([
+            'customer_name' => 'required|string',
+            'subtotal' => 'required|numeric',
+            'discount' => 'required|numeric',
+            'tax' => 'nullable|numeric',
+            'total' => 'required|numeric',
+            'payment_type' => 'required|string',
+            'received_amount' => 'required|numeric',
+            'balance_amount' => 'required|numeric',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.mrp' => 'required|numeric|min:0',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.discount' => 'required|numeric|min:0',
+            'items.*.special_discount' => 'nullable|numeric|min:0',
+            'items.*.total' => 'required|numeric|min:0',
+        ]);
 
         DB::beginTransaction();
         try {
@@ -238,7 +242,7 @@ $request->validate([
             // Delete existing sale items
             $sale->items()->delete();
 
-            // Helper function to calculate discount for a product
+            // Helper function to calculate discount for a product (for reference/validation)
             $calculateDiscount = function ($product, $schemes) {
                 $basePrice = $product->sales_price ?? 0;
                 $categoryName = $product->category_name ?? null;
@@ -279,12 +283,11 @@ $request->validate([
             foreach ($request->items as $item) {
                 $product = Product::where('product_name', $item['product_name'])->first();
                 if ($product) {
-                    // Calculate discount and adjust unit price and total
-                    $discountAmount = $calculateDiscount($product, $activeSchemes);
-                    $specialDiscount = $item['special_discount'] ?? 0;
-                    $unitPrice = $product->sales_price - $discountAmount;
-                    $unitPrice = max(0, $unitPrice);
-                    $totalPrice = ($unitPrice * $item['quantity']) - $specialDiscount;
+                    // Use the unit_price provided in the request
+                    $unitPrice = floatval($item['unit_price']);
+                    $specialDiscount = floatval($item['special_discount'] ?? 0);
+                    $discountAmount = floatval($item['discount'] ?? 0);
+                    $totalPrice = ($unitPrice * $item['quantity']) - ($discountAmount + $specialDiscount);
 
                     if ($item['quantity'] <= 0) {
                         Log::warning('Invalid quantity for product ' . $item['product_name'] . ': ' . $item['quantity']);
@@ -300,20 +303,25 @@ $request->validate([
                         'unit_price' => $unitPrice,
                         'discount' => $discountAmount,
                         'special_discount' => $specialDiscount,
-                        'total' => $totalPrice,
+                        'total' => max(0, $totalPrice),
                     ]);
                 } else {
-                    Log::warning('Product not found: ' . $item['product_name']);
+                    // If product not found, save as is with provided unit_price
+                    $unitPrice = floatval($item['unit_price']);
+                    $specialDiscount = floatval($item['special_discount'] ?? 0);
+                    $discountAmount = floatval($item['discount'] ?? 0);
+                    $totalPrice = ($unitPrice * $item['quantity']) - ($discountAmount + $specialDiscount);
+
                     SaleItem::create([
                         'sale_id' => $sale->id,
                         'product_id' => null,
                         'product_name' => $item['product_name'],
                         'quantity' => $item['quantity'],
                         'mrp' => $item['mrp'],
-                        'unit_price' => $item['unit_price'],
-                        'discount' => $item['discount'],
-                        'special_discount' => $item['special_discount'] ?? 0,
-                        'total' => $item['total'],
+                        'unit_price' => $unitPrice,
+                        'discount' => $discountAmount,
+                        'special_discount' => $specialDiscount,
+                        'total' => max(0, $totalPrice),
                     ]);
                 }
             }
@@ -698,7 +706,7 @@ $request->validate([
 
                     $reportData[$supplierName]['totalCostPrice'] += $itemCostPrice;
                     $reportData[$supplierName]['totalSellingPrice'] += $itemSellingPrice;
-                    $reportData[$supplierName]['totalProfit'] = $itemProfit;
+                    $reportData[$supplierName]['totalProfit'] += $itemProfit;
 
                     $totalCostPriceAll += $itemCostPrice;
                     $totalSellingPriceAll += $itemSellingPrice;
