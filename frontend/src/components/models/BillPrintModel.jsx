@@ -8,6 +8,8 @@ const BillPrintModal = ({
   initialTax = 0,
   initialShipping = 0,
   initialTotals = {},
+  grandTotal = 0,
+  totalItemDiscount = 0,
   initialCustomerInfo = { name: "", mobile: "", bill_number: "", userId: "" },
   saleType = "Retail",
   onClose,
@@ -28,6 +30,16 @@ const BillPrintModal = ({
     contact_number: "0750296343",
   });
 
+  // Customer creation state
+  const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    mobile: "",
+    nic_number: "",
+    is_credit_customer: false,
+  });
+  const [customerErrors, setCustomerErrors] = useState({});
+
   // Refs for focus management
   const customerSelectRef = useRef(null);
   const receivedAmountRef = useRef(null);
@@ -35,13 +47,6 @@ const BillPrintModal = ({
   const printButtonRef = useRef(null);
   const saveOnlyButtonRef = useRef(null);
   const newCustomerNameRef = useRef(null);
-
-  // State for new customer form
-  const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({
-    name: "",
-    mobile: "",
-  });
 
   // Fetch customers and company details
   useEffect(() => {
@@ -146,12 +151,14 @@ const BillPrintModal = ({
         ...customer,
         name: customer.customer_name,
         mobile: customer.phone,
+        is_credit_customer: customer.is_credit_customer,
       });
     } else {
       setSelectedCustomer({
         name: "Walk-in Customer",
         mobile: "",
         bill_number: billNumber,
+        is_credit_customer: false,
       });
     }
   };
@@ -174,6 +181,18 @@ const BillPrintModal = ({
 
   // Handle saving the bill
   const handleSave = async () => {
+    // Validate credit customer requirement
+    if (paymentType === "credit") {
+      if (!selectedCustomer?.id) {
+        alert("Please select a credit-approved customer for credit sales.");
+        return;
+      }
+      if (!selectedCustomer.is_credit_customer) {
+        alert("The selected customer is not approved for credit purchases.");
+        return;
+      }
+    }
+
     const billData = {
       bill_number: billNumber,
       customer_id: selectedCustomer?.id || null,
@@ -227,7 +246,6 @@ const BillPrintModal = ({
       );
     }
   };
-
   // Handle printing
   const handlePrint = () => {
     const printContent = printRef.current.innerHTML;
@@ -372,38 +390,84 @@ const BillPrintModal = ({
       document.body.removeChild(iframe);
     }, 500);
   };
-
   // Handle confirm actions
   const handleConfirmPrint = () => {
+    if (paymentType === "credit") {
+      if (!selectedCustomer?.id) {
+        alert("Please select a credit-approved customer for credit sales.");
+        return;
+      }
+      if (!selectedCustomer.is_credit_customer) {
+        alert("The selected customer is not approved for credit purchases.");
+        return;
+      }
+    }
+
     if (paymentType !== "credit" && receivedAmount < totals.finalTotal) {
       alert("Received amount cannot be less than the grand total.");
       return;
     }
+
     handleSave();
     handlePrint();
   };
 
   const handleConfirmSave = () => {
+    if (paymentType === "credit") {
+      if (!selectedCustomer?.id) {
+        alert("Please select a credit-approved customer for credit sales.");
+        return;
+      }
+      if (!selectedCustomer.is_credit_customer) {
+        alert("The selected customer is not approved for credit purchases.");
+        return;
+      }
+    }
+
     setShowConfirmation(false);
     handleSave();
   };
 
   // Handle new customer form
   const handleNewCustomerChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setNewCustomer({
       ...newCustomer,
-      [e.target.name]: e.target.value,
+      [name]: type === "checkbox" ? checked : value,
     });
+    setCustomerErrors({ ...customerErrors, [name]: "" });
+  };
+
+  const validateNewCustomer = () => {
+    const errors = {};
+    if (!newCustomer.name.trim()) {
+      errors.name = "Customer name is required";
+    }
+    if (!newCustomer.mobile.trim()) {
+      errors.mobile = "Phone number is required";
+    }
+    if (!newCustomer.nic_number.trim()) {
+      errors.nic_number = "NIC number is required";
+    }
+    return errors;
   };
 
   const handleAddCustomer = async (e) => {
     e.preventDefault();
+    const validationErrors = validateNewCustomer();
+    if (Object.keys(validationErrors).length > 0) {
+      setCustomerErrors(validationErrors);
+      return;
+    }
+
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/customers",
         {
           customer_name: newCustomer.name,
           phone: newCustomer.mobile,
+          nic_number: newCustomer.nic_number,
+          is_credit_customer: newCustomer.is_credit_customer,
         },
         getAuthHeaders()
       );
@@ -419,11 +483,18 @@ const BillPrintModal = ({
         id: response.data.id,
         name: response.data.customer_name,
         mobile: response.data.phone,
+        is_credit_customer: response.data.is_credit_customer,
       });
 
       // Reset form
-      setNewCustomer({ name: "", mobile: "" });
+      setNewCustomer({
+        name: "",
+        mobile: "",
+        nic_number: "",
+        is_credit_customer: false,
+      });
       setShowAddCustomerForm(false);
+      setCustomerErrors({});
     } catch (error) {
       console.error("Error adding customer:", error);
       alert(
@@ -473,7 +544,6 @@ const BillPrintModal = ({
         break;
     }
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
       <div
@@ -548,6 +618,19 @@ const BillPrintModal = ({
                       type="text"
                       name="mobile"
                       value={newCustomer.mobile}
+                      onChange={handleNewCustomerChange}
+                      className="w-full p-2 mt-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      NIC Number
+                    </label>
+                    <input
+                      type="text"
+                      name="nic_number"
+                      value={newCustomer.nic_number}
                       onChange={handleNewCustomerChange}
                       className="w-full p-2 mt-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                       required
@@ -767,9 +850,158 @@ const BillPrintModal = ({
         </div>
 
         {/* Hidden Print Content */}
+
+        {/* Hidden Print Content */}
         <div className="hidden">
           <div ref={printRef} className="print-container">
-            {/* ... (existing print content remains the same) ... */}
+            {/* Header */}
+            <div className="bill-header text-center">
+              <div className="shop-name font-bold text-xl uppercase">
+                MUNSI TEX
+              </div>
+              <div className="shop-address text-sm">
+                MOSQUE BUILDING, POLICE ROAD
+              </div>
+              <div className="shop-contact text-sm">Mob: 0769859513</div>
+              <hr className="border-t border-black my-1" />
+            </div>
+
+            {/* Bill Info */}
+            <div className="bill-info grid grid-cols-2 gap-2 text-xs mt-2">
+              <div>
+                <strong>Bill No:</strong> {initialCustomerInfo.bill_number}
+              </div>{" "}
+              <div>
+                <strong>Date:</strong> {new Date().toLocaleDateString()}
+              </div>
+              <div>
+                <strong>Customer:</strong>{" "}
+                {selectedCustomer?.name || "Walk-in Customer"}
+              </div>
+              <div>
+                <strong>Cashier:</strong> Admin
+              </div>
+              <div>
+                <strong>Payment:</strong> {paymentType}
+              </div>
+              <div>
+                <strong>Time:</strong>{" "}
+                {new Date().toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: true,
+                })}
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <table className="bill-table w-full border-collapse mt-2">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border border-black px-2 py-1 text-left">
+                    S.No
+                  </th>
+                  <th className="border border-black px-2 py-1 text-left">
+                    Name
+                  </th>
+                  <th className="border border-black px-2 py-1 text-center">
+                    Qty
+                  </th>
+                  <th className="border border-black px-2 py-1 text-right">
+                    MRP
+                  </th>
+                  <th className="border border-black px-2 py-1 text-right">
+                    U.Price
+                  </th>
+                  <th className="border border-black px-2 py-1 text-right">
+                    U.Dis
+                  </th>
+                  <th className="border border-black px-2 py-1 text-right">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {initialProducts.map((product, index) => (
+                  <React.Fragment key={index}>
+                    {/* Item Name Row */}
+                    <tr className="tr-name">
+                      <td className="border border-black px-2 py-1 text-left">
+                        {index + 1}
+                      </td>
+                      <td
+                        className="border border-black px-2 py-1 text-left font-bold"
+                        colSpan="6"
+                      >
+                        {product.product_name}
+                      </td>
+                    </tr>
+                    {/* Item Details Row */}
+                    <tr className="tr-details">
+                      <td className="border border-black px-2 py-1 text-left"></td>
+                      <td className="border border-black px-2 py-1 text-left"></td>
+                      <td className="border border-black px-2 py-1 text-center">
+                        {product.qty}
+                      </td>
+                      <td className="border border-black px-2 py-1 text-right">
+                        {product.mrp}
+                      </td>
+                      <td className="border border-black px-2 py-1 text-right">
+                        {product.price}
+                      </td>
+                      <td className="border border-black px-2 py-1 text-right">
+                        {product.discount}
+                      </td>
+                      <td className="border border-black px-2 py-1 text-right font-bold">
+                        {(product.mrp - product.discount) * product.qty}
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Summary Section */}
+            <div className="bill-summary text-right text-sm mt-2">
+              <p>
+                <strong>Subtotal:</strong>{" "}
+                {formatCurrency(grandTotal + initialBillDiscount)}
+              </p>
+              <p>
+                <strong>Discount:</strong>{" "}
+                {formatCurrency(totalItemDiscount + initialBillDiscount)}
+              </p>
+              <p className="font-bold text-lg">
+                <strong>Grand Total:</strong> {formatCurrency(grandTotal)}
+              </p>
+              <p>
+                <strong>Received:</strong> {formatCurrency(receivedAmount)}
+              </p>
+              <p>
+                <strong>Balance:</strong> {formatCurrency(balanceAmount)}
+              </p>
+            </div>
+
+            {/* Terms & Conditions */}
+            <div className="terms-conditions text-left text-xs mt-2">
+              <h4 className="font-bold text-center">Terms and Conditions</h4>
+              <p>
+                - Goods once sold cannot be returned. <br />
+                - Please keep the bill for future reference. <br />
+                - Exchange is allowed within 7 days with original bill. <br />
+                - No refunds, only exchange for unused items. <br />
+              </p>
+            </div>
+
+            {/* Thank You Message */}
+            <p className="thanks text-center font-semibold mt-2">
+              Thank You! Visit Again.
+            </p>
+
+            {/* Branding */}
+            <p className="systemby">System by IMSS</p>
+            <p className="systemby-web ">visit🔗: www.imss.lk</p>
           </div>
         </div>
 
