@@ -146,6 +146,7 @@ const TOUCHPOSFORM = () => {
   const [tax, setTax] = useState(0);
   const [billDiscount, setBillDiscount] = useState(0);
   const [shipping, setShipping] = useState(0);
+  const [selectedProductId, setSelectedProductId] = useState(null);
   const searchInputRef = useRef(null);
   const taxInputRef = useRef(null);
   const discountInputRef = useRef(null);
@@ -200,7 +201,7 @@ const TOUCHPOSFORM = () => {
     setLoadingHeldSales(true);
     try {
       const response = await axios.get("/api/holds", {
-        params: { terminal_id: terminalId, status: "held" },
+        params: { status: "held" },
       });
       if (response.data.status === "success") {
         setHeldSales(response.data.data);
@@ -580,12 +581,47 @@ const TOUCHPOSFORM = () => {
     }
   }, [saleType, activeSchemes, loadingSchemes, calculateSpecialDiscount]);
 
+  // Update product prices when saleType changes
+  useEffect(() => {
+    setProducts((prevProducts) =>
+      prevProducts.map((product) => {
+        const price =
+          saleType === "Wholesale"
+            ? parseFloat(product.wholesale_price || product.sales_price || 0)
+            : parseFloat(product.sales_price || 0);
+
+        const mrp = parseFloat(product.mrp || 0);
+        const discountPerUnit = Math.max(0, mrp - price);
+        const productWithQty = { ...product, qty: product.qty || 1 };
+        const specialDiscount = calculateSpecialDiscount(
+          productWithQty,
+          saleType,
+          new Date().toISOString().split("T")[0]
+        );
+        const total =
+          price * (product.qty || 0) -
+          (specialDiscount || 0) -
+          (product.discount || 0);
+
+        return {
+          ...product,
+          price,
+          discount: discountPerUnit,
+          specialDiscount,
+          total: total >= 0 ? total : 0,
+        };
+      })
+    );
+  }, [saleType, calculateSpecialDiscount]);
+
   // Add Product to Bill
   const addProductToTable = (item) => {
     if (!item || !item.id) {
       alert("Invalid product selected.");
       return;
     }
+
+    setSelectedProductId(item.id);
 
     const availableStock = parseFloat(item.stock || 0);
     if (isNaN(availableStock)) {
@@ -784,7 +820,7 @@ const TOUCHPOSFORM = () => {
 
       totalQty += qty;
       subTotalMRP += mrp * qty;
-      totalItemDiscounts += unitDiscount * qty;
+      totalItemDiscounts += unitDiscount; // discount is total discount for product, not per unit
       totalSpecialDiscounts += specialDiscount;
       grandTotalBeforeAdjustments += p.total;
     });
@@ -856,6 +892,8 @@ const TOUCHPOSFORM = () => {
     }
   };
 
+  const [editingDiscountIndex, setEditingDiscountIndex] = useState(null);
+  const [tempDiscountValue, setTempDiscountValue] = useState(0);
   // Hold Sale
   const holdSale = useCallback(async () => {
     if (products.length === 0) {
@@ -943,6 +981,10 @@ const TOUCHPOSFORM = () => {
     [items]
   );
 
+  useEffect(() => {
+    console.log("Current Products in Cart:", products);
+  }, [products]);
+
   // Open Bill Modal
   const handleOpenBill = useCallback(() => {
     if (!registerStatus.isOpen) {
@@ -993,6 +1035,12 @@ const TOUCHPOSFORM = () => {
       const response = await axios.post(`/api/holds/${hold_id}/recall`);
       if (response.data.status === "success") {
         const sale = response.data.data;
+        const productsWithSerial =
+          sale.products?.map((p, idx) => ({
+            ...p,
+            serialNumber: idx + 1,
+          })) || [];
+        setProducts(productsWithSerial);
         setProducts(sale.products || []);
         setTax(sale.tax || 0);
         setBillDiscount(sale.billDiscount || 0);
@@ -1126,33 +1174,69 @@ const TOUCHPOSFORM = () => {
                     </td>
                   </tr>
                 ) : (
-                  products.map((product, index) => (
-                    <tr key={product.id + "-" + index} className="border-b">
-                      <td className="p-1 text-xs sm:p-2 sm:text-sm">
-                        {product.serialNumber}
-                      </td>
-                      <td className="p-1 sm:p-2">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold sm:text-sm">
-                            {product.product_name}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-white">
-                            Barcode: {product.barcode}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-1 text-center sm:p-2">
-                        <div className="flex items-center justify-center gap-1 sm:gap-2">
-                          <button
-                            onClick={() => decrementQuantity(index)}
-                            className="p-1 bg-gray-300 rounded-lg sm:p-2 dark:bg-slate-800"
-                          >
-                            <Minus size={16} className="sm:w-5 sm:h-5" />
-                          </button>
+                  products.map((product, index) => {
+                    // Ensure serial number exists for all items
+                    const serialNumber =
+                      product.serialNumber !== undefined
+                        ? product.serialNumber
+                        : index + 1;
+
+                    return (
+                      <tr
+                        key={`${product.id}-${serialNumber}`}
+                        className="border-b"
+                      >
+                        <td className="p-1 text-xs sm:p-2 sm:text-sm">
+                          {serialNumber}
+                        </td>
+                        <td className="p-1 sm:p-2">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold sm:text-sm">
+                              {product.product_name}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-white">
+                              Barcode: {product.barcode}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-1 text-center sm:p-2">
+                          <div className="flex items-center justify-center gap-1 sm:gap-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="w-16 p-1 text-center text-sm border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                              value={product.qty}
+                              onChange={(e) =>
+                                updateProductQuantity(index, e.target.value)
+                              }
+                              onBlur={(e) => {
+                                if (
+                                  e.target.value === "" ||
+                                  parseFloat(e.target.value) < 0
+                                ) {
+                                  updateProductQuantity(index, 0);
+                                }
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                          {formatNumberWithCommas(product.price.toFixed(2))}
+                        </td>
+                        <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
                           <input
                             type="number"
                             step="0.01"
                             min="0"
+                            max={(product.price * (product.qty || 0)).toFixed(
+                              2
+                            )}
+                            value={product.discount?.toFixed(2) ?? "0.00"}
+                            onChange={(e) => {
+                              let value = parseFloat(e.target.value);
+                              if (isNaN(value) || value < 0) {
+                                value = 0;
                             className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
                             value={product.qty}
                             onChange={(e) =>
@@ -1166,44 +1250,51 @@ const TOUCHPOSFORM = () => {
                               ) {
                                 updateProductQuantity(index, 0);
                               }
+                              const maxDiscount =
+                                product.price * (product.qty || 0);
+                              if (value > maxDiscount) {
+                                value = maxDiscount;
+                              }
+                              // Update discount in products state
+                              setProducts((prevProducts) =>
+                                prevProducts.map((p) =>
+                                  p.id === product.id
+                                    ? {
+                                        ...p,
+                                        discount: value,
+                                        total:
+                                          p.price * (p.qty || 0) -
+                                          (p.specialDiscount || 0) -
+                                          value,
+                                      }
+                                    : p
+                                )
+                              );
                             }}
+                            className="w-full p-1 text-xs text-right border rounded dark:bg-slate-700 dark:text-white sm:text-sm"
                           />
+                        </td>
+                        <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
+                          {formatNumberWithCommas(
+                            product.specialDiscount?.toFixed(2) ?? 0.0
+                          )}
+                        </td>
+                        <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                          {formatNumberWithCommas(
+                            product.total?.toFixed(2) ?? 0.0
+                          )}
+                        </td>
+                        <td className="p-1 text-center sm:p-2">
                           <button
-                            onClick={() => incrementQuantity(index)}
-                            className="p-1 bg-gray-300 rounded-lg sm:p-2 dark:bg-slate-800"
+                            onClick={() => handleDeleteClick(index)}
+                            className="p-1 text-white bg-red-500 rounded-lg sm:p-2 dark:text-slate-900"
                           >
-                            <Plus size={16} className="sm:w-5 sm:h-5" />
+                            <Trash2 size={16} className="sm:w-5 sm:h-5" />
                           </button>
-                        </div>
-                      </td>
-                      <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
-                        {formatNumberWithCommas(product.price.toFixed(2))}
-                      </td>
-                      <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
-                        {formatNumberWithCommas(
-                          product.discount?.toFixed(2) ?? 0.0
-                        )}
-                      </td>
-                      <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
-                        {formatNumberWithCommas(
-                          product.specialDiscount?.toFixed(2) ?? 0.0
-                        )}
-                      </td>
-                      <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
-                        {formatNumberWithCommas(
-                          product.total?.toFixed(2) ?? 0.0
-                        )}
-                      </td>
-                      <td className="p-1 text-center sm:p-2">
-                        <button
-                          onClick={() => handleDeleteClick(index)}
-                          className="p-1 text-white bg-red-500 rounded-lg sm:p-2 dark:text-slate-900"
-                        >
-                          <Trash2 size={16} className="sm:w-5 sm:h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1212,13 +1303,12 @@ const TOUCHPOSFORM = () => {
           {/* Totals Section */}
           <div className="flex flex-col gap-4 mt-2 sm:mt-4 dark:bg-slate-800 sm:flex-row sm:gap-6">
             <div className="flex-1">
-              <div className="flex items-center gap-2 text-sm font-semibold sm:text-lg">
-                <span>Total Quantity:</span>
+              <div className="flex items-center gap-2 text-sm font-semibold sm:text-lg mt-1">
+                <span>Selected Item Quantity:</span>
                 <span>
                   {formatNumberWithCommas(
-                    (registerStatus.totalSalesQty !== undefined
-                      ? registerStatus.totalSalesQty
-                      : totals.totalQty
+                    (
+                      products.find((p) => p.id === selectedProductId)?.qty || 0
                     ).toFixed(1)
                   )}
                 </span>
@@ -1353,9 +1443,10 @@ const TOUCHPOSFORM = () => {
                     <span>
                       Rs.{" "}
                       {formatNumberWithCommas(
-                        (registerStatus.totalSales !== undefined
-                          ? registerStatus.totalSales
-                          : totals.finalTotal
+                        (
+                          totals.grandTotalBeforeAdjustments +
+                          totals.taxAmount -
+                          totals.totalBillDiscount
                         ).toFixed(2)
                       )}
                     </span>

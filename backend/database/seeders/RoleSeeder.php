@@ -14,7 +14,8 @@ class RoleSeeder extends Seeder
             ['name' => 'superadmin', 'description' => 'Super Administrator with all access'],
             ['name' => 'manager', 'description' => 'Store Manager'],
             ['name' => 'cashier', 'description' => 'Point of Sale Operator'],
-            ['name' => 'storekeeper', 'description' => 'Inventory Manager']
+            ['name' => 'storekeeper', 'description' => 'Inventory Manager'],
+            ['name' => 'user', 'description' => 'Generic User']
         ];
 
         foreach ($roles as $role) {

@@ -173,12 +173,12 @@ const SideNav = ({ isPosOpen }) => {
       label: "Outstanding",
       roles: ["admin", "manager"],
     },
-    {
-      path: "/ledger",
-      icon: BookOpen,
-      label: "Ledger",
-      roles: ["admin", "manager"],
-    },
+    // {
+    //   path: "/ledger",
+    //   icon: BookOpen,
+    //   label: "Ledger",
+    //   roles: ["admin", "manager"],
+    // },
     {
       path: "/profit",
       icon: FileText,
@@ -198,12 +198,12 @@ const SideNav = ({ isPosOpen }) => {
           roles: ["admin", "manager"],
         },
         // { path: "/CompanyWiseProfit", label: "Company Wise Profit", icon: FileBarChart, roles: ['admin', 'manager'] },
-        {
-          path: "/SupplierWiseProfit",
-          label: "Supplier Wise Profit",
-          icon: ShoppingCart,
-          roles: ["admin", "manager"],
-        },
+        // {
+        //   path: "/SupplierWiseProfit",
+        //   label: "Supplier Wise Profit",
+        //   icon: ShoppingCart,
+        //   roles: ["admin", "manager"],
+        // },
       ],
     },
     {
@@ -261,58 +261,58 @@ const SideNav = ({ isPosOpen }) => {
       roles: ["admin"],
     },
 
-    {
-      path: "/TaskManager",
-      icon: LayoutList,
-      label: "Task Management",
-      roles: ["admin", "manager"],
-      subItems: [
-        {
-          path: "/HomePage",
-          label: "Taskmanager",
-          icon: SquareCheckBig,
-          roles: ["admin", "manager"],
-        },
-        {
-          path: "/TasksPage",
-          label: "Tasks",
-          icon: SquareCheckBig,
-          roles: ["admin", "manager"],
-        },
-        {
-          path: "/ProjectsPage",
-          label: "Projects",
-          icon: SquareCheckBig,
-          roles: ["admin", "manager"],
-        },
-        {
-          path: "/ReportPage",
-          label: "Reports",
-          icon: SquareCheckBig,
-          roles: ["admin", "manager"],
-        },
-        {
-          path: "/SubtasksPage",
-          label: "Sub Tasks",
-          icon: SquareCheckBig,
-          roles: ["admin", "manager"],
-        },
-      ],
-    },
-    {
-      path: "/Staff",
-      icon: Users,
-      label: "Staff Management",
-      roles: ["admin"],
-      subItems: [
-        {
-          path: "/StaffManagement",
-          label: "Staff Panel",
-          icon: BookUser,
-          roles: ["admin"],
-        },
-      ],
-    },
+    // {
+    //   path: "/TaskManager",
+    //   icon: LayoutList,
+    //   label: "Task Management",
+    //   roles: ["admin", "manager"],
+    //   subItems: [
+    //     {
+    //       path: "/HomePage",
+    //       label: "Taskmanager",
+    //       icon: SquareCheckBig,
+    //       roles: ["admin", "manager"],
+    //     },
+    //     {
+    //       path: "/TasksPage",
+    //       label: "Tasks",
+    //       icon: SquareCheckBig,
+    //       roles: ["admin", "manager"],
+    //     },
+    //     {
+    //       path: "/ProjectsPage",
+    //       label: "Projects",
+    //       icon: SquareCheckBig,
+    //       roles: ["admin", "manager"],
+    //     },
+    //     {
+    //       path: "/ReportPage",
+    //       label: "Reports",
+    //       icon: SquareCheckBig,
+    //       roles: ["admin", "manager"],
+    //     },
+    //     {
+    //       path: "/SubtasksPage",
+    //       label: "Sub Tasks",
+    //       icon: SquareCheckBig,
+    //       roles: ["admin", "manager"],
+    //     },
+    //   ],
+    // },
+    // {
+    //   path: "/Staff",
+    //   icon: Users,
+    //   label: "Staff Management",
+    //   roles: ["admin"],
+    //   subItems: [
+    //     {
+    //       path: "/StaffManagement",
+    //       label: "Staff Panel",
+    //       icon: BookUser,
+    //       roles: ["admin"],
+    //     },
+    //   ],
+    // },
     {
       path: "/UserManagement",
       icon: UserRound,
@@ -320,14 +320,14 @@ const SideNav = ({ isPosOpen }) => {
       roles: ["admin"],
       subItems: [
         // { path: "/AdminAccess", label: "Admin Panel", roles: ['admin'] },
-        { path: "/RoleList", label: "Roles", icon: Wrench, roles: ["admin"] },
+        // { path: "/RoleList", label: "Roles", icon: Wrench, roles: ["admin"] },
         { path: "/UserList", label: "Users", icon: Users, userlist: ["admin"] },
-        {
-          path: "/RecycleBin",
-          label: "Recycle Bin",
-          icon: Trash2,
-          recycle: ["admin"],
-        },
+        // {
+        //   path: "/RecycleBin",
+        //   label: "Recycle Bin",
+        //   icon: Trash2,
+        //   recycle: ["admin"],
+        // },
       ],
     },
 
@@ -444,10 +444,11 @@ const SideNav = ({ isPosOpen }) => {
                     <Link
                       to={item.subItems ? "#" : item.path}
                       onClick={() => item.subItems && toggleMenu(item.path)}
-                      className={`hover:bg-amber-600 dark:hover:bg-slate-600 flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-100 ${isActive
+                      className={`hover:bg-amber-600 dark:hover:bg-slate-600 flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-100 ${
+                        isActive
                           ? " hover:text-slate-900 text-blue-700  dark:text-amber-600"
                           : "text-gray-700 hover:text-slate-900 dark:text-gray-400 dark:hover:text-cyan-500"
-                        }`}
+                      }`}
                     >
                       <Icon size={20} />
                       {isNavVisible && (
@@ -474,10 +475,11 @@ const SideNav = ({ isPosOpen }) => {
                           <Link
                             key={subItem.path}
                             to={subItem.path}
-                            className={`flex items-center ml-8 p-2 rounded-lg transition-colors duration-200 ${location.pathname === subItem.path
+                            className={`flex items-center ml-8 p-2 rounded-lg transition-colors duration-200 ${
+                              location.pathname === subItem.path
                                 ? "bg-amber-500 text-blue-700 dark:bg-blue-800 dark:text-blue-300"
                                 : "text-gray-700 hover:bg-amber-500 dark:text-gray-400 dark:hover:bg-gray-700"
-                              }`}
+                            }`}
                           >
                             {subItem.icon && <subItem.icon size={16} />}
                             <span className="ml-3">{subItem.label}</span>

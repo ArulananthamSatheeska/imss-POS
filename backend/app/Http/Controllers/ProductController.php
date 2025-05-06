@@ -217,7 +217,41 @@ if ($storeLocationName) {
                 ]),
             ];
 
-            Log::info('Mapped product data:', ['product_data' => $productData]);
+            // Preprocess numeric fields: remove commas and convert to numbers
+            $numericFields = [
+                'buying_cost',
+                'sales_price',
+                'minimum_price',
+                'wholesale_price',
+                'mrp',
+                'minimum_stock_quantity',
+                'opening_stock_quantity',
+                'opening_stock_value',
+            ];
+
+            foreach ($numericFields as $field) {
+                if (isset($productData[$field])) {
+                    // Remove commas
+                    $value = str_replace(',', '', $productData[$field]);
+                    // Convert to float or int depending on field
+                    if (in_array($field, ['minimum_stock_quantity', 'opening_stock_quantity'])) {
+                        $value = (int) $value;
+                        // Set negative values to zero
+                        if ($value < 0) {
+                            $value = 0;
+                        }
+                    } else {
+                        $value = (float) $value;
+                        // Set negative values to zero
+                        if ($value < 0) {
+                            $value = 0.0;
+                        }
+                    }
+                    $productData[$field] = $value;
+                }
+            }
+
+            Log::info('Mapped and preprocessed product data:', ['product_data' => $productData]);
 
             $validator = Validator::make($productData, $this->importRules());
 
