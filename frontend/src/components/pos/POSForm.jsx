@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import debounce from "lodash/debounce";
 import CloseRegisterModal from "../models/CloseRegisterModal";
 import HeldSalesList from "./HeldSalesList";
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
 import RegisterModal from "../models/registerModel.jsx";
 import {
   ClipboardList,
@@ -148,7 +148,8 @@ const POSForm = ({
   onCancel,
 }) => {
   const { user } = useAuth();
-  const { registerStatus, openRegister, closeRegister, refreshRegisterStatus } = useRegister();
+  const { registerStatus, openRegister, closeRegister, refreshRegisterStatus } =
+    useRegister();
   const terminalId = registerStatus.terminalId || "T-1";
   const userId = user?.id || 1;
   const navigate = useNavigate();
@@ -167,7 +168,9 @@ const POSForm = ({
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [customerInfo, setCustomerInfo] = useState(initialCustomerInfo);
-  const [billNumber, setBillNumber] = useState(initialCustomerInfo.bill_number || "");
+  const [billNumber, setBillNumber] = useState(
+    initialCustomerInfo.bill_number || ""
+  );
   const [showNotification, setShowNotification] = useState(false);
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState(null);
   const [showBillModal, setShowBillModal] = useState(false);
@@ -184,7 +187,7 @@ const POSForm = ({
   const [checkedRegisterModal, setCheckedRegisterModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
-  const [stockWarning, setStockWarning] = useState('');
+  const [stockWarning, setStockWarning] = useState("");
   const searchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
   const payButtonRef = useRef(null);
@@ -196,9 +199,15 @@ const POSForm = ({
         try {
           const token = user?.token;
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
-          const response = await axios.get("http://127.0.0.1:8000/api/next-bill-number", { headers });
+          const response = await axios.get(
+            "http://127.0.0.1:8000/api/next-bill-number",
+            { headers }
+          );
           setBillNumber(response.data.next_bill_number);
-          setCustomerInfo(prev => ({ ...prev, bill_number: response.data.next_bill_number }));
+          setCustomerInfo((prev) => ({
+            ...prev,
+            bill_number: response.data.next_bill_number,
+          }));
         } catch (error) {
           console.error("Error fetching next bill number:", error);
           setBillNumber("ERR-001");
@@ -281,7 +290,11 @@ const POSForm = ({
     if (activeSchemes.length > 0 || !loadingSchemes) {
       setProducts((prevProducts) =>
         prevProducts.map((product) => {
-          const { schemeName } = applyDiscountScheme(product, saleType, activeSchemes);
+          const { schemeName } = applyDiscountScheme(
+            product,
+            saleType,
+            activeSchemes
+          );
           const productWithQty = { ...product, qty: product.qty || 1 };
           const specialDiscount = calculateSpecialDiscount(
             productWithQty,
@@ -289,12 +302,14 @@ const POSForm = ({
             new Date().toISOString().split("T")[0]
           );
           const unitPrice = parseFloat(product.price || 0);
-          const discount = parseFloat(product.discount || 0);
-          const total = unitPrice * product.qty - (discount + specialDiscount);
+          const unitDiscount = Math.max(0, (product.mrp || 0) - unitPrice);
+          const total =
+            unitPrice * product.qty - (unitDiscount + specialDiscount);
 
           return {
             ...product,
             schemeName: schemeName,
+            discount: unitDiscount,
             specialDiscount: specialDiscount,
             total: total >= 0 ? total : 0,
           };
@@ -342,8 +357,8 @@ const POSForm = ({
         const productMatch =
           scheme.applies_to === "product" &&
           target ===
-          (product.product_name?.trim().toLowerCase() ||
-            product.description?.trim().toLowerCase());
+            (product.product_name?.trim().toLowerCase() ||
+              product.description?.trim().toLowerCase());
         const categoryMatch =
           scheme.applies_to === "category" &&
           categoryName &&
@@ -529,7 +544,7 @@ const POSForm = ({
           `Warning: Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available. You're adding ${newQuantity} (including ${existingProduct.qty || 0} already in bill).`
         );
       } else {
-        setStockWarning('');
+        setStockWarning("");
       }
 
       const updatedProductWithQty = { ...existingProduct, qty: newQuantity };
@@ -547,7 +562,9 @@ const POSForm = ({
         discount_percentage: existingProduct.discount_percentage || 0,
         schemeName: schemeName,
         specialDiscount: newSpecialDiscount,
-        total: (existingProduct.price || 0) * newQuantity - ((existingProduct.discount || 0) + newSpecialDiscount),
+        total:
+          (existingProduct.price || 0) * newQuantity -
+          ((existingProduct.discount || 0) + newSpecialDiscount),
       };
       setProducts(updatedProducts);
     } else {
@@ -557,18 +574,31 @@ const POSForm = ({
           `Warning: Insufficient stock for ${selectedProduct.product_name}! Only ${availableStock} available. You're adding ${currentQuantity}.`
         );
       } else {
-        setStockWarning('');
+        setStockWarning("");
       }
 
       const newProduct = {
         ...selectedProduct,
         qty: currentQuantity,
-        price: 0,
-        discount: 0,
-        discount_percentage: 0,
+        price: selectedProduct.sales_price || 0,
+        discount: Math.max(
+          0,
+          (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
+        ),
+        discount_percentage:
+          selectedProduct.mrp && selectedProduct.sales_price
+            ? (Math.max(
+                0,
+                (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
+              ) /
+                selectedProduct.mrp) *
+              100
+            : 0,
         schemeName: schemeName,
         specialDiscount: specialDiscount,
-        total: 0,
+        total:
+          (selectedProduct.sales_price || 0) * currentQuantity -
+          specialDiscount,
         serialNumber: products.length + 1,
       };
       setProducts([...products, newProduct]);
@@ -602,7 +632,7 @@ const POSForm = ({
           `Warning: Insufficient stock for ${productToUpdate.product_name}! Only ${availableStock} available. You're setting quantity to ${newQty}.`
         );
       } else {
-        setStockWarning('');
+        setStockWarning("");
       }
 
       const updatedProductWithQty = { ...productToUpdate, qty: newQty };
@@ -611,13 +641,19 @@ const POSForm = ({
         saleType,
         new Date().toISOString().split("T")[0]
       );
+      const newDiscount = Math.max(
+        0,
+        (productToUpdate.mrp || 0) - (productToUpdate.price || 0)
+      );
 
       return prevProducts.map((product, i) => {
         if (i === index) {
-          const newTotal = product.price * newQty - (product.discount + newSpecialDiscount);
+          const newTotal =
+            product.price * newQty - (newDiscount + newSpecialDiscount);
           return {
             ...product,
             qty: newQty,
+            discount: newDiscount,
             specialDiscount: newSpecialDiscount,
             total: newTotal >= 0 ? newTotal : 0,
           };
@@ -642,14 +678,16 @@ const POSForm = ({
             saleType,
             new Date().toISOString().split("T")[0]
           );
+          const newDiscount = Math.max(0, (product.mrp || 0) - newPrice);
           // Recalculate discount percentage based on current discount
-          const newDiscountPercentage = product.discount && newPrice > 0
-            ? (product.discount / newPrice) * 100
-            : 0;
-          const newTotal = newPrice * product.qty - (product.discount + newSpecialDiscount);
+          const newDiscountPercentage =
+            newPrice > 0 ? (newDiscount / newPrice) * 100 : 0;
+          const newTotal =
+            newPrice * product.qty - (newDiscount + newSpecialDiscount);
           return {
             ...product,
             price: newPrice,
+            discount: newDiscount,
             discount_percentage: newDiscountPercentage,
             schemeName: null,
             specialDiscount: newSpecialDiscount,
@@ -677,10 +715,10 @@ const POSForm = ({
             new Date().toISOString().split("T")[0]
           );
           // Calculate discount percentage
-          const newDiscountPercentage = product.price > 0
-            ? (newDiscount / product.price) * 100
-            : 0;
-          const newTotal = product.price * product.qty - (newDiscount + newSpecialDiscount);
+          const newDiscountPercentage =
+            product.price > 0 ? (newDiscount / product.price) * 100 : 0;
+          const newTotal =
+            product.price * product.qty - (newDiscount + newSpecialDiscount);
           return {
             ...product,
             discount: newDiscount,
@@ -712,7 +750,8 @@ const POSForm = ({
           );
           // Calculate discount amount from percentage
           const newDiscount = (product.price * newPercentage) / 100;
-          const newTotal = product.price * product.qty - (newDiscount + newSpecialDiscount);
+          const newTotal =
+            product.price * product.qty - (newDiscount + newSpecialDiscount);
           return {
             ...product,
             discount: newDiscount,
@@ -881,7 +920,7 @@ const POSForm = ({
       } else {
         alert(
           "Failed to load held sales: " +
-          (response.data.message || "Unknown error")
+            (response.data.message || "Unknown error")
         );
         setHeldSales([]);
       }
@@ -944,7 +983,7 @@ const POSForm = ({
       } else {
         alert(
           "Failed to delete held sale: " +
-          (response.data.message || "Unknown error")
+            (response.data.message || "Unknown error")
         );
       }
     } catch (error) {
@@ -1096,7 +1135,9 @@ const POSForm = ({
 
   // Check register status on mount
   useEffect(() => {
-    const registerModalDismissed = localStorage.getItem("registerModalDismissed");
+    const registerModalDismissed = localStorage.getItem(
+      "registerModalDismissed"
+    );
     if (!registerStatus.isOpen && !registerModalDismissed) {
       setShowRegisterModal(true);
     } else {
@@ -1107,9 +1148,14 @@ const POSForm = ({
 
   const calculateClosingDetails = () => {
     // Use totalSales and openingCash from registerStatus if available, ensure numbers
-    const totalSales = Number(registerStatus.totalSales) || products.reduce((sum, p) => sum + (p.total || 0), 0);
-    const totalSalesQty = Number(registerStatus.totalSalesQty) || products.reduce((sum, p) => sum + (p.qty || 0), 0);
-    const openingCash = Number(registerStatus.openingCash ?? registerStatus.cashOnHand) || 0;
+    const totalSales =
+      Number(registerStatus.totalSales) ||
+      products.reduce((sum, p) => sum + (p.total || 0), 0);
+    const totalSalesQty =
+      Number(registerStatus.totalSalesQty) ||
+      products.reduce((sum, p) => sum + (p.qty || 0), 0);
+    const openingCash =
+      Number(registerStatus.openingCash ?? registerStatus.cashOnHand) || 0;
     return {
       totalSales,
       totalSalesQty,
@@ -1128,8 +1174,8 @@ const POSForm = ({
     if (isClosingRegister) {
       const closingDetails = calculateClosingDetails();
       try {
-        if (!amount || typeof amount.inCashierAmount !== 'number') {
-          alert('Invalid amount provided for closing register.');
+        if (!amount || typeof amount.inCashierAmount !== "number") {
+          alert("Invalid amount provided for closing register.");
           return;
         }
         await closeRegister({
@@ -1185,27 +1231,29 @@ const POSForm = ({
         scheme.active &&
         scheme.applies_to === "product" &&
         scheme.target?.trim().toLowerCase() ===
-        (item.product_name?.trim().toLowerCase() ||
-          item.description?.trim().toLowerCase())
+          (item.product_name?.trim().toLowerCase() ||
+            item.description?.trim().toLowerCase())
     );
     const categoryScheme = activeSchemes.find(
       (scheme) =>
         scheme.active &&
         scheme.applies_to === "category" &&
         scheme.target?.trim().toLowerCase() ===
-        item.category_name?.trim().toLowerCase()
+          item.category_name?.trim().toLowerCase()
     );
     let discountInfo = "";
     if (productScheme) {
-      discountInfo = `, Discount: Product ${productScheme.target} (${productScheme.type === "percentage"
-        ? `${productScheme.value}%`
-        : `Rs. ${productScheme.value}`
-        })`;
+      discountInfo = `, Discount: Product ${productScheme.target} (${
+        productScheme.type === "percentage"
+          ? `${productScheme.value}%`
+          : `Rs. ${productScheme.value}`
+      })`;
     } else if (categoryScheme) {
-      discountInfo = `, Discount: Category ${categoryScheme.target} (${categoryScheme.type === "percentage"
-        ? `${categoryScheme.value}%`
-        : `Rs. ${categoryScheme.value}`
-        })`;
+      discountInfo = `, Discount: Category ${categoryScheme.target} (${
+        categoryScheme.type === "percentage"
+          ? `${categoryScheme.value}%`
+          : `Rs. ${categoryScheme.value}`
+      })`;
     }
     return discountInfo;
   };
@@ -1334,7 +1382,8 @@ const POSForm = ({
                       onMouseEnter={() => setSelectedSearchIndex(index)}
                     >
                       {item.product_name} (Code: {item.item_code || "N/A"},
-                      Stock: {item.stock ?? "N/A"}, Category: {item.category_name}
+                      Stock: {item.stock ?? "N/A"}, Category:{" "}
+                      {item.category_name}
                       {getProductDiscountInfo(item)})
                     </li>
                   ))}
@@ -1388,28 +1437,52 @@ const POSForm = ({
             <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300">
               <thead className="text-xs text-white uppercase bg-gray-700 dark:bg-gray-700 dark:text-amber-400">
                 <tr>
-                  <th scope="col" className="px-3 py-3 border-r dark:border-gray-600">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 border-r dark:border-gray-600"
+                  >
                     S.No
                   </th>
-                  <th scope="col" className="px-4 py-3 border-r dark:border-gray-600 min-w-[200px]">
+                  <th
+                    scope="col"
+                    className="px-4 py-3 border-r dark:border-gray-600 min-w-[200px]"
+                  >
                     Name
                   </th>
-                  <th scope="col" className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]"
+                  >
                     Qty
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]"
+                  >
                     U.Price
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                  >
                     U.Disc
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                  >
                     Disc %
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                  >
                     Sp.Disc
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]">
+                  <th
+                    scope="col"
+                    className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]"
+                  >
                     Total
                   </th>
                   <th scope="col" className="px-3 py-3 text-center">
@@ -1420,7 +1493,10 @@ const POSForm = ({
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="py-6 italic text-center text-gray-500 dark:text-gray-400">
+                    <td
+                      colSpan="9"
+                      className="py-6 italic text-center text-gray-500 dark:text-gray-400"
+                    >
                       No items added to the bill yet.
                     </td>
                   </tr>
@@ -1451,7 +1527,9 @@ const POSForm = ({
                           min="0"
                           className="w-16 py-1 text-sm text-center bg-transparent border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:text-white"
                           value={product.qty}
-                          onChange={(e) => updateProductQuantity(index, e.target.value)}
+                          onChange={(e) =>
+                            updateProductQuantity(index, e.target.value)
+                          }
                           onFocus={(e) => e.target.select()}
                         />
                       </td>
@@ -1462,14 +1540,28 @@ const POSForm = ({
                             step="0.01"
                             min="0"
                             className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            value={product.price}
-                            onChange={(e) => updateProductPrice(index, e.target.value)}
+                            value={formatNumberWithCommas(
+                              parseFloat(product.mrp || 0).toFixed(2)
+                            )}
+                            onChange={(e) =>
+                              updateProductPrice(index, e.target.value)
+                            }
                             onFocus={(e) => e.target.select()}
                           />
-                          <div className="flex flex-col items-end mt-1 text-xs text-red-600 dark:text-red-400">
-                            <span>MRP: {formatNumberWithCommas(parseFloat(product.mrp || 0).toFixed(2))}</span>
-                            <span>Sales: {formatNumberWithCommas(parseFloat(product.sales_price || 0).toFixed(2))}</span>
-                          </div>
+                          {/* <div className="flex flex-col items-end mt-1 text-xs text-red-600 dark:text-red-400">
+                            <span>
+                              MRP:{" "}
+                              {formatNumberWithCommas(
+                                parseFloat(product.mrp || 0).toFixed(2)
+                              )}
+                            </span>
+                            <span>
+                              Sales:{" "}
+                              {formatNumberWithCommas(
+                                parseFloat(product.sales_price || 0).toFixed(2)
+                              )}
+                            </span>
+                          </div> */}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-right border-r dark:border-gray-700">
@@ -1478,8 +1570,14 @@ const POSForm = ({
                           step="0.01"
                           min="0"
                           className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                          value={product.discount}
-                          onChange={(e) => updateProductDiscount(index, e.target.value)}
+                          value={formatNumberWithCommas(
+                            parseFloat(
+                              product.mrp - product.sales_price
+                            ).toFixed(2)
+                          )}
+                          onChange={(e) =>
+                            updateProductDiscount(index, e.target.value)
+                          }
                           onFocus={(e) => e.target.select()}
                         />
                       </td>
@@ -1490,15 +1588,24 @@ const POSForm = ({
                           min="0"
                           className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                           value={product.discount_percentage}
-                          onChange={(e) => updateProductDiscountPercentage(index, e.target.value)}
+                          onChange={(e) =>
+                            updateProductDiscountPercentage(
+                              index,
+                              e.target.value
+                            )
+                          }
                           onFocus={(e) => e.target.select()}
                         />
                       </td>
                       <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
-                        {formatNumberWithCommas(product.specialDiscount?.toFixed(2) ?? 0.00)}
+                        {formatNumberWithCommas(
+                          product.specialDiscount?.toFixed(2) ?? 0.0
+                        )}
                       </td>
                       <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">
-                        {formatNumberWithCommas(product.total?.toFixed(2) ?? 0.00)}
+                        {formatNumberWithCommas(
+                          product.total?.toFixed(2) ?? 0.0
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center">
                         <button
@@ -1551,7 +1658,9 @@ const POSForm = ({
                 step="0.01"
                 value={tax}
                 onChange={(e) =>
-                  setTax(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)
+                  setTax(
+                    e.target.value === "" ? "" : parseFloat(e.target.value) || 0
+                  )
                 }
                 className="w-full px-3 py-2 text-black bg-white border border-gray-300 rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., 5"
@@ -1567,7 +1676,9 @@ const POSForm = ({
                 step="0.01"
                 value={billDiscount}
                 onChange={(e) =>
-                  setBillDiscount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)
+                  setBillDiscount(
+                    e.target.value === "" ? "" : parseFloat(e.target.value) || 0
+                  )
                 }
                 className="w-full px-3 py-2 text-black bg-white border border-gray-300 rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Discount amount"
@@ -1578,7 +1689,8 @@ const POSForm = ({
             <div className="flex justify-between">
               <span>Total Items / Qty:</span>
               <span className="font-medium">
-                {products.length} / {formatNumberWithCommas(totals.totalQty.toFixed(1))}
+                {products.length} /{" "}
+                {formatNumberWithCommas(totals.totalQty.toFixed(1))}
               </span>
             </div>
             <div className="flex justify-between">
@@ -1590,19 +1702,26 @@ const POSForm = ({
             <div className="flex justify-between text-red-300">
               <span>(-) Item Discounts:</span>
               <span className="font-medium">
-                Rs. {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}
+                Rs.{" "}
+                {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}
               </span>
             </div>
             <div className="flex justify-between text-red-300">
               <span>(-) Special Discounts:</span>
               <span className="font-medium">
-                Rs. {formatNumberWithCommas(totals.totalSpecialDiscounts.toFixed(2))}
+                Rs.{" "}
+                {formatNumberWithCommas(
+                  totals.totalSpecialDiscounts.toFixed(2)
+                )}
               </span>
             </div>
             <div className="flex justify-between">
               <span>Net Item Total:</span>
               <span className="font-medium">
-                Rs. {formatNumberWithCommas(totals.grandTotalBeforeAdjustments.toFixed(2))}
+                Rs.{" "}
+                {formatNumberWithCommas(
+                  totals.grandTotalBeforeAdjustments.toFixed(2)
+                )}
               </span>
             </div>
             <div className="flex justify-between text-yellow-300">
@@ -1614,7 +1733,8 @@ const POSForm = ({
             <div className="flex justify-between text-red-300">
               <span>(-) Bill Discount:</span>
               <span className="font-medium">
-                Rs. {formatNumberWithCommas(totals.totalBillDiscount.toFixed(2))}
+                Rs.{" "}
+                {formatNumberWithCommas(totals.totalBillDiscount.toFixed(2))}
               </span>
             </div>
             <hr className="my-2 border-gray-500 dark:border-gray-600" />
