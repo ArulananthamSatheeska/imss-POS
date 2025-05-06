@@ -110,111 +110,148 @@ class ProductController extends Controller
         }
     }
 
-    public function import(Request $request)
-    {
-        Log::info('Import method called with request data: ', $request->all());
+public function import(Request $request)
+{
+    Log::info('Import method called with request data: ', $request->all());
 
-        try {
-            Log::info('Validating file...');
-            $request->validate([
-                'file' => 'required|mimes:xlsx,xls,csv',
-            ]);
+    try {
+        Log::info('Validating file...');
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv',
+        ]);
 
-            if (!$request->hasFile('file')) {
-                Log::warning('No file uploaded.');
-                return response()->json([
-                    'message' => 'No file uploaded',
-                ], 400);
-            }
-
-            $file = $request->file('file');
-            Log::info('File uploaded:', ['file' => $file->getClientOriginalName()]);
-
-            Log::info('Loading spreadsheet...');
-            $spreadsheet = IOFactory::load($file->getPathname());
-
-            $sheet = $spreadsheet->getActiveSheet();
-            $rows = $sheet->toArray();
-
-            Log::info('Rows data:', ['rows' => $rows]);
-
-            $header = array_shift($rows);
-            Log::info('Excel header:', ['header' => $header]);
-
-            DB::beginTransaction();
-
-            $importedProducts = [];
-            $rowCount = count($rows);
-            Log::info('Total rows to process: ' . $rowCount);
-
-            foreach ($rows as $index => $row) {
-                Log::info("Processing row: $index", ['row' => $row]);
-
-                if (empty($row[0])) {
-                    Log::warning('Skipping row due to missing product_name:', ['index' => $index]);
-                    continue;
-                }
-
-                $productData = [
-                    'product_name' => $row[0] ?? null,
-                    'item_code' => $row[1] ?? null,
-                    'expiry_date' => $row[3] ?? null,
-                    'buying_cost' => $row[4] ?? 0,
-                    'sales_price' => $row[5] ?? 0,
-                    'minimum_price' => $row[6] ?? 0,
-                    'wholesale_price' => $row[7] ?? 0,
-                    'barcode' => $row[8] ?? null,
-                    'mrp' => $row[9] ?? 0,
-                    'minimum_stock_quantity' => $row[10] ?? 0,
-                    'opening_stock_quantity' => $row[11] ?? 0,
-                    'opening_stock_value' => $row[12] ?? 0,
-                    'category' => $row[13] ?? null,
-                    'supplier' => $row[14] ?? null,
-                    'unit_type' => $row[15] ?? null,
-                    'store_location' => $row[16] ?? null,
-                    'cabinet' => $row[17] ?? null,
-                    'row' => $row[18] ?? null,
-                    'extra_fields' => json_encode([
-                        'extra_field_name' => $row[19] ?? null,
-                        'extra_field_value' => $row[20] ?? null,
-                    ]),
-                ];
-
-                Log::info('Mapped product data:', ['product_data' => $productData]);
-
-                $validator = Validator::make($productData, $this->importRules());
-
-                if ($validator->fails()) {
-                    Log::warning('Validation failed for row: ' . $index, ['errors' => $validator->errors()->all()]);
-                    continue;
-                }
-
-                try {
-                    $product = Product::create($productData);
-                    $importedProducts[] = $product;
-                    Log::info("Product created for row: $index", ['product' => $product]);
-                } catch (\Exception $e) {
-                    Log::error("Error creating product for row $index:", ['error' => $e->getMessage()]);
-                }
-            }
-
-            DB::commit();
-
-            Log::info('Import process completed. Total products imported: ' . count($importedProducts));
-
+        if (!$request->hasFile('file')) {
+            Log::warning('No file uploaded.');
             return response()->json([
-                'message' => 'Products imported successfully',
-                'imported_products' => $importedProducts,
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error importing products:', ['error' => $e->getMessage()]);
-            return response()->json([
-                'message' => 'Error importing products',
-                'error' => $e->getMessage(),
-            ], 500);
+                'message' => 'No file uploaded',
+            ], 400);
         }
+
+        $file = $request->file('file');
+        Log::info('File uploaded:', ['file' => $file->getClientOriginalName()]);
+
+        Log::info('Loading spreadsheet...');
+        $spreadsheet = IOFactory::load($file->getPathname());
+
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = $sheet->toArray();
+
+        Log::info('Rows data:', ['rows' => $rows]);
+
+        $header = array_shift($rows);
+        Log::info('Excel header:', ['header' => $header]);
+
+        DB::beginTransaction();
+
+        $importedProducts = [];
+        $rowCount = count($rows);
+        Log::info('Total rows to process: ' . $rowCount);
+
+        foreach ($rows as $index => $row) {
+            Log::info("Processing row: $index", ['row' => $row]);
+
+            if (empty($row[0])) {
+                Log::warning('Skipping row due to missing product_name:', ['index' => $index]);
+                continue;
+            }
+
+            // Fetch or create related entities
+            $categoryName = $row[13] ?? null;
+            $supplierName = $row[14] ?? null;
+            $unitName = $row[15] ?? null;
+            $storeLocationName = $row[16] ?? null;
+
+            $categoryId = null;
+            $supplierId = null;
+            $unitId = null;
+            $storeLocationId = null;
+
+            if ($categoryName) {
+                $category = \App\Models\Category::firstOrCreate(['name' => $categoryName]);
+                $categoryId = $category->id;
+            }
+
+if ($supplierName) {
+    $supplier = \App\Models\Supplier::firstOrCreate(
+        ['supplier_name' => $supplierName],
+        ['contact' => '', 'address' => '']
+    );
+    $supplierId = $supplier->id;
+}
+
+            if ($unitName) {
+                $unit = \App\Models\Unit::firstOrCreate(['unit_name' => $unitName]);
+                $unitId = $unit->id;
+            }
+
+if ($storeLocationName) {
+    $storeLocation = \App\Models\StoreLocation::firstOrCreate(
+        ['store_name' => $storeLocationName],
+        ['phone_number' => '', 'address' => '']
+    );
+    $storeLocationId = $storeLocation->id;
+}
+
+            $productData = [
+                'product_name' => $row[0] ?? null,
+                'item_code' => $row[1] ?? null,
+                'expiry_date' => $row[3] ?? null,
+                'buying_cost' => $row[4] ?? 0,
+                'sales_price' => $row[5] ?? 0,
+                'minimum_price' => $row[6] ?? 0,
+                'wholesale_price' => $row[7] ?? 0,
+                'barcode' => $row[8] ?? null,
+                'mrp' => $row[9] ?? 0,
+                'minimum_stock_quantity' => $row[10] ?? 0,
+                'opening_stock_quantity' => $row[11] ?? 0,
+                'opening_stock_value' => $row[12] ?? 0,
+                'category' => $categoryName,
+                'supplier' => $supplierName,
+                'unit_type' => $unitName,
+                'store_location' => $storeLocationName,
+                'cabinet' => $row[17] ?? null,
+                'row' => $row[18] ?? null,
+                'extra_fields' => json_encode([
+                    'extra_field_name' => $row[19] ?? null,
+                    'extra_field_value' => $row[20] ?? null,
+                ]),
+            ];
+
+            Log::info('Mapped product data:', ['product_data' => $productData]);
+
+            $validator = Validator::make($productData, $this->importRules());
+
+            if ($validator->fails()) {
+                Log::warning('Validation failed for row: ' . $index, ['errors' => $validator->errors()->all()]);
+                continue;
+            }
+
+            try {
+                $product = Product::create($productData);
+                $importedProducts[] = $product;
+                Log::info("Product created for row: $index", ['product' => $product]);
+            } catch (\Exception $e) {
+                Log::error("Error creating product for row $index:", ['error' => $e->getMessage()]);
+            }
+        }
+
+        DB::commit();
+
+        Log::info('Import process completed. Total products imported: ' . count($importedProducts));
+
+        return response()->json([
+            'message' => 'Products imported successfully',
+            'imported_products' => $importedProducts,
+        ], 200);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error importing products:', ['error' => $e->getMessage()]);
+        return response()->json([
+            'message' => 'Error importing products',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 
     public function checkNames(Request $request)
 {

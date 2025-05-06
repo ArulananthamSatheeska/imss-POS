@@ -18,15 +18,13 @@ class DashboardController extends Controller
         try {
             $today = Carbon::today();
 
-            // Total Sales: sum of POS sales for today (fully paid)
+            // Total Sales: sum of POS sales for today (include fully and partially paid)
             $posSalesTotal = Sale::whereDate('created_at', $today)
-                ->where('balance_amount', 0)
                 ->sum('total');
 
-            // Total Sales from invoices for today (fully paid)
+            // Total Sales from invoices for today (include fully and partially paid)
             $invoiceSalesTotal = DB::table('invoices')
                 ->whereDate('created_at', $today)
-                ->where('balance', '<=', 0) // fully paid or overpaid
                 ->sum('total_amount');
 
             $totalTodaysSales = $posSalesTotal + $invoiceSalesTotal;
@@ -36,8 +34,7 @@ class DashboardController extends Controller
 
             // Today's Total Costs: sum of buying_cost * quantity sold today (POS sales only)
             $todaySalesItems = SaleItem::whereHas('sale', function ($query) use ($today) {
-                $query->whereDate('created_at', $today)
-                    ->where('balance_amount', 0);
+                $query->whereDate('created_at', $today);
             })->get();
 
             $todaysTotalCosts = 0;
