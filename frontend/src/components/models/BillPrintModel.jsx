@@ -26,7 +26,7 @@ const BillPrintModal = ({
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8080/api/customers");
+        const response = await axios.get("http://127.0.0.1:8000/api/customers");
         setCustomers(response.data.data);
       } catch (error) {
         console.error("Error fetching customers:", error);
@@ -107,7 +107,7 @@ const BillPrintModal = ({
   useEffect(() => {
     const fetchCompanyDetails = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8080/api/company-details");
+        const response = await axios.get("http://127.0.0.1:8000/api/company-details");
         if (response.data) {
           setCompanyDetails({
             company_name: response.data.company_name || "",
@@ -173,7 +173,7 @@ const BillPrintModal = ({
     };
 
     try {
-      const response = await axios.post("http://127.0.0.1:8080/api/sales", billData, getAuthHeaders());
+      const response = await axios.post("http://127.0.0.1:8000/api/sales", billData, getAuthHeaders());
       console.log("Bill saved successfully:", response.data);
       setReceivedAmount(0);
       setBalanceAmount(0);

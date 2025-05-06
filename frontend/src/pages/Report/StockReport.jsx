@@ -79,7 +79,7 @@ const StockReport = () => {
     setError(null);
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8080/api/detailed-stock-reports",
+        "http://127.0.0.1:8000/api/detailed-stock-reports",
         {
           params: {
             fromDate,

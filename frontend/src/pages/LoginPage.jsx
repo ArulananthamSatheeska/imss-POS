@@ -48,12 +48,12 @@ const Login = () => {
         const fetchCompanyDetails = async () => {
             try {
                 // Fetch list of companies with id and company_name
-                const listResponse = await axios.get("http://127.0.0.1:8080/api/companies?fields=id,company_name");
+                const listResponse = await axios.get("http://127.0.0.1:8000/api/companies?fields=id,company_name");
                 const companies = listResponse.data;
                 if (companies.length > 0) {
                     // Fetch details of the first company
                     const firstCompanyName = companies[0].company_name;
-                    const detailResponse = await axios.get(`http://127.0.0.1:8080/api/companies/${firstCompanyName}`);
+                    const detailResponse = await axios.get(`http://127.0.0.1:8000/api/companies/${firstCompanyName}`);
                     const companyData = detailResponse.data;
                     setCompanyName(companyData.company_name || "Company");
                     setCompanyType(companyData.company_type || "");

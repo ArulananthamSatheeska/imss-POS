@@ -16,7 +16,7 @@ import PrintableInvoice from "./PrintableInvoice";
 import BillPrintModal from "../../components/models/BillPrintModel";
 import POSForm from "../../components/pos/POSForm";
 
-const API_BASE_URL = "http://127.0.0.1:8080/api";
+const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 const SalesReport = () => {
   const today = new Date().toISOString().split("T")[0];
@@ -1183,9 +1183,6 @@ const SalesReport = () => {
                                             Special Disc
                                           </th>
                                           <th className="px-2 py-1 font-medium text-right">
-                                            Buying Price
-                                          </th>
-                                          <th className="px-2 py-1 font-medium text-right">
                                             Total
                                           </th>
                                         </tr>
@@ -1219,11 +1216,6 @@ const SalesReport = () => {
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
                                               {formatCurrency(
                                                 item.special_discount || 0
-                                              )}
-                                            </td>
-                                            <td className="px-2 py-1 text-right text-gray-600 dark:text-gray-300">
-                                              {formatCurrency(
-                                                item.total_buying_cost || 0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 font-semibold text-right text-gray-900 dark:text-white">

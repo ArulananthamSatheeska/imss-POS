@@ -49,7 +49,7 @@ function ProductionManagement() {
 
   // Axios instance for products API
   const api = axios.create({
-    baseURL: "http://127.0.0.1:8080/api",
+    baseURL: "http://127.0.0.1:8000/api",
     headers: {
       Authorization: `Bearer ${currentUser?.token}`,
       "Content-Type": "application/json",

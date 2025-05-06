@@ -196,7 +196,7 @@ const POSForm = ({
         try {
           const token = user?.token;
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
-          const response = await axios.get("http://127.0.0.1:8080/api/next-bill-number", { headers });
+          const response = await axios.get("http://127.0.0.1:8000/api/next-bill-number", { headers });
           setBillNumber(response.data.next_bill_number);
           setCustomerInfo(prev => ({ ...prev, bill_number: response.data.next_bill_number }));
         } catch (error) {
@@ -212,7 +212,7 @@ const POSForm = ({
   useEffect(() => {
     setLoadingItems(true);
     axios
-      .get("http://127.0.0.1:8080/api/products")
+      .get("http://127.0.0.1:8000/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => {
@@ -226,6 +226,8 @@ const POSForm = ({
               ...p,
               stock: parseFloat(p.opening_stock_quantity || 0),
               category_name: categoryName,
+              sales_price: parseFloat(p.sales_price || 0),
+              mrp: parseFloat(p.mrp || 0),
             };
           });
           setItems(productsWithOpeningStock);
@@ -248,7 +250,7 @@ const POSForm = ({
   useEffect(() => {
     setLoadingSchemes(true);
     axios
-      .get("http://127.0.0.1:8080/api/discount-schemes")
+      .get("http://127.0.0.1:8000/api/discount-schemes")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const formattedSchemes = response.data.data.map((s) => ({
@@ -274,27 +276,24 @@ const POSForm = ({
       });
   }, []);
 
-  // Apply discounts and special discounts to products
+  // Apply discounts to products (only for special discounts)
   useEffect(() => {
     if (activeSchemes.length > 0 || !loadingSchemes) {
       setProducts((prevProducts) =>
         prevProducts.map((product) => {
-          const { price: discountedPrice, schemeName } = applyDiscountScheme(product, saleType, activeSchemes);
-          const mrp = parseFloat(product.mrp || 0);
-          const salesPrice = parseFloat(product.sales_price || 0);
-          const discountPerUnit = Math.max(0, mrp - salesPrice);
+          const { schemeName } = applyDiscountScheme(product, saleType, activeSchemes);
           const productWithQty = { ...product, qty: product.qty || 1 };
           const specialDiscount = calculateSpecialDiscount(
             productWithQty,
             saleType,
             new Date().toISOString().split("T")[0]
           );
-          const total = salesPrice * (product.qty || 0) - (specialDiscount || 0);
+          const unitPrice = parseFloat(product.price || 0);
+          const discount = parseFloat(product.discount || 0);
+          const total = unitPrice * product.qty - (discount + specialDiscount);
 
           return {
             ...product,
-            price: salesPrice,
-            discount: discountPerUnit,
             schemeName: schemeName,
             specialDiscount: specialDiscount,
             total: total >= 0 ? total : 0,
@@ -377,8 +376,7 @@ const POSForm = ({
       }
 
       console.log(
-        `Applied ${applicableScheme.applies_to} discount for ${product.product_name
-        }: Target=${applicableScheme.target}, Discount=${discount.toFixed(2)}`
+        `Applied ${applicableScheme.applies_to} discount for ${product.product_name}: Target=${applicableScheme.target}, Discount=${discount.toFixed(2)}`
       );
       return discount >= 0 ? discount : 0;
     },
@@ -502,8 +500,6 @@ const POSForm = ({
     }
 
     const salesPrice = parseFloat(selectedProduct.sales_price || 0);
-    const mrp = parseFloat(selectedProduct.mrp || 0);
-    const discountPerUnit = Math.max(0, mrp - salesPrice);
     const { schemeName } = applyDiscountScheme(
       selectedProduct,
       saleType,
@@ -546,11 +542,12 @@ const POSForm = ({
       updatedProducts[existingProductIndex] = {
         ...existingProduct,
         qty: newQuantity,
-        price: salesPrice,
-        discount: discountPerUnit,
+        price: existingProduct.price || 0,
+        discount: existingProduct.discount || 0,
+        discount_percentage: existingProduct.discount_percentage || 0,
         schemeName: schemeName,
         specialDiscount: newSpecialDiscount,
-        total: salesPrice * newQuantity - newSpecialDiscount,
+        total: (existingProduct.price || 0) * newQuantity - ((existingProduct.discount || 0) + newSpecialDiscount),
       };
       setProducts(updatedProducts);
     } else {
@@ -566,11 +563,12 @@ const POSForm = ({
       const newProduct = {
         ...selectedProduct,
         qty: currentQuantity,
-        price: salesPrice,
-        discount: discountPerUnit,
+        price: 0,
+        discount: 0,
+        discount_percentage: 0,
         schemeName: schemeName,
         specialDiscount: specialDiscount,
-        total: salesPrice * currentQuantity - specialDiscount,
+        total: 0,
         serialNumber: products.length + 1,
       };
       setProducts([...products, newProduct]);
@@ -616,7 +614,7 @@ const POSForm = ({
 
       return prevProducts.map((product, i) => {
         if (i === index) {
-          const newTotal = newQty * product.price - newSpecialDiscount;
+          const newTotal = product.price * newQty - (product.discount + newSpecialDiscount);
           return {
             ...product,
             qty: newQty,
@@ -638,19 +636,87 @@ const POSForm = ({
     setProducts((prevProducts) =>
       prevProducts.map((product, i) => {
         if (i === index) {
-          const mrp = parseFloat(product.mrp || 0);
-          const newDiscountPerUnit = Math.max(0, mrp - newPrice);
           const updatedProductWithQty = { ...product, qty: product.qty || 1 };
           const newSpecialDiscount = calculateSpecialDiscount(
             updatedProductWithQty,
             saleType,
             new Date().toISOString().split("T")[0]
           );
-          const newTotal = newPrice * (product.qty || 0) - newSpecialDiscount;
+          // Recalculate discount percentage based on current discount
+          const newDiscountPercentage = product.discount && newPrice > 0
+            ? (product.discount / newPrice) * 100
+            : 0;
+          const newTotal = newPrice * product.qty - (product.discount + newSpecialDiscount);
           return {
             ...product,
             price: newPrice,
-            discount: newDiscountPerUnit,
+            discount_percentage: newDiscountPercentage,
+            schemeName: null,
+            specialDiscount: newSpecialDiscount,
+            total: newTotal >= 0 ? newTotal : 0,
+          };
+        }
+        return product;
+      })
+    );
+  };
+
+  const updateProductDiscount = (index, newDiscountStr) => {
+    const newDiscount = parseFloat(newDiscountStr);
+    if (isNaN(newDiscount) || newDiscount < 0) {
+      console.warn("Invalid discount input:", newDiscountStr);
+      return;
+    }
+    setProducts((prevProducts) =>
+      prevProducts.map((product, i) => {
+        if (i === index) {
+          const updatedProductWithQty = { ...product, qty: product.qty || 1 };
+          const newSpecialDiscount = calculateSpecialDiscount(
+            updatedProductWithQty,
+            saleType,
+            new Date().toISOString().split("T")[0]
+          );
+          // Calculate discount percentage
+          const newDiscountPercentage = product.price > 0
+            ? (newDiscount / product.price) * 100
+            : 0;
+          const newTotal = product.price * product.qty - (newDiscount + newSpecialDiscount);
+          return {
+            ...product,
+            discount: newDiscount,
+            discount_percentage: newDiscountPercentage,
+            schemeName: null,
+            specialDiscount: newSpecialDiscount,
+            total: newTotal >= 0 ? newTotal : 0,
+          };
+        }
+        return product;
+      })
+    );
+  };
+
+  const updateProductDiscountPercentage = (index, newPercentageStr) => {
+    const newPercentage = parseFloat(newPercentageStr);
+    if (isNaN(newPercentage) || newPercentage < 0) {
+      console.warn("Invalid discount percentage input:", newPercentageStr);
+      return;
+    }
+    setProducts((prevProducts) =>
+      prevProducts.map((product, i) => {
+        if (i === index) {
+          const updatedProductWithQty = { ...product, qty: product.qty || 1 };
+          const newSpecialDiscount = calculateSpecialDiscount(
+            updatedProductWithQty,
+            saleType,
+            new Date().toISOString().split("T")[0]
+          );
+          // Calculate discount amount from percentage
+          const newDiscount = (product.price * newPercentage) / 100;
+          const newTotal = product.price * product.qty - (newDiscount + newSpecialDiscount);
+          return {
+            ...product,
+            discount: newDiscount,
+            discount_percentage: newPercentage,
             schemeName: null,
             specialDiscount: newSpecialDiscount,
             total: newTotal >= 0 ? newTotal : 0,
@@ -698,8 +764,8 @@ const POSForm = ({
     products.forEach((p) => {
       const qty = p.qty || 0;
       const mrp = parseFloat(p.mrp || 0);
-      const unitDiscount = p.discount || 0;
       const unitPrice = p.price || 0;
+      const unitDiscount = p.discount || 0;
       const specialDiscount = p.specialDiscount || 0;
 
       totalQty += qty;
@@ -906,7 +972,7 @@ const POSForm = ({
             const token = user?.token;
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             const response = await axios.get(
-              "http://127.0.0.1:8080/api/next-bill-number",
+              "http://127.0.0.1:8000/api/next-bill-number",
               { headers }
             );
             setBillNumber(response.data.next_bill_number);
@@ -1156,8 +1222,7 @@ const POSForm = ({
 
   return (
     <div
-      className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""
-        }`}
+      className={`min-h-screen w-full p-4 dark:bg-gray-900 bg-gray-100 ${isFullScreen ? "fullscreen-mode" : ""}`}
     >
       <div className="p-2 mb-4 rounded-lg shadow-xl bg-gradient-to-r from-slate-700 to-slate-600 dark:from-slate-800 dark:to-slate-700">
         <div className="flex flex-wrap items-center justify-between w-full gap-2 p-3 rounded-lg shadow-md md:gap-4 bg-slate-500 dark:bg-slate-600">
@@ -1247,9 +1312,7 @@ const POSForm = ({
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={
-                  loadingItems || loadingSchemes
-                }
+                disabled={loadingItems || loadingSchemes}
                 autoComplete="off"
               />
               {(loadingItems || loadingSchemes) && (
@@ -1262,16 +1325,17 @@ const POSForm = ({
                   {searchResults.map((item, index) => (
                     <li
                       key={item.product_id || index}
-                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${index === selectedSearchIndex
-                        ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white"
-                        : "text-black dark:text-gray-200"
-                        }`}
+                      className={`p-2 text-sm cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-600 ${
+                        index === selectedSearchIndex
+                          ? "bg-blue-200 dark:bg-blue-500 text-black dark:text-white"
+                          : "text-black dark:text-gray-200"
+                      }`}
                       onClick={() => handleItemSelection(item)}
                       onMouseEnter={() => setSelectedSearchIndex(index)}
                     >
                       {item.product_name} (Code: {item.item_code || "N/A"},
-                      Stock: {item.stock ?? "N/A"}, Category:{" "}
-                      {item.category_name}${getProductDiscountInfo(item)})
+                      Stock: {item.stock ?? "N/A"}, Category: {item.category_name}
+                      {getProductDiscountInfo(item)})
                     </li>
                   ))}
                 </ul>
@@ -1295,11 +1359,7 @@ const POSForm = ({
                 value={quantity}
                 onChange={handleQuantityChange}
                 onKeyDown={handleKeyDown}
-                disabled={
-                  !selectedProduct ||
-                  loadingItems ||
-                  loadingSchemes
-                }
+                disabled={!selectedProduct || loadingItems || loadingSchemes}
               />
             </div>
             <div className="flex-shrink-0 w-full md:w-auto">
@@ -1328,52 +1388,28 @@ const POSForm = ({
             <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300">
               <thead className="text-xs text-white uppercase bg-gray-700 dark:bg-gray-700 dark:text-amber-400">
                 <tr>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 border-r dark:border-gray-600"
-                  >
+                  <th scope="col" className="px-3 py-3 border-r dark:border-gray-600">
                     S.No
                   </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-3 border-r dark:border-gray-600 min-w-[200px]"
-                  >
+                  <th scope="col" className="px-4 py-3 border-r dark:border-gray-600 min-w-[200px]">
                     Name
                   </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600"
-                  >
-                    MRP
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]"
-                  >
+                  <th scope="col" className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]">
                     Qty
                   </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]"
-                  >
+                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]">
                     U.Price
                   </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
-                  >
+                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]">
                     U.Disc
                   </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
-                  >
+                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]">
+                    Disc %
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]">
                     Sp.Disc
                   </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]"
-                  >
+                  <th scope="col" className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]">
                     Total
                   </th>
                   <th scope="col" className="px-3 py-3 text-center">
@@ -1384,10 +1420,7 @@ const POSForm = ({
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                 {products.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan="10"
-                      className="py-6 italic text-center text-gray-500 dark:text-gray-400"
-                    >
+                    <td colSpan="9" className="py-6 italic text-center text-gray-500 dark:text-gray-400">
                       No items added to the bill yet.
                     </td>
                   </tr>
@@ -1411,9 +1444,6 @@ const POSForm = ({
                           {product.product_name}
                         </button>
                       </td>
-                      <td className="px-3 py-2 text-right border-r dark:border-gray-700">
-                        {formatNumberWithCommas(product.mrp)}
-                      </td>
                       <td className="px-1 py-1 text-center border-r dark:border-gray-700">
                         <input
                           type="number"
@@ -1421,9 +1451,35 @@ const POSForm = ({
                           min="0"
                           className="w-16 py-1 text-sm text-center bg-transparent border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:text-white"
                           value={product.qty}
-                          onChange={(e) =>
-                            updateProductQuantity(index, e.target.value)
-                          }
+                          onChange={(e) => updateProductQuantity(index, e.target.value)}
+                          onFocus={(e) => e.target.select()}
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right border-r dark:border-gray-700">
+                        <div className="flex flex-col items-end">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            value={product.price}
+                            onChange={(e) => updateProductPrice(index, e.target.value)}
+                            onFocus={(e) => e.target.select()}
+                          />
+                          <div className="flex flex-col items-end mt-1 text-xs text-red-600 dark:text-red-400">
+                            <span>MRP: {formatNumberWithCommas(parseFloat(product.mrp || 0).toFixed(2))}</span>
+                            <span>Sales: {formatNumberWithCommas(parseFloat(product.sales_price || 0).toFixed(2))}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right border-r dark:border-gray-700">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                          value={product.discount}
+                          onChange={(e) => updateProductDiscount(index, e.target.value)}
                           onFocus={(e) => e.target.select()}
                         />
                       </td>
@@ -1433,27 +1489,16 @@ const POSForm = ({
                           step="0.01"
                           min="0"
                           className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                          value={product.price.toFixed(2)}
-                          onChange={(e) =>
-                            updateProductPrice(index, e.target.value)
-                          }
+                          value={product.discount_percentage}
+                          onChange={(e) => updateProductDiscountPercentage(index, e.target.value)}
                           onFocus={(e) => e.target.select()}
                         />
                       </td>
                       <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
-                        {formatNumberWithCommas(
-                          product.discount?.toFixed(2) ?? 0.00
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
-                        {formatNumberWithCommas(
-                          product.specialDiscount?.toFixed(2) ?? 0.00
-                        )}
+                        {formatNumberWithCommas(product.specialDiscount?.toFixed(2) ?? 0.00)}
                       </td>
                       <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">
-                        {formatNumberWithCommas(
-                          product.total?.toFixed(2) ?? 0.00
-                        )}
+                        {formatNumberWithCommas(product.total?.toFixed(2) ?? 0.00)}
                       </td>
                       <td className="px-3 py-2 text-center">
                         <button
@@ -1472,8 +1517,7 @@ const POSForm = ({
           </div>
           {showNotification && (
             <Notification
-              message={`Delete item "${products[pendingDeleteIndex]?.product_name ?? "this item"
-                }"?`}
+              message={`Delete item "${products[pendingDeleteIndex]?.product_name ?? "this item"}"?`}
               onClose={cancelDelete}
             >
               <div className="flex justify-end gap-4 mt-4">
@@ -1507,9 +1551,7 @@ const POSForm = ({
                 step="0.01"
                 value={tax}
                 onChange={(e) =>
-                  setTax(
-                    e.target.value === "" ? "" : parseFloat(e.target.value) || 0
-                  )
+                  setTax(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)
                 }
                 className="w-full px-3 py-2 text-black bg-white border border-gray-300 rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., 5"
@@ -1525,9 +1567,7 @@ const POSForm = ({
                 step="0.01"
                 value={billDiscount}
                 onChange={(e) =>
-                  setBillDiscount(
-                    e.target.value === "" ? "" : parseFloat(e.target.value) || 0
-                  )
+                  setBillDiscount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)
                 }
                 className="w-full px-3 py-2 text-black bg-white border border-gray-300 rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Discount amount"
@@ -1538,8 +1578,7 @@ const POSForm = ({
             <div className="flex justify-between">
               <span>Total Items / Qty:</span>
               <span className="font-medium">
-                {products.length} /{" "}
-                {formatNumberWithCommas(totals.totalQty.toFixed(1))}
+                {products.length} / {formatNumberWithCommas(totals.totalQty.toFixed(1))}
               </span>
             </div>
             <div className="flex justify-between">
@@ -1551,26 +1590,19 @@ const POSForm = ({
             <div className="flex justify-between text-red-300">
               <span>(-) Item Discounts:</span>
               <span className="font-medium">
-                Rs.{" "}
-                {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}
+                Rs. {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}
               </span>
             </div>
             <div className="flex justify-between text-red-300">
               <span>(-) Special Discounts:</span>
               <span className="font-medium">
-                Rs.{" "}
-                {formatNumberWithCommas(
-                  totals.totalSpecialDiscounts.toFixed(2)
-                )}
+                Rs. {formatNumberWithCommas(totals.totalSpecialDiscounts.toFixed(2))}
               </span>
             </div>
             <div className="flex justify-between">
               <span>Net Item Total:</span>
               <span className="font-medium">
-                Rs.{" "}
-                {formatNumberWithCommas(
-                  totals.grandTotalBeforeAdjustments.toFixed(2)
-                )}
+                Rs. {formatNumberWithCommas(totals.grandTotalBeforeAdjustments.toFixed(2))}
               </span>
             </div>
             <div className="flex justify-between text-yellow-300">
@@ -1582,8 +1614,7 @@ const POSForm = ({
             <div className="flex justify-between text-red-300">
               <span>(-) Bill Discount:</span>
               <span className="font-medium">
-                Rs.{" "}
-                {formatNumberWithCommas(totals.totalBillDiscount.toFixed(2))}
+                Rs. {formatNumberWithCommas(totals.totalBillDiscount.toFixed(2))}
               </span>
             </div>
             <hr className="my-2 border-gray-500 dark:border-gray-600" />
@@ -1649,7 +1680,6 @@ const POSForm = ({
           onClose={() => {
             setShowRegisterModal(false);
             setIsClosingRegister(false);
-
           }}
           onConfirm={handleRegisterConfirm}
           cashOnHand={registerStatus.cashOnHand}
@@ -1659,7 +1689,7 @@ const POSForm = ({
         />
       )}
       {stockWarning && (
-        <div className="p-2 my-2 text-sm text-yellow-700 bg-yellow-100 rounded-md flex items-center">
+        <div className="flex items-center p-2 my-2 text-sm text-yellow-700 bg-yellow-100 rounded-md">
           <ExclamationTriangleIcon className="w-5 h-5 mr-2" />
           {stockWarning}
           <span className="ml-2 text-yellow-800">(Sale will proceed)</span>

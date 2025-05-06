@@ -25,14 +25,14 @@ const SupplierForm = ({ supplier, onSuccess }) => {
 
     try {
       if (supplier) {
-        await axios.put(`http://127.0.0.1:8080/api/suppliers/${supplier.id}`, {
+        await axios.put(`http://127.0.0.1:8000/api/suppliers/${supplier.id}`, {
           supplier_name: supplierName,
           contact,
           address,
         });
         onSuccess("Supplier updated successfully!", "success");
       } else {
-        await axios.post("http://127.0.0.1:8080/api/suppliers", {
+        await axios.post("http://127.0.0.1:8000/api/suppliers", {
           supplier_name: supplierName,
           contact,
           address,
@@ -160,7 +160,7 @@ const SupplierManagement = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8080/api/suppliers");
+      const response = await axios.get("http://127.0.0.1:8000/api/suppliers");
       setSuppliers(response.data);
     } catch (error) {
       console.error("Error fetching suppliers:", error);
@@ -182,7 +182,7 @@ const SupplierManagement = () => {
 
   const confirmDelete = async (id) => {
     try {
-      await axios.delete(`http://127.0.0.1:8080/api/suppliers/${id}`);
+      await axios.delete(`http://127.0.0.1:8000/api/suppliers/${id}`);
       fetchSuppliers();
       showNotification("Supplier deleted successfully!", "success");
     } catch (error) {
