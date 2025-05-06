@@ -26,7 +26,7 @@ class SalesReturnController extends Controller
         $salesReturns = SalesReturn::with(['invoice', 'sale', 'items.product'])->get();
         $salesReturns->each(function ($return) {
             $return->items->each(function ($item) {
-                $item->buying_cost = (float) $item->buying_cost;
+                $item->selling_cost = (float) $item->selling_cost;
             });
         });
         return response()->json(['data' => $salesReturns], 200);
@@ -43,7 +43,7 @@ class SalesReturnController extends Controller
         try {
             $salesReturn = SalesReturn::with(['invoice', 'sale', 'items.product'])->findOrFail($id);
             $salesReturn->items->each(function ($item) {
-                $item->buying_cost = (float) $item->buying_cost;
+                $item->selling_cost = (float) $item->selling_cost;
             });
             return response()->json(['data' => $salesReturn], 200);
         } catch (\Exception $e) {
@@ -70,7 +70,7 @@ class SalesReturnController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,product_id',
             'items.*.quantity' => 'required|integer|min:1',
-            'items.*.buying_cost' => 'required|numeric|min:0',
+            'items.*.selling_cost' => 'required|numeric|min:0',
             'items.*.reason' => 'nullable|string|max:255',
             'refund_method' => 'required|in:cash,card,store-credit',
             'remarks' => 'nullable|string|max:1000',
@@ -78,6 +78,9 @@ class SalesReturnController extends Controller
         ], [
             'invoice_no.exists' => 'The selected invoice number is invalid.',
             'bill_number.exists' => 'The selected bill number is invalid.',
+            'items.*.selling_cost.required' => 'The selling cost for each item is required.',
+            'items.*.selling_cost.numeric' => 'The selling cost for each item must be a number.',
+            'items.*.selling_cost.min' => 'The selling cost for each item cannot be negative.',
         ]);
 
         // Custom validation: exactly one of invoice_no or bill_number must be provided
@@ -126,7 +129,7 @@ class SalesReturnController extends Controller
                     'product_id' => $item['product_id'],
                     'product_name' => $product->product_name,
                     'quantity' => $item['quantity'],
-                    'buying_cost' => $item['buying_cost'],
+                    'selling_cost' => $item['selling_cost'],
                     'reason' => $item['reason'],
                 ]);
 
@@ -167,7 +170,7 @@ class SalesReturnController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,product_id',
             'items.*.quantity' => 'required|integer|min:1',
-            'items.*.buying_cost' => 'required|numeric|min:0',
+            'items.*.selling_cost' => 'required|numeric|min:0',
             'items.*.reason' => 'nullable|string|max:255',
             'refund_method' => 'required|in:cash,card,store-credit',
             'remarks' => 'nullable|string|max:1000',
@@ -175,6 +178,9 @@ class SalesReturnController extends Controller
         ], [
             'invoice_no.exists' => 'The selected invoice number is invalid.',
             'bill_number.exists' => 'The selected bill number is invalid.',
+            'items.*.selling_cost.required' => 'The selling cost for each item is required.',
+            'items.*.selling_cost.numeric' => 'The selling cost for each item must be a number.',
+            'items.*.selling_cost.min' => 'The selling cost for each item cannot be negative.',
         ]);
 
         // Custom validation: exactly one of invoice_no or bill_number must be provided
@@ -234,7 +240,7 @@ class SalesReturnController extends Controller
                     'product_id' => $item['product_id'],
                     'product_name' => $product->product_name,
                     'quantity' => $item['quantity'],
-                    'buying_cost' => $item['buying_cost'],
+                    'selling_cost' => $item['selling_cost'],
                     'reason' => $item['reason'],
                 ]);
 
