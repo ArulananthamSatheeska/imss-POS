@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { FiSearch, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { useAuth } from "../../context/NewAuthContext";
 import { getApi } from "../../services/api";
+import axios from "axios";
 
 const SalesReturn = () => {
   const { user } = useAuth();
@@ -25,8 +26,8 @@ const SalesReturn = () => {
   const [itemForm, setItemForm] = useState({
     product_id: "",
     search_query: "",
-    quantity: 0, // Changed initial quantity to 0
-    buying_cost: 0,
+    quantity: 0,
+    selling_cost: 0,
     reason: "",
   });
   const [invoiceSearch, setInvoiceSearch] = useState("");
@@ -46,7 +47,7 @@ const SalesReturn = () => {
   const productSearchInputRef = useRef(null);
   const invoiceSearchInputRef = useRef(null);
   const quantityInputRef = useRef(null);
-  const buyingCostInputRef = useRef(null);
+  const sellingCostInputRef = useRef(null);
   const reasonInputRef = useRef(null);
 
   // Function to generate sales return number
@@ -149,10 +150,6 @@ const SalesReturn = () => {
         throw new Error("Invalid products data format");
       }
 
-      productsData.forEach((product) => {
-        product.buying_cost = parseFloat(product.buying_cost) || 0;
-      });
-
       // Process sales returns
       let returnsData = [];
       if (Array.isArray(returnsRes.data.data)) {
@@ -166,7 +163,7 @@ const SalesReturn = () => {
       returnsData.forEach((returnItem) => {
         if (returnItem.items) {
           returnItem.items.forEach((item) => {
-            item.buying_cost = parseFloat(item.buying_cost) || 0;
+            item.selling_cost = parseFloat(item.selling_cost) || 0;
           });
         }
       });
@@ -274,21 +271,31 @@ const SalesReturn = () => {
     }
   }, [invoiceSearch, invoices]);
 
-  // Prefill buying cost when selecting a product
+  // Fetch selling cost when selecting a product
   useEffect(() => {
     if (itemForm.product_id) {
-      const selectedProduct = products.find(
-        (p) => p.product_id === parseInt(itemForm.product_id)
-      );
-      if (selectedProduct) {
-        setItemForm((prev) => ({
-          ...prev,
-          buying_cost: parseFloat(selectedProduct.buying_cost) || 0,
-          search_query: selectedProduct.product_name,
-        }));
-      }
+      const fetchSellingCost = async () => {
+        try {
+          const response = await axios.get(
+            `http://127.0.0.1:8000/api/products/${itemForm.product_id}`
+          );
+          const productData = response.data.data;
+          setItemForm((prev) => ({
+            ...prev,
+            selling_cost: parseFloat(productData.sales_price) || 0,
+            search_query: productData.product_name,
+          }));
+        } catch (error) {
+          toast.error("Failed to fetch product selling price");
+          setItemForm((prev) => ({
+            ...prev,
+            selling_cost: 0,
+          }));
+        }
+      };
+      fetchSellingCost();
     }
-  }, [itemForm.product_id, products]);
+  }, [itemForm.product_id]);
 
   // Handle clicks outside to close suggestions
   useEffect(() => {
@@ -325,8 +332,8 @@ const SalesReturn = () => {
         name === "quantity"
           ? parseInt(value) >= 0
             ? parseInt(value)
-            : 0 // Ensure quantity is non-negative
-          : name === "buying_cost"
+            : 0
+          : name === "selling_cost"
           ? parseFloat(value) || 0
           : value,
     }));
@@ -337,7 +344,7 @@ const SalesReturn = () => {
       ...itemForm,
       product_id: product.product_id.toString(),
       search_query: product.product_name,
-      buying_cost: parseFloat(product.buying_cost) || 0,
+      selling_cost: 0, // Will be updated by API call
     });
     setShowProductSuggestions(false);
     setProductHighlightedIndex(-1);
@@ -404,11 +411,11 @@ const SalesReturn = () => {
   const handleQuantityKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      buyingCostInputRef.current?.focus();
+      sellingCostInputRef.current?.focus();
     }
   };
 
-  const handleBuyingCostKeyDown = (e) => {
+  const handleSellingCostKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       reasonInputRef.current?.focus();
@@ -435,8 +442,8 @@ const SalesReturn = () => {
       toast.error("Quantity must be greater than 0");
       return;
     }
-    if (itemForm.buying_cost < 0) {
-      toast.error("Buying cost cannot be negative");
+    if (itemForm.selling_cost < 0) {
+      toast.error("Selling cost cannot be negative");
       return;
     }
 
@@ -444,7 +451,7 @@ const SalesReturn = () => {
       product_id: itemForm.product_id,
       product_name: selectedProduct.product_name,
       quantity: itemForm.quantity,
-      buying_cost: itemForm.buying_cost,
+      selling_cost: itemForm.selling_cost,
       reason: itemForm.reason || null,
     };
 
@@ -456,8 +463,8 @@ const SalesReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 0, // Reset quantity to 0
-      buying_cost: 0,
+      quantity: 0,
+      selling_cost: 0,
       reason: "",
     });
     setShowProductSuggestions(false);
@@ -484,7 +491,7 @@ const SalesReturn = () => {
           product_id: item.product_id.toString(),
           product_name: item.product_name,
           quantity: item.quantity,
-          buying_cost: parseFloat(item.buying_cost),
+          selling_cost: parseFloat(item.selling_cost),
           reason: item.reason || "",
         })),
         refundMethod: data.refund_method,
@@ -531,8 +538,8 @@ const SalesReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 0, // Reset quantity to 0
-      buying_cost: 0,
+      quantity: 0,
+      selling_cost: 0,
       reason: "",
     });
     setInvoiceSearch("");
@@ -554,13 +561,15 @@ const SalesReturn = () => {
       const returnData = {
         sales_return_number: newReturn.salesReturnNumber,
         customer_name: newReturn.customerName,
-        items: newReturn.items,
+        items: newReturn.items.map((item) => ({
+          ...item,
+          selling_cost: item.selling_cost,
+        })),
         refund_method: newReturn.refundMethod,
         remarks: newReturn.remarks,
         status: newReturn.status,
       };
 
-      // Set invoice_no or bill_number based on type
       if (newReturn.type === "invoice") {
         returnData.invoice_no = newReturn.invoiceOrBillNumber;
         returnData.bill_number = null;
@@ -585,12 +594,11 @@ const SalesReturn = () => {
       } else {
         response = await api.post("/sales-returns", returnData);
         toast.success("Sales return submitted successfully!");
-        // Normalize response data to match returnItems structure
         const newReturnItem = {
           ...response.data.data,
           items: response.data.data.items.map((item) => ({
             ...item,
-            buying_cost: parseFloat(item.buying_cost) || 0,
+            selling_cost: parseFloat(item.selling_cost) || 0,
           })),
         };
         setReturnItems(
@@ -598,7 +606,6 @@ const SalesReturn = () => {
             a.sales_return_number.localeCompare(b.sales_return_number)
           )
         );
-        // Reset form with new sales return number
         setNewReturn({
           salesReturnNumber: generateSalesReturnNumber(),
           invoiceOrBillNumber: "",
@@ -612,8 +619,8 @@ const SalesReturn = () => {
         setItemForm({
           product_id: "",
           search_query: "",
-          quantity: 0, // Reset quantity to 0
-          buying_cost: 0,
+          quantity: 0,
+          selling_cost: 0,
           reason: "",
         });
         setInvoiceSearch("");
@@ -658,7 +665,7 @@ const SalesReturn = () => {
     );
   };
 
-  const formatBuyingCost = (cost) => {
+  const formatSellingCost = (cost) => {
     const parsedCost = parseFloat(cost);
     return isNaN(parsedCost) ? "0.00" : parsedCost.toFixed(2);
   };
@@ -666,7 +673,7 @@ const SalesReturn = () => {
   const calculateTotalAmount = (items) => {
     return items
       .reduce((total, item) => {
-        const cost = parseFloat(item.buying_cost) || 0;
+        const cost = parseFloat(item.selling_cost) || 0;
         const quantity = parseInt(item.quantity) || 0;
         return total + cost * quantity;
       }, 0)
@@ -842,16 +849,16 @@ const SalesReturn = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                        Buying Cost
+                        Selling Cost
                       </label>
                       <input
-                        ref={buyingCostInputRef}
+                        ref={sellingCostInputRef}
                         type="number"
-                        name="buying_cost"
-                        value={itemForm.buying_cost.toFixed(2)}
+                        name="selling_cost"
+                        value={itemForm.selling_cost.toFixed(2)}
                         onChange={handleItemFormChange}
-                        onKeyDown={handleBuyingCostKeyDown}
-                        placeholder="Buying Cost"
+                        onKeyDown={handleSellingCostKeyDown}
+                        placeholder="Selling Cost"
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         min="0"
                         step="0.01"
@@ -899,7 +906,7 @@ const SalesReturn = () => {
                             Quantity
                           </th>
                           <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
-                            Cost
+                            Total Cost
                           </th>
                           <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
                             Reason
@@ -922,7 +929,10 @@ const SalesReturn = () => {
                               {item.quantity}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              LKR {formatBuyingCost(item.buying_cost)}
+                              LKR{" "}
+                              {formatSellingCost(
+                                item.quantity * item.selling_cost
+                              )}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                               {item.reason || "N/A"}
@@ -938,6 +948,20 @@ const SalesReturn = () => {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-gray-100 dark:bg-gray-700">
+                          <td
+                            colSpan="2"
+                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 text-right"
+                          >
+                            Subtotal:
+                          </td>
+                          <td className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                            LKR {calculateTotalAmount(newReturn.items)}
+                          </td>
+                          <td colSpan="2" className="px-4 py-2"></td>
+                        </tr>
+                      </tfoot>
                     </table>
                   )}
                 </div>
@@ -1059,7 +1083,7 @@ const SalesReturn = () => {
                           Quantity
                         </th>
                         <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                          Buying Cost
+                          Total Cost
                         </th>
                         <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                           Reason
@@ -1076,7 +1100,10 @@ const SalesReturn = () => {
                             {item.quantity}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                            LKR {formatBuyingCost(item.buying_cost)}
+                            LKR{" "}
+                            {formatSellingCost(
+                              item.quantity * item.selling_cost
+                            )}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
                             {item.reason || "N/A"}
@@ -1251,7 +1278,7 @@ const SalesReturn = () => {
                                       Quantity
                                     </th>
                                     <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-r border-gray-300">
-                                      Buying Cost
+                                      Total Cost
                                     </th>
                                     <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                                       Reason
@@ -1271,7 +1298,10 @@ const SalesReturn = () => {
                                         {item.quantity}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200 border-r border-gray-300">
-                                        LKR {formatBuyingCost(item.buying_cost)}
+                                        LKR{" "}
+                                        {formatSellingCost(
+                                          item.quantity * item.selling_cost
+                                        )}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
                                         {item.reason || "N/A"}

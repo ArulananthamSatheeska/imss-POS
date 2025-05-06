@@ -21,7 +21,7 @@ const PurchaseReturn = () => {
   const [itemForm, setItemForm] = useState({
     product_id: "",
     search_query: "",
-    quantity: 0, // Changed initial quantity to 0
+    quantity: 0,
     reason: "",
     buying_cost: 0,
   });
@@ -184,7 +184,7 @@ const PurchaseReturn = () => {
         name === "quantity"
           ? parseInt(value) >= 0
             ? parseInt(value)
-            : 0 // Ensure quantity is non-negative
+            : 0
           : name === "buying_cost"
           ? parseFloat(value) || 0
           : value,
@@ -276,7 +276,7 @@ const PurchaseReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 0, // Reset quantity to 0
+      quantity: 0,
       reason: "",
       buying_cost: 0,
     });
@@ -344,7 +344,7 @@ const PurchaseReturn = () => {
     setItemForm({
       product_id: "",
       search_query: "",
-      quantity: 0, // Reset quantity to 0
+      quantity: 0,
       reason: "",
       buying_cost: 0,
     });
@@ -393,7 +393,7 @@ const PurchaseReturn = () => {
       setItemForm({
         product_id: "",
         search_query: "",
-        quantity: 0, // Reset quantity to 0
+        quantity: 0,
         reason: "",
         buying_cost: 0,
       });
@@ -622,7 +622,7 @@ const PurchaseReturn = () => {
                             Quantity
                           </th>
                           <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
-                            Cost
+                            Total Cost
                           </th>
                           <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-b border-gray-300">
                             Reason
@@ -645,7 +645,10 @@ const PurchaseReturn = () => {
                               {item.quantity}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                              LKR {formatBuyingCost(item.buying_cost)}
+                              LKR{" "}
+                              {formatBuyingCost(
+                                item.quantity * item.buying_cost
+                              )}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                               {item.reason || "N/A"}
@@ -661,6 +664,20 @@ const PurchaseReturn = () => {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-gray-100 dark:bg-gray-700">
+                          <td
+                            colSpan="2"
+                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 text-right"
+                          >
+                            Subtotal:
+                          </td>
+                          <td className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                            LKR {calculateTotalAmount(newReturn.items)}
+                          </td>
+                          <td colSpan="2" className="px-4 py-2"></td>
+                        </tr>
+                      </tfoot>
                     </table>
                   )}
                 </div>
@@ -772,7 +789,7 @@ const PurchaseReturn = () => {
                           Quantity
                         </th>
                         <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                          Buying Cost
+                          Total Cost
                         </th>
                         <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                           Reason
@@ -789,7 +806,8 @@ const PurchaseReturn = () => {
                             {item.quantity}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
-                            LKR {formatBuyingCost(item.buying_cost)}
+                            LKR{" "}
+                            {formatBuyingCost(item.quantity * item.buying_cost)}
                           </td>
                           <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
                             {item.reason || "N/A"}
@@ -956,7 +974,7 @@ const PurchaseReturn = () => {
                                       Quantity
                                     </th>
                                     <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200 border-r border-gray-300">
-                                      Buying Cost
+                                      Total Cost
                                     </th>
                                     <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                                       Reason
@@ -976,7 +994,10 @@ const PurchaseReturn = () => {
                                         {item.quantity}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200 border-r border-gray-300">
-                                        LKR {formatBuyingCost(item.buying_cost)}
+                                        LKR{" "}
+                                        {formatBuyingCost(
+                                          item.quantity * item.buying_cost
+                                        )}
                                       </td>
                                       <td className="px-2 py-1 text-sm text-gray-700 dark:text-gray-200">
                                         {item.reason || "N/A"}
