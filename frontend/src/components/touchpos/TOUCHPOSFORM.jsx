@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash.debounce";
@@ -19,9 +25,9 @@ import Notification from "../notification/Notification.jsx";
 import { formatNumberWithCommas } from "../../utils/numberformat";
 import CalculatorModal from "../models/calculator/CalculatorModal.jsx";
 import HeldSalesList from "../pos/HeldSalesList";
-import { useRegister } from '../../context/RegisterContext';
+import { useRegister } from "../../context/RegisterContext";
 import RegisterModal from "../models/registerModel.jsx";
-import { useAuth } from '../../context/NewAuthContext.jsx';
+import { useAuth } from "../../context/NewAuthContext.jsx";
 
 // Helper function to check if date is within discount scheme period
 const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
@@ -163,7 +169,14 @@ const TOUCHPOSFORM = () => {
   const [filterError, setFilterError] = useState(null);
   const [user, setUser] = useState(null);
   const auth = useAuth();
-  const { registerStatus, openRegister, closeRegister, loading, refreshRegisterStatus, terminalId } = useRegister();
+  const {
+    registerStatus,
+    openRegister,
+    closeRegister,
+    loading,
+    refreshRegisterStatus,
+    terminalId,
+  } = useRegister();
   const userId = auth?.user?.id || 1;
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isClosingRegister, setIsClosingRegister] = useState(false);
@@ -192,7 +205,10 @@ const TOUCHPOSFORM = () => {
       if (response.data.status === "success") {
         setHeldSales(response.data.data);
       } else {
-        alert("Failed to load held sales: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to load held sales: " +
+            (response.data.message || "Unknown error")
+        );
         setHeldSales([]);
       }
     } catch (error) {
@@ -205,7 +221,9 @@ const TOUCHPOSFORM = () => {
 
   // Register modal handling
   useEffect(() => {
-    const registerModalDismissed = localStorage.getItem('registerModalDismissed');
+    const registerModalDismissed = localStorage.getItem(
+      "registerModalDismissed"
+    );
     if (!loading && !registerStatus.isOpen && !registerModalDismissed) {
       setShowRegisterModal(true);
     } else {
@@ -215,7 +233,7 @@ const TOUCHPOSFORM = () => {
   }, [registerStatus.isOpen, loading]);
 
   const handleRegisterModalClose = () => {
-    localStorage.setItem('registerModalDismissed', 'true');
+    localStorage.setItem("registerModalDismissed", "true");
     setShowRegisterModal(false);
     setIsClosingRegister(false);
   };
@@ -235,15 +253,15 @@ const TOUCHPOSFORM = () => {
           otherAmount: amount.otherAmount,
         });
         if (!result.success) {
-          alert(result.error || 'Failed to close register.');
+          alert(result.error || "Failed to close register.");
           return;
         }
         refreshRegisterStatus();
         setIsClosingRegister(false);
         setShowRegisterModal(false);
       } catch (error) {
-        console.error('Failed to close register:', error);
-        alert('Failed to close register. Check console for details.');
+        console.error("Failed to close register:", error);
+        alert("Failed to close register. Check console for details.");
       }
     } else {
       try {
@@ -253,14 +271,14 @@ const TOUCHPOSFORM = () => {
           opening_cash: amount,
         });
         if (!result.success) {
-          alert(result.error || 'Failed to open register.');
+          alert(result.error || "Failed to open register.");
           return;
         }
         refreshRegisterStatus();
         setShowRegisterModal(false);
       } catch (error) {
-        console.error('Failed to open register:', error);
-        alert('Failed to open register. Check console for details.');
+        console.error("Failed to open register:", error);
+        alert("Failed to open register. Check console for details.");
       }
     }
   };
@@ -546,7 +564,8 @@ const TOUCHPOSFORM = () => {
             saleType,
             new Date().toISOString().split("T")[0]
           );
-          const total = salesPrice * (product.qty || 0) - (specialDiscount || 0);
+          const total =
+            salesPrice * (product.qty || 0) - (specialDiscount || 0);
 
           return {
             ...product,
@@ -579,7 +598,7 @@ const TOUCHPOSFORM = () => {
       setLowStockWarning({
         productName: item.product_name,
         remainingStock: availableStock,
-        productId: item.id
+        productId: item.id,
       });
       return;
     }
@@ -603,17 +622,18 @@ const TOUCHPOSFORM = () => {
     const discountPerUnit = Math.max(0, mrp - salesPrice);
     const { schemeName } = applyDiscountScheme(item, saleType, activeSchemes);
     const productWithQty = { ...item, qty: newTotalQty };
-    const specialDiscount = existingProductIndex >= 0
-      ? calculateSpecialDiscount(
-        productWithQty,
-        saleType,
-        new Date().toISOString().split("T")[0]
-      )
-      : calculateSpecialDiscount(
-        { ...item, qty: qtyToAdd },
-        saleType,
-        new Date().toISOString().split("T")[0]
-      );
+    const specialDiscount =
+      existingProductIndex >= 0
+        ? calculateSpecialDiscount(
+            productWithQty,
+            saleType,
+            new Date().toISOString().split("T")[0]
+          )
+        : calculateSpecialDiscount(
+            { ...item, qty: qtyToAdd },
+            saleType,
+            new Date().toISOString().split("T")[0]
+          );
 
     let updatedProducts = [...products];
 
@@ -681,11 +701,11 @@ const TOUCHPOSFORM = () => {
       prevProducts.map((p, i) =>
         i === index
           ? {
-            ...p,
-            qty: parsedQty,
-            specialDiscount: newSpecialDiscount,
-            total: p.price * parsedQty - newSpecialDiscount,
-          }
+              ...p,
+              qty: parsedQty,
+              specialDiscount: newSpecialDiscount,
+              total: p.price * parsedQty - newSpecialDiscount,
+            }
           : p
       )
     );
@@ -773,7 +793,8 @@ const TOUCHPOSFORM = () => {
     const currentBillDiscount = parseFloat(billDiscount || 0);
     const currentShipping = parseFloat(shipping || 0);
     const taxAmount = grandTotalBeforeAdjustments * (currentTaxRate / 100);
-    const finalTotalDiscount = totalItemDiscounts + totalSpecialDiscounts + currentBillDiscount;
+    const finalTotalDiscount =
+      totalItemDiscounts + totalSpecialDiscounts + currentBillDiscount;
     const finalTotal =
       grandTotalBeforeAdjustments +
       taxAmount -
@@ -784,7 +805,9 @@ const TOUCHPOSFORM = () => {
       totalQty,
       subTotalMRP: isNaN(subTotalMRP) ? 0 : subTotalMRP,
       totalItemDiscounts: isNaN(totalItemDiscounts) ? 0 : totalItemDiscounts,
-      totalSpecialDiscounts: isNaN(totalSpecialDiscounts) ? 0 : totalSpecialDiscounts,
+      totalSpecialDiscounts: isNaN(totalSpecialDiscounts)
+        ? 0
+        : totalSpecialDiscounts,
       totalBillDiscount: isNaN(currentBillDiscount) ? 0 : currentBillDiscount,
       finalTotalDiscount: isNaN(finalTotalDiscount) ? 0 : finalTotalDiscount,
       taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
@@ -798,9 +821,18 @@ const TOUCHPOSFORM = () => {
   const calculateClosingDetails = () => {
     const totals = calculateTotals();
     return {
-      salesAmount: registerStatus.totalSales !== undefined ? registerStatus.totalSales : totals.finalTotal,
-      totalSalesQty: registerStatus.totalSalesQty !== undefined ? registerStatus.totalSalesQty : totals.totalQty,
-      cashOnHand: registerStatus.openingCash !== undefined ? registerStatus.openingCash : registerStatus.cashOnHand,
+      salesAmount:
+        registerStatus.totalSales !== undefined
+          ? registerStatus.totalSales
+          : totals.finalTotal,
+      totalSalesQty:
+        registerStatus.totalSalesQty !== undefined
+          ? registerStatus.totalSalesQty
+          : totals.totalQty,
+      cashOnHand:
+        registerStatus.openingCash !== undefined
+          ? registerStatus.openingCash
+          : registerStatus.cashOnHand,
       inCashierAmount: 0,
       otherAmount: 0,
     };
@@ -852,13 +884,24 @@ const TOUCHPOSFORM = () => {
         resetPOS(false);
         loadHeldSales();
       } else {
-        alert("Failed to hold sale: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to hold sale: " + (response.data.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Error holding sale:", error);
       alert("Failed to hold sale. Check console for details.");
     }
-  }, [products, calculateTotals, tax, billDiscount, shipping, saleType, customerInfo, billNumber]);
+  }, [
+    products,
+    calculateTotals,
+    tax,
+    billDiscount,
+    shipping,
+    saleType,
+    customerInfo,
+    billNumber,
+  ]);
 
   // Reset POS
   const resetPOS = useCallback(
@@ -913,7 +956,7 @@ const TOUCHPOSFORM = () => {
       return;
     }
 
-    setCustomerInfo(prev => ({ ...prev, bill_number: billNumber }));
+    setCustomerInfo((prev) => ({ ...prev, bill_number: billNumber }));
     setShowBillModal(true);
   }, [products, billNumber, registerStatus.isOpen]);
 
@@ -955,13 +998,25 @@ const TOUCHPOSFORM = () => {
         setBillDiscount(sale.billDiscount || 0);
         setShipping(sale.shipping || 0);
         setSaleType(sale.saleType || "Retail");
-        setCustomerInfo(sale.customerInfo || { name: "", mobile: "", bill_number: "", userId: "U-1", receivedAmount: 0 });
+        setCustomerInfo(
+          sale.customerInfo || {
+            name: "",
+            mobile: "",
+            bill_number: "",
+            userId: "U-1",
+            receivedAmount: 0,
+          }
+        );
         setBillNumber(sale.billNumber || "");
-        setHeldSales((prevHeldSales) => prevHeldSales.filter(s => s.hold_id !== hold_id));
+        setHeldSales((prevHeldSales) =>
+          prevHeldSales.filter((s) => s.hold_id !== hold_id)
+        );
         setShowHeldSalesList(false);
         alert(`Recalled sale with ID: ${hold_id}`);
       } else {
-        alert("Failed to recall sale: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to recall sale: " + (response.data.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Error recalling sale:", error);
@@ -976,7 +1031,10 @@ const TOUCHPOSFORM = () => {
         alert("Held sale deleted successfully");
         loadHeldSales();
       } else {
-        alert("Failed to delete held sale: " + (response.data.message || "Unknown error"));
+        alert(
+          "Failed to delete held sale: " +
+            (response.data.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Error deleting held sale:", error);
@@ -1006,19 +1064,21 @@ const TOUCHPOSFORM = () => {
             <h2 className="text-lg font-bold sm:text-xl">Billing</h2>
             <div className="flex gap-1 sm:gap-2">
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Retail"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-800"
-                  }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
+                  saleType === "Retail"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-800"
+                }`}
                 onClick={() => setSaleType("Retail")}
               >
                 Retail
               </button>
               <button
-                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${saleType === "Wholesale"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-800"
-                  }`}
+                className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-lg ${
+                  saleType === "Wholesale"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-800"
+                }`}
                 onClick={() => setSaleType("Wholesale")}
               >
                 Wholesale
@@ -1031,31 +1091,54 @@ const TOUCHPOSFORM = () => {
             <table className="w-full border">
               <thead className="bg-gray-200 dark:bg-slate-700">
                 <tr>
-                  <th className="p-1 text-xs text-left sm:p-2 sm:text-sm">S.No</th>
-                  <th className="p-1 text-xs text-left sm:p-2 sm:text-sm">Product</th>
-                  <th className="p-1 text-xs text-center sm:p-2 sm:text-sm">Qty</th>
-                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">Price</th>
-                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">Disc</th>
-                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">Sp.Disc</th>
-                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">Total</th>
+                  <th className="p-1 text-xs text-left sm:p-2 sm:text-sm">
+                    S.No
+                  </th>
+                  <th className="p-1 text-xs text-left sm:p-2 sm:text-sm">
+                    Product
+                  </th>
+                  <th className="p-1 text-xs text-center sm:p-2 sm:text-sm">
+                    Qty
+                  </th>
+                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                    Price
+                  </th>
+                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                    Disc
+                  </th>
+                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                    Sp.Disc
+                  </th>
+                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                    Total
+                  </th>
                   <th className="p-1 sm:p-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="p-4 text-center text-gray-500 dark:text-white">
+                    <td
+                      colSpan="8"
+                      className="p-4 text-center text-gray-500 dark:text-white"
+                    >
                       No items added to the bill yet.
                     </td>
                   </tr>
                 ) : (
                   products.map((product, index) => (
                     <tr key={product.id + "-" + index} className="border-b">
-                      <td className="p-1 text-xs sm:p-2 sm:text-sm">{product.serialNumber}</td>
+                      <td className="p-1 text-xs sm:p-2 sm:text-sm">
+                        {product.serialNumber}
+                      </td>
                       <td className="p-1 sm:p-2">
                         <div className="flex flex-col">
-                          <span className="text-xs font-semibold sm:text-sm">{product.product_name}</span>
-                          <span className="text-xs text-gray-500 dark:text-white">Barcode: {product.barcode}</span>
+                          <span className="text-xs font-semibold sm:text-sm">
+                            {product.product_name}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-white">
+                            Barcode: {product.barcode}
+                          </span>
                         </div>
                       </td>
                       <td className="p-1 text-center sm:p-2">
@@ -1072,10 +1155,15 @@ const TOUCHPOSFORM = () => {
                             min="0"
                             className="w-16 p-1 text-center text-sm border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
                             value={product.qty}
-                            onChange={(e) => updateProductQuantity(index, e.target.value)}
+                            onChange={(e) =>
+                              updateProductQuantity(index, e.target.value)
+                            }
                             onBlur={(e) => {
                               // Ensure value is not empty or negative on blur
-                              if (e.target.value === "" || parseFloat(e.target.value) < 0) {
+                              if (
+                                e.target.value === "" ||
+                                parseFloat(e.target.value) < 0
+                              ) {
                                 updateProductQuantity(index, 0);
                               }
                             }}
@@ -1092,13 +1180,19 @@ const TOUCHPOSFORM = () => {
                         {formatNumberWithCommas(product.price.toFixed(2))}
                       </td>
                       <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
-                        {formatNumberWithCommas(product.discount?.toFixed(2) ?? 0.0)}
+                        {formatNumberWithCommas(
+                          product.discount?.toFixed(2) ?? 0.0
+                        )}
                       </td>
                       <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
-                        {formatNumberWithCommas(product.specialDiscount?.toFixed(2) ?? 0.0)}
+                        {formatNumberWithCommas(
+                          product.specialDiscount?.toFixed(2) ?? 0.0
+                        )}
                       </td>
                       <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
-                        {formatNumberWithCommas(product.total?.toFixed(2) ?? 0.0)}
+                        {formatNumberWithCommas(
+                          product.total?.toFixed(2) ?? 0.0
+                        )}
                       </td>
                       <td className="p-1 text-center sm:p-2">
                         <button
@@ -1120,7 +1214,14 @@ const TOUCHPOSFORM = () => {
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm font-semibold sm:text-lg">
                 <span>Total Quantity:</span>
-                <span>{formatNumberWithCommas((registerStatus.totalSalesQty !== undefined ? registerStatus.totalSalesQty : totals.totalQty).toFixed(1))}</span>
+                <span>
+                  {formatNumberWithCommas(
+                    (registerStatus.totalSalesQty !== undefined
+                      ? registerStatus.totalSalesQty
+                      : totals.totalQty
+                    ).toFixed(1)
+                  )}
+                </span>
               </div>
             </div>
             <div className="flex-1 space-y-2 sm:space-y-3">
@@ -1200,31 +1301,64 @@ const TOUCHPOSFORM = () => {
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span>Sub Total (MRP):</span>
-                    <span>Rs. {formatNumberWithCommas(totals.subTotalMRP.toFixed(2))}</span>
+                    <span>
+                      Rs.{" "}
+                      {formatNumberWithCommas(totals.subTotalMRP.toFixed(2))}
+                    </span>
                   </div>
                   <div className="flex justify-between text-xs text-red-600 sm:text-sm">
                     <span>(-) Item Discounts:</span>
-                    <span>Rs. {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}</span>
+                    <span>
+                      Rs.{" "}
+                      {formatNumberWithCommas(
+                        totals.totalItemDiscounts.toFixed(2)
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between text-xs text-red-600 sm:text-sm">
                     <span>(-) Special Discounts:</span>
-                    <span>Rs. {formatNumberWithCommas(totals.totalSpecialDiscounts.toFixed(2))}</span>
+                    <span>
+                      Rs.{" "}
+                      {formatNumberWithCommas(
+                        totals.totalSpecialDiscounts.toFixed(2)
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span>Net Item Total:</span>
-                    <span>Rs. {formatNumberWithCommas(totals.grandTotalBeforeAdjustments.toFixed(2))}</span>
+                    <span>
+                      Rs.{" "}
+                      {formatNumberWithCommas(
+                        totals.grandTotalBeforeAdjustments.toFixed(2)
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between text-xs text-yellow-600 sm:text-sm">
                     <span>(+) Tax ({parseFloat(tax || 0).toFixed(1)}%):</span>
-                    <span>Rs. {formatNumberWithCommas(totals.taxAmount.toFixed(2))}</span>
+                    <span>
+                      Rs. {formatNumberWithCommas(totals.taxAmount.toFixed(2))}
+                    </span>
                   </div>
                   <div className="flex justify-between text-xs text-red-600 sm:text-sm">
                     <span>(-) Bill Discount:</span>
-                    <span>Rs. {formatNumberWithCommas(totals.totalBillDiscount.toFixed(2))}</span>
+                    <span>
+                      Rs.{" "}
+                      {formatNumberWithCommas(
+                        totals.totalBillDiscount.toFixed(2)
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm font-bold sm:text-lg">
                     <span>Grand Total:</span>
-                    <span>Rs. {formatNumberWithCommas((registerStatus.totalSales !== undefined ? registerStatus.totalSales : totals.finalTotal).toFixed(2))}</span>
+                    <span>
+                      Rs.{" "}
+                      {formatNumberWithCommas(
+                        (registerStatus.totalSales !== undefined
+                          ? registerStatus.totalSales
+                          : totals.finalTotal
+                        ).toFixed(2)
+                      )}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1268,10 +1402,20 @@ const TOUCHPOSFORM = () => {
             placeholder="Scan/Search by Code/Name"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            disabled={loadingItems || loadingSchemes || loadingCategories || loadingBrands}
+            disabled={
+              loadingItems ||
+              loadingSchemes ||
+              loadingCategories ||
+              loadingBrands
+            }
           />
-          {(loadingItems || loadingSchemes || loadingCategories || loadingBrands) && (
-            <span className="text-xs text-gray-500 dark:text-white">Loading...</span>
+          {(loadingItems ||
+            loadingSchemes ||
+            loadingCategories ||
+            loadingBrands) && (
+            <span className="text-xs text-gray-500 dark:text-white">
+              Loading...
+            </span>
           )}
 
           {/* Action Buttons */}
@@ -1316,7 +1460,9 @@ const TOUCHPOSFORM = () => {
           {/* Category Filter - Modified */}
           <div className="mb-2 sm:mb-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-medium dark:text-white">Categories:</span>
+              <span className="text-sm font-medium dark:text-white">
+                Categories:
+              </span>
               {categories.length > 8 && (
                 <select
                   className="p-1 text-sm border rounded-lg dark:bg-slate-700 dark:text-white"
@@ -1340,13 +1486,18 @@ const TOUCHPOSFORM = () => {
                 {categories.map((category) => (
                   <button
                     key={category.id}
-                    className={`flex-shrink-0 p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedCategory === category.name
-                      ? "bg-blue-500 text-white dark:text-slate-800"
-                      : "bg-gray-200 dark:bg-slate-700 dark:text-white"
-                      }`}
+                    className={`flex-shrink-0 p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
+                      selectedCategory === category.name
+                        ? "bg-blue-500 text-white dark:text-slate-800"
+                        : "bg-gray-200 dark:bg-slate-700 dark:text-white"
+                    }`}
                     onClick={() => {
                       setSelectedCategory(category.name);
-                      debouncedSearch(searchQuery, category.name, selectedBrand);
+                      debouncedSearch(
+                        searchQuery,
+                        category.name,
+                        selectedBrand
+                      );
                     }}
                     disabled={loadingCategories}
                   >
@@ -1360,14 +1511,20 @@ const TOUCHPOSFORM = () => {
           {/* Brand Filter - Modified */}
           <div className="mb-2 sm:mb-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-medium dark:text-white">Brands:</span>
+              <span className="text-sm font-medium dark:text-white">
+                Brands:
+              </span>
               {brands.length > 8 && (
                 <select
                   className="p-1 text-sm border rounded-lg dark:bg-slate-700 dark:text-white"
                   value={selectedBrand}
                   onChange={(e) => {
                     setSelectedBrand(e.target.value);
-                    debouncedSearch(searchQuery, selectedCategory, e.target.value);
+                    debouncedSearch(
+                      searchQuery,
+                      selectedCategory,
+                      e.target.value
+                    );
                   }}
                 >
                   {brands.map((brand) => (
@@ -1384,13 +1541,18 @@ const TOUCHPOSFORM = () => {
                 {brands.map((brand) => (
                   <button
                     key={brand.id}
-                    className={`flex-shrink-0 p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${selectedBrand === brand.name
-                      ? "bg-blue-500 text-white dark:text-slate-800"
-                      : "bg-gray-200 dark:bg-slate-700 dark:text-white"
-                      }`}
+                    className={`flex-shrink-0 p-2 sm:p-3 rounded-lg text-sm sm:text-lg ${
+                      selectedBrand === brand.name
+                        ? "bg-blue-500 text-white dark:text-slate-800"
+                        : "bg-gray-200 dark:bg-slate-700 dark:text-white"
+                    }`}
                     onClick={() => {
                       setSelectedBrand(brand.name);
-                      debouncedSearch(searchQuery, selectedCategory, brand.name);
+                      debouncedSearch(
+                        searchQuery,
+                        selectedCategory,
+                        brand.name
+                      );
                     }}
                     disabled={loadingBrands}
                   >
@@ -1419,8 +1581,9 @@ const TOUCHPOSFORM = () => {
                   className={`
                     relative p-2 sm:p-3 rounded-xl shadow-lg cursor-pointer
                     border-4 border-black
-                    ${categoryColors[item.category_name] ||
-                    "bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-slate-700 dark:text-white"
+                    ${
+                      categoryColors[item.category_name] ||
+                      "bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-slate-700 dark:text-white"
                     }
                     hover:shadow-xl hover:border-purple-800
                     active:scale-95 transition-all duration-200
@@ -1432,7 +1595,8 @@ const TOUCHPOSFORM = () => {
                     <div className="flex flex-col">
                       <div className="text-xs font-semibold text-green-700 sm:text-sm">
                         {formatNumberWithCommas(
-                          applyDiscountScheme(item, saleType, activeSchemes).price
+                          applyDiscountScheme(item, saleType, activeSchemes)
+                            .price
                         )}{" "}
                         Rs.
                       </div>
@@ -1523,7 +1687,6 @@ const TOUCHPOSFORM = () => {
         />
       )}
 
-
       {showHeldSalesList && (
         <HeldSalesList
           heldSales={heldSales}
@@ -1537,20 +1700,27 @@ const TOUCHPOSFORM = () => {
       {lowStockWarning && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full dark:bg-slate-800">
-            <h3 className="text-lg font-bold mb-4 dark:text-white">Low Stock Warning</h3>
+            <h3 className="text-lg font-bold mb-4 dark:text-white">
+              Low Stock Warning
+            </h3>
             <p className="mb-4 dark:text-white">
-              Only {lowStockWarning.remainingStock} units of {lowStockWarning.productName} remaining!
-              Do you want to proceed anyway?
+              Only {lowStockWarning.remainingStock} units of{" "}
+              {lowStockWarning.productName} remaining! Do you want to proceed
+              anyway?
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
                   // Find the product again in case it changed
-                  const item = items.find(i => i.id === lowStockWarning.productId);
+                  const item = items.find(
+                    (i) => i.id === lowStockWarning.productId
+                  );
                   if (item) {
                     const availableStock = parseFloat(item.stock || 0);
                     const qtyToAdd = 1;
-                    const existingProductIndex = products.findIndex((p) => p.id === item.id);
+                    const existingProductIndex = products.findIndex(
+                      (p) => p.id === item.id
+                    );
                     const newTotalQty =
                       existingProductIndex >= 0
                         ? products[existingProductIndex].qty + qtyToAdd
@@ -1559,19 +1729,24 @@ const TOUCHPOSFORM = () => {
                     const salesPrice = parseFloat(item.sales_price || 0);
                     const mrp = parseFloat(item.mrp || 0);
                     const discountPerUnit = Math.max(0, mrp - salesPrice);
-                    const { schemeName } = applyDiscountScheme(item, saleType, activeSchemes);
+                    const { schemeName } = applyDiscountScheme(
+                      item,
+                      saleType,
+                      activeSchemes
+                    );
                     const productWithQty = { ...item, qty: newTotalQty };
-                    const specialDiscount = existingProductIndex >= 0
-                      ? calculateSpecialDiscount(
-                        productWithQty,
-                        saleType,
-                        new Date().toISOString().split("T")[0]
-                      )
-                      : calculateSpecialDiscount(
-                        { ...item, qty: qtyToAdd },
-                        saleType,
-                        new Date().toISOString().split("T")[0]
-                      );
+                    const specialDiscount =
+                      existingProductIndex >= 0
+                        ? calculateSpecialDiscount(
+                            productWithQty,
+                            saleType,
+                            new Date().toISOString().split("T")[0]
+                          )
+                        : calculateSpecialDiscount(
+                            { ...item, qty: qtyToAdd },
+                            saleType,
+                            new Date().toISOString().split("T")[0]
+                          );
 
                     let updatedProducts = [...products];
 
@@ -1603,7 +1778,9 @@ const TOUCHPOSFORM = () => {
 
                     const updateStock = (list) =>
                       list.map((i) =>
-                        i.id === item.id ? { ...i, stock: i.stock - qtyToAdd } : i
+                        i.id === item.id
+                          ? { ...i, stock: i.stock - qtyToAdd }
+                          : i
                       );
                     setItems(updateStock);
                     setSearchResults(updateStock);

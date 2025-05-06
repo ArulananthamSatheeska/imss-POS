@@ -43,22 +43,22 @@ class SaleController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'customer_name' => 'required|string',
-            'subtotal' => 'required|numeric',
-            'discount' => 'required|numeric',
-            'tax' => 'nullable|numeric',
-            'total' => 'required|numeric',
-            'payment_type' => 'required|string',
-            'received_amount' => 'required|numeric',
-            'balance_amount' => 'required|numeric',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.mrp' => 'required|numeric|min:0',
-            'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.discount' => 'required|numeric|min:0',
-            'items.*.special_discount' => 'nullable|numeric|min:0',
-            'items.*.total' => 'required|numeric|min:0',
-        ]);
+$request->validate([
+    'customer_name' => 'required|string',
+    'subtotal' => 'required|numeric',
+    'discount' => 'required|numeric',
+    'tax' => 'nullable|numeric',
+    'total' => 'required|numeric',
+    'payment_type' => 'required|string',
+    'received_amount' => 'required|numeric',
+    'balance_amount' => 'required|numeric',
+    'items.*.quantity' => 'required|numeric|min:0.01',
+    'items.*.mrp' => 'required|numeric|min:0',
+    'items.*.unit_price' => 'required|numeric|min:0',
+    'items.*.discount' => 'required|numeric|min:0',
+    'items.*.special_discount' => 'nullable|numeric|min:0',
+    'items.*.total' => 'required|numeric|min:0',
+]);
 
         DB::beginTransaction();
         try {
@@ -192,22 +192,22 @@ class SaleController extends Controller
             return response()->json(['message' => 'Sale not found'], 404);
         }
 
-        $request->validate([
-            'customer_name' => 'required|string',
-            'subtotal' => 'required|numeric',
-            'discount' => 'required|numeric',
-            'tax' => 'nullable|numeric',
-            'total' => 'required|numeric',
-            'payment_type' => 'required|string',
-            'received_amount' => 'required|numeric',
-            'balance_amount' => 'required|numeric',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.mrp' => 'required|numeric|min:0',
-            'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.discount' => 'required|numeric|min:0',
-            'items.*.special_discount' => 'nullable|numeric|min:0',
-            'items.*.total' => 'required|numeric|min:0',
-        ]);
+$request->validate([
+    'customer_name' => 'required|string',
+    'subtotal' => 'required|numeric',
+    'discount' => 'required|numeric',
+    'tax' => 'nullable|numeric',
+    'total' => 'required|numeric',
+    'payment_type' => 'required|string',
+    'received_amount' => 'required|numeric',
+    'balance_amount' => 'required|numeric',
+    'items.*.quantity' => 'required|numeric|min:0.01',
+    'items.*.mrp' => 'required|numeric|min:0',
+    'items.*.unit_price' => 'required|numeric|min:0',
+    'items.*.discount' => 'required|numeric|min:0',
+    'items.*.special_discount' => 'nullable|numeric|min:0',
+    'items.*.total' => 'required|numeric|min:0',
+]);
 
         DB::beginTransaction();
         try {
