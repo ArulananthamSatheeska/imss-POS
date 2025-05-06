@@ -107,18 +107,18 @@ const PurchaseInvoiceForm = ({
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
         : Array.isArray(suppliersRes.data)
-        ? suppliersRes.data
-        : [];
+          ? suppliersRes.data
+          : [];
       const storesData = Array.isArray(storesRes.data.data)
         ? storesData.data.data
         : Array.isArray(storesRes.data)
-        ? storesRes.data
-        : [];
+          ? storesRes.data
+          : [];
       const productsData = Array.isArray(productsRes.data.data)
         ? productsRes.data.data
         : Array.isArray(productsRes.data)
-        ? productsRes.data
-        : [];
+          ? productsRes.data
+          : [];
 
       setSuppliers(suppliersData);
       setStores(storesData);
@@ -295,8 +295,8 @@ const PurchaseInvoiceForm = ({
         name === "searchQuery"
           ? value
           : name === "itemId"
-          ? value
-          : parseFloat(value) || 0,
+            ? value
+            : parseFloat(value) || 0,
       ...(name === "discountPercentage"
         ? { discountAmountEdited: false, discountAmount: 0 }
         : {}),
@@ -532,7 +532,7 @@ const PurchaseInvoiceForm = ({
 
   const calculateItemSubtotal = () => {
     return items.reduce(
-      (sum, item) => sum + (item.quantity + item.freeItems) * item.buyingCost,
+      (sum, item) => sum + item.quantity * item.buyingCost,
       0
     );
   };
@@ -609,7 +609,7 @@ const PurchaseInvoiceForm = ({
       tax: invoice.tax,
       items: items.map((item) => ({
         productId: item.productId,
-        quantity: item.quantity + item.freeItems,
+        quantity: item.quantity,
         freeItems: item.freeItems,
         buyingCost: item.buyingCost,
         discountPercentage: item.discountPercentage,
@@ -659,7 +659,10 @@ const PurchaseInvoiceForm = ({
             </div>
           )}
           {!loading && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              className=" min-w-5xl bg-slate-100 text-slate-900 dark:text-white  dark:bg-gray-700 space-y-4"
+            >
               {/* Purchase Details */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
@@ -1020,10 +1023,10 @@ const PurchaseInvoiceForm = ({
                           <th className="p-2 border">Quantity</th>
                           <th className="p-2 border">Free Items</th>
                           <th className="p-2 border">Buying Cost</th>
-                          <th className="p-2 border">Subtotal</th>
+                          <th className="p-2 border">Total</th>
                           <th className="p-2 border">Discount (%)</th>
                           <th className="p-2 border">Discount (LKR)</th>
-                          <th className="p-2 border">Total</th>
+                          <th className="p-2 border">Subtotal</th>
                           <th className="p-2 border">Action</th>
                         </tr>
                       </thead>
@@ -1041,7 +1044,7 @@ const PurchaseInvoiceForm = ({
                               {item.buyingCost.toFixed(2)}
                             </td>
                             <td className="p-2 border">
-                              {item.subtotal.toFixed(2)}
+                              {(item.quantity * item.buyingCost).toFixed(2)}
                             </td>
                             <td className="p-2 border">
                               {item.discountPercentage.toFixed(1)}
@@ -1049,8 +1052,12 @@ const PurchaseInvoiceForm = ({
                             <td className="p-2 border">
                               {item.discountAmount.toFixed(2)}
                             </td>
+
                             <td className="p-2 border">
-                              {item.total.toFixed(2)}
+                              {(
+                                item.quantity * item.buyingCost -
+                                item.discountAmount
+                              ).toFixed(2)}
                             </td>
                             <td className="p-2 border">
                               <button
