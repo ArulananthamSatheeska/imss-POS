@@ -1175,7 +1175,6 @@ const TOUCHPOSFORM = () => {
                   </tr>
                 ) : (
                   products.map((product, index) => {
-                    // Ensure serial number exists for all items
                     const serialNumber =
                       product.serialNumber !== undefined
                         ? product.serialNumber
@@ -1237,25 +1236,12 @@ const TOUCHPOSFORM = () => {
                               let value = parseFloat(e.target.value);
                               if (isNaN(value) || value < 0) {
                                 value = 0;
-                            className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
-                            value={product.qty}
-                            onChange={(e) =>
-                              updateProductQuantity(index, e.target.value)
-                            }
-                            onBlur={(e) => {
-                              // Ensure value is not empty or negative on blur
-                              if (
-                                e.target.value === "" ||
-                                parseFloat(e.target.value) < 0
-                              ) {
-                                updateProductQuantity(index, 0);
                               }
                               const maxDiscount =
                                 product.price * (product.qty || 0);
                               if (value > maxDiscount) {
                                 value = maxDiscount;
                               }
-                              // Update discount in products state
                               setProducts((prevProducts) =>
                                 prevProducts.map((p) =>
                                   p.id === product.id
