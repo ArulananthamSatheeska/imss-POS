@@ -8,21 +8,9 @@ import React, {
 import Select from "react-select";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { format } from "date-fns";
 
-// Helper function to check if invoice date is within discount scheme period
-const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
-  try {
-    const invDate = new Date(invoiceDate);
-    const start = startDate ? new Date(startDate) : null;
-    const end = endDate ? new Date(endDate) : null;
-    return (!start || invDate >= start) && (!end || invDate <= end);
-  } catch (e) {
-    console.error("Error checking date within scheme:", e);
-    return false;
-  }
-};
-
-// ErrorBoundary
+// ErrorBoundary component remains the same
 class ErrorBoundary extends React.Component {
   state = { hasError: false };
   static getDerivedStateFromError() {
@@ -44,6 +32,28 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// Helper functions
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat("en-LK", {
+    style: "currency",
+    currency: "LKR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
+const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
+  try {
+    const invDate = new Date(invoiceDate);
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    return (!start || invDate >= start) && (!end || invDate <= end);
+  } catch (e) {
+    console.error("Error checking date within scheme:", e);
+    return false;
+  }
+};
+
 const SalesInvoice = ({
   initialData,
   isEditMode,
@@ -55,13 +65,15 @@ const SalesInvoice = ({
   const formatDate = (date) => {
     try {
       return date
-        ? new Date(date).toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0];
+        ? format(new Date(date), "yyyy-MM-dd")
+        : format(new Date(), "yyyy-MM-dd");
     } catch {
-      return new Date().toISOString().split("T")[0];
+      return format(new Date(), "yyyy-MM-dd");
     }
   };
 
+  // Refs
+  const formRef = useRef(null);
   const invoiceNoRef = useRef(null);
   const invoiceDateRef = useRef(null);
   const invoiceTimeRef = useRef(null);
@@ -74,16 +86,13 @@ const SalesInvoice = ({
   const taxPercentageRef = useRef(null);
   const itemRefs = useRef([]);
 
+  // State
   const [formData, setFormData] = useState(() => {
     const defaultState = {
       invoice: {
         no: "",
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        }),
+        date: format(new Date(), "yyyy-MM-dd"),
+        time: format(new Date(), "HH:mm"),
       },
       customer: { id: null, name: "", address: "", phone: "", email: "" },
       items: [
@@ -102,6 +111,7 @@ const SalesInvoice = ({
           buyingCost: 0,
           categoryId: null,
           mrp: 0,
+          stock: 0,
         },
       ],
       purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
@@ -136,6 +146,8 @@ const SalesInvoice = ({
           );
           const unitPrice = parseFloat(item.unitPrice || item.unit_price || 0);
           const mrp = parseFloat(item.mrp || unitPrice);
+          const stock = parseFloat(item.stock || 0);
+
           return {
             ...item,
             id: item.id || Date.now() + idx,
@@ -146,6 +158,7 @@ const SalesInvoice = ({
             mrp,
             salesPrice,
             buyingCost,
+            stock,
             discountAmount: "",
             discountPercentage: "",
             specialDiscount: parseFloat(item.specialDiscount || 0),
@@ -187,6 +200,8 @@ const SalesInvoice = ({
           const buyingCost = parseFloat(item.buyingCost || 0);
           const unitPrice = parseFloat(item.unitPrice || 0);
           const mrp = parseFloat(item.mrp || unitPrice);
+          const stock = parseFloat(item.stock || 0);
+
           return {
             ...item,
             id: item.id || Date.now() + idx,
@@ -197,134 +212,123 @@ const SalesInvoice = ({
             mrp,
             salesPrice,
             buyingCost,
+            stock,
             discountAmount: "",
             discountPercentage: "",
-            specialDiscount: parseFloat(item.specialDiscount || 0),
-            total: parseFloat(
-              item.total || qty * unitPrice - (item.specialDiscount || 0)
-            ),
-            totalBuyingCost: parseFloat(
-              item.totalBuyingCost || qty * buyingCost
-            ),
+            specialDiscount: 0,
+            total: 0,
+            totalBuyingCost: 0,
           };
         }),
         purchaseDetails: {
           ...defaultState.purchaseDetails,
           ...(savedDraft.purchaseDetails || {}),
-          taxPercentage: savedDraft.purchaseDetails?.taxPercentage || 0,
+          taxPercentage: savedDraft.taxPercentage || 0,
         },
-        id: null,
+        id: savedDraft.id || null,
       };
     }
 
     return defaultState;
   });
 
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [discountSchemes, setDiscountSchemes] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(false);
-
-  // Fetch data
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [discountSchemes, setDiscountSchemes] = useState([]);
   useEffect(() => {
     const fetchData = async () => {
       try {
         setCustomersLoading(true);
-        const today = new Date().toISOString().split("T")[0];
-        const [
-          stockResponse,
-          productResponse,
-          customersResponse,
-          categoriesResponse,
-          schemesResponse,
-        ] = await Promise.all([
-          axios.get("http://127.0.0.1:8000/api/detailed-stock-reports", {
+        const today = format(new Date(), "yyyy-MM-dd");
+
+        const endpoints = [
+          {
+            url: "/api/detailed-stock-reports",
             params: { toDate: today },
-          }),
-          axios.get("http://127.0.0.1:8000/api/products"),
-          axios.get("http://127.0.0.1:8000/api/customers"),
-          axios.get("http://127.0.0.1:8000/api/categories"),
-          axios.get("http://127.0.0.1:8000/api/discount-schemes"),
-        ]);
+            name: "stock",
+          },
+          { url: "/api/products", name: "products" },
+          { url: "/api/customers", name: "customers" },
+          { url: "/api/categories", name: "categories" },
+          { url: "/api/discount-schemes", name: "schemes" },
+        ];
+
+        const responses = await Promise.all(
+          endpoints.map((endpoint) =>
+            axios
+              .get(endpoint.url, { params: endpoint.params })
+              .then((res) => ({ data: res.data, name: endpoint.name }))
+              .catch((err) => {
+                console.error(`Error fetching ${endpoint.url}:`, err);
+                toast.error(`Failed to load ${endpoint.name} data`);
+                return { data: null, name: endpoint.name };
+              })
+          )
+        );
+
+        // Convert responses to an object for easier access
+        const responseData = responses.reduce((acc, response) => {
+          acc[response.name] = response.data;
+          return acc;
+        }, {});
 
         // Process products with stock and category_name
-        if (
-          stockResponse.data &&
-          Array.isArray(stockResponse.data) &&
-          productResponse.data &&
-          Array.isArray(productResponse.data.data)
-        ) {
-          const productsWithStock = productResponse.data.data.map((product) => {
-            const stockItem = stockResponse.data.find(
-              (stock) => stock.itemCode === product.item_code
-            );
-            return {
-              ...product,
-              product_id: product.product_id,
-              category_name: product.category || "Unknown",
-              opening_stock_quantity: stockItem
-                ? parseFloat(stockItem.closingStock || 0)
-                : parseFloat(product.opening_stock_quantity || 0),
-            };
-          });
-          setProducts(productsWithStock);
-          productsWithStock.forEach((p) => {
-            if (!p.category_name || p.category_name === "Unknown") {
-              console.warn(
-                `Missing or invalid category_name for product: ${p.product_name} (category_id: ${p.category_id})`
-              );
+        if (responseData.products?.data) {
+          const productsWithStock = responseData.products.data.map(
+            (product) => {
+              const stockItem =
+                responseData.stock?.data?.find(
+                  (stock) => stock.itemCode === product.item_code
+                ) ||
+                responseData.stock?.find(
+                  (stock) => stock.itemCode === product.item_code
+                );
+
+              return {
+                ...product,
+                product_id: product.product_id,
+                category_name: product.category || "Unknown",
+                opening_stock_quantity: stockItem
+                  ? parseFloat(stockItem.closingStock || 0)
+                  : parseFloat(product.opening_stock_quantity || 0),
+                buying_cost: parseFloat(product.buying_cost || 0),
+              };
             }
-          });
-        } else {
-          setProducts(
-            productResponse.data.data.map((product) => ({
-              ...product,
-              product_id: product.product_id,
-              category_name: product.category || "Unknown",
-              opening_stock_quantity: parseFloat(
-                product.opening_stock_quantity || 0
-              ),
-            }))
           );
-          toast.warn(
-            "Invalid stock data format. Using default stock quantities."
+          setProducts(productsWithStock);
+        }
+
+        if (responseData.customers?.data) {
+          setCustomers(responseData.customers.data);
+        } else if (responseData.customers) {
+          // Handle case where data might not be nested under .data
+          setCustomers(responseData.customers);
+        }
+
+        if (responseData.categories) {
+          setCategories(
+            responseData.categories.data || responseData.categories
           );
         }
 
-        setCustomers(customersResponse.data.data || []);
-        setCategories(categoriesResponse.data || []);
-        setDiscountSchemes(
-          schemesResponse.data.data || schemesResponse.data || []
-        );
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error("Failed to load data. Check console for details.");
-        try {
-          const fallbackResponse = await axios.get(
-            "http://127.0.0.1:8000/api/products"
-          );
-          setProducts(
-            fallbackResponse.data.data.map((product) => ({
-              ...product,
-              product_id: product.product_id,
-              category_name: product.category || "Unknown",
-              opening_stock_quantity: parseFloat(
-                product.opening_stock_quantity || 0
-              ),
-            }))
-          );
-        } catch (fallbackError) {
-          toast.error("Failed to load products.");
+        if (responseData.schemes?.data || responseData.schemes) {
+          setDiscountSchemes(responseData.schemes.data || responseData.schemes);
         }
+      } catch (error) {
+        console.error("Error in main fetch:", error);
+        toast.error("Failed to load some data. Check console for details.");
       } finally {
         setCustomersLoading(false);
       }
     };
+
     fetchData();
-  }, []);
+  }, []); // Add dependencies if needed
 
   // Recalculate discounts when discountSchemes or products change
   useEffect(() => {
@@ -360,1349 +364,1479 @@ const SalesInvoice = ({
   }, [formData, isEditMode]);
 
   // Calculate special discount based on product or category
-// Removed duplicate declaration of calculateSpecialDiscount
-
-// Calculate special discount based on product or category
-const calculateSpecialDiscount = useCallback(
-  (item, invoiceDate) => {
-    if (!item.productId) {
-      return { discount: 0, scheme: null, schemeType: null };
-    }
-
-    const product = products.find((p) => p.product_id === item.productId);
-    if (!product) {
-      console.warn(`Product not found for productId: ${item.productId}`);
-      return { discount: 0, scheme: null, schemeType: null };
-    }
-
-    const categoryName = product.category_name || "Unknown";
-    if (categoryName === "Unknown") {
-      console.warn(
-        `No valid category_name for product: ${product.product_name} (category_id: ${product.category_id})`
-      );
-    }
-
-    const qty = parseFloat(item.qty) || 1;
-    const salesPrice = parseFloat(item.unitPrice) || 0;
-    const totalAmount = qty * salesPrice;
-
-    const applicableScheme = discountSchemes.find((scheme) => {
-      if (
-        !scheme.active ||
-        !isDateWithinScheme(invoiceDate, scheme.start_date, scheme.end_date)
-      ) {
-        return false;
+  const calculateSpecialDiscount = useCallback(
+    (item, invoiceDate) => {
+      if (!item.productId) {
+        return { discount: 0, scheme: null, schemeType: null };
       }
-      const target = scheme.target?.trim().toLowerCase();
-      const productMatch =
-        scheme.applies_to === "product" &&
-        target ===
-        (product.description?.trim().toLowerCase() ||
-          product.product_name?.trim().toLowerCase());
-      const categoryMatch =
-        scheme.applies_to === "category" &&
-        categoryName &&
-        target === categoryName?.trim().toLowerCase();
-      return productMatch || categoryMatch;
-    });
 
-    if (!applicableScheme) {
-      return { discount: 0, scheme: null, schemeType: null };
-    }
-
-    let discount = 0;
-    if (applicableScheme.type === "percentage") {
-      discount = (totalAmount * parseFloat(applicableScheme.value)) / 100;
-    } else if (applicableScheme.type === "amount") {
-      discount = parseFloat(applicableScheme.value) * qty;
-    }
-
-    const schemeType =
-      applicableScheme.applies_to === "product" ? "product" : "category";
-    return {
-      discount: discount >= 0 ? discount : 0,
-      scheme: applicableScheme,
-      schemeType,
-    };
-  },
-  [products, discountSchemes]
-);
-
-// Update item totals including special discount
-const updateItemTotal = useCallback(
-  (item, invoiceDate) => {
-    const qty = parseFloat(item.qty) || 0;
-    const unitPrice = parseFloat(item.unitPrice) || 0;
-    const mrp = parseFloat(item.mrp) || 0;
-    const buyingCost = parseFloat(item.buyingCost) || 0;
-    let discountAmount = parseFloat(item.discountAmount) || 0;
-    let discountPercentage = parseFloat(item.discountPercentage) || 0;
-
-    // Calculate discount from percentage or amount
-    if (
-      item.discountPercentage !== "" &&
-      item.discountPercentage !== undefined
-    ) {
-      discountPercentage =
-        discountPercentage >= 0 && discountPercentage <= 100
-          ? discountPercentage
-          : 0;
-      discountAmount = (unitPrice * qty * discountPercentage) / 100;
-    } else if (
-      item.discountAmount !== "" &&
-      item.discountAmount !== undefined
-    ) {
-      discountAmount = discountAmount >= 0 ? discountAmount : 0;
-      discountPercentage =
-        unitPrice > 0 && qty > 0
-          ? (discountAmount / (unitPrice * qty)) * 100
-          : 0;
-    } else {
-      discountAmount = 0;
-      discountPercentage = 0;
-    }
-
-    // Calculate special discount
-    const { discount: specialDiscount, scheme, schemeType } =
-      calculateSpecialDiscount(item, invoiceDate);
-
-    // Calculate total: qty * unitPrice - (discountAmount + specialDiscount)
-    const total = qty * unitPrice - (discountAmount + specialDiscount);
-
-    return {
-      ...item,
-      discountAmount: discountAmount >= 0 ? discountAmount : 0,
-      discountPercentage,
-      specialDiscount,
-      discountScheme: scheme,
-      discountSchemeType: schemeType,
-      total: total >= 0 ? total : 0,
-      totalBuyingCost: qty * buyingCost,
-      mrp,
-    };
-  },
-  [calculateSpecialDiscount]
-);
-
-const handleInputChange = (e, section, field, index = null) => {
-  const { name, value } = e.target;
-  const targetName = name || field;
-  let processedValue = value;
-
-  setFormData((prev) => {
-    const newData = { ...prev };
-    if (index !== null && section === "items") {
-      const newItems = [...newData.items];
-      if (
-        targetName === "qty" ||
-        targetName === "unitPrice" ||
-        targetName === "discountAmount" ||
-        targetName === "discountPercentage"
-      ) {
-        processedValue = value === "" ? "" : parseFloat(value) || 0;
-        newItems[index] = {
-          ...newItems[index],
-          [targetName]: processedValue,
-        };
-        newItems[index] = updateItemTotal(newItems[index], newData.invoice.date);
-      } else {
-        newItems[index] = {
-          ...newItems[index],
-          [targetName]: processedValue,
-        };
+      const product = products.find((p) => p.product_id === item.productId);
+      if (!product) {
+        console.warn(`Product not found for productId: ${item.productId}`);
+        return { discount: 0, scheme: null, schemeType: null };
       }
-      newData.items = newItems;
-    } else {
-      if (
-        section === "purchaseDetails" &&
-        (targetName === "amount" || targetName === "taxPercentage")
-      ) {
-        processedValue = value === "" ? "" : parseFloat(value) || 0;
-      }
-      newData[section] = {
-        ...newData[section],
-        [targetName]: processedValue,
-      };
-      if (section === "invoice" && targetName === "date") {
-        newData.items = newData.items.map((item) =>
-          updateItemTotal(item, processedValue)
+
+      const categoryName = product.category_name || "Unknown";
+      if (categoryName === "Unknown") {
+        console.warn(
+          `No valid category_name for product: ${product.product_name} (category_id: ${product.category_id})`
         );
       }
-    }
-    return newData;
-  });
 
-  setErrors((prev) => ({
-    ...prev,
-    [`${section === "items"
-        ? `item${targetName.charAt(0).toUpperCase() + targetName.slice(1)
-        }${index}`
-        : `${section}${targetName.charAt(0).toUpperCase() + targetName.slice(1)
-        }`
-      }`]: undefined,
-    items: undefined,
-    purchaseAmount: undefined,
-  }));
-};
+      const qty = parseFloat(item.qty) || 1;
+      const salesPrice = parseFloat(item.unitPrice) || 0;
+      const totalAmount = qty * salesPrice;
 
-const handleCustomerSelect = (selectedOption) => {
-  const customer = selectedOption
-    ? customers.find((c) => c.id === selectedOption.value)
-    : null;
-  setFormData((prev) => ({
-    ...prev,
-    customer: {
-      id: customer ? customer.id : null,
-      name: customer ? customer.customer_name : "",
-      address: customer ? customer.address || "" : "",
-      phone: customer ? customer.phone || "" : "",
-      email: customer ? customer.email || "" : "",
+      const applicableScheme = discountSchemes.find((scheme) => {
+        if (
+          !scheme.active ||
+          !isDateWithinScheme(invoiceDate, scheme.start_date, scheme.end_date)
+        ) {
+          return false;
+        }
+        const target = scheme.target?.trim().toLowerCase();
+        const productMatch =
+          scheme.applies_to === "product" &&
+          target ===
+            (product.description?.trim().toLowerCase() ||
+              product.product_name?.trim().toLowerCase());
+        const categoryMatch =
+          scheme.applies_to === "category" &&
+          categoryName &&
+          target === categoryName?.trim().toLowerCase();
+        return productMatch || categoryMatch;
+      });
+
+      if (!applicableScheme) {
+        return { discount: 0, scheme: null, schemeType: null };
+      }
+
+      let discount = 0;
+      if (applicableScheme.type === "percentage") {
+        discount = (totalAmount * parseFloat(applicableScheme.value)) / 100;
+      } else if (applicableScheme.type === "amount") {
+        discount = parseFloat(applicableScheme.value) * qty;
+      }
+
+      const schemeType =
+        applicableScheme.applies_to === "product" ? "product" : "category";
+      return {
+        discount: discount >= 0 ? discount : 0,
+        scheme: applicableScheme,
+        schemeType,
+      };
     },
-  }));
-  setErrors((prev) => ({
-    ...prev,
-    customerName: undefined,
-    customerEmail: undefined,
-  }));
-  setTimeout(() => customerAddressRef.current?.focus(), 0);
-};
+    [products, discountSchemes]
+  );
 
-const handleProductSelect = (selectedOption, index) => {
-  const product = selectedOption
-    ? products.find((p) => p.product_id === selectedOption.value)
-    : null;
-  setFormData((prev) => {
-    const newItems = [...prev.items];
-    const qty = parseFloat(newItems[index].qty) || 1;
-    const mrp = product ? parseFloat(product.mrp) || 0 : 0;
-    const salesPrice = product ? parseFloat(product.sales_price) || mrp : 0;
-    const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
+  // Update item totals including special discount
+  const updateItemTotal = useCallback(
+    (item, invoiceDate) => {
+      const qty = parseFloat(item.qty) || 0;
+      const unitPrice = parseFloat(item.unitPrice) || 0;
+      const mrp = parseFloat(item.mrp) || 0;
+      const buyingCost = parseFloat(item.buyingCost) || 0;
+      let discountAmount = parseFloat(item.discountAmount) || 0;
+      let discountPercentage = parseFloat(item.discountPercentage) || 0;
 
-    newItems[index] = {
-      ...newItems[index],
-      productId: product ? product.product_id : null,
-      categoryId: product ? product.category_id : null,
-      description: product ? product.product_name : "",
-      unitPrice: "",
-      mrp,
-      salesPrice,
-      buyingCost,
-      discountAmount: "",
-      discountPercentage: "",
-      totalBuyingCost: qty * buyingCost,
-    };
+      // Calculate discount from percentage or amount
+      if (
+        item.discountPercentage !== "" &&
+        item.discountPercentage !== undefined
+      ) {
+        discountPercentage =
+          discountPercentage >= 0 && discountPercentage <= 100
+            ? discountPercentage
+            : 0;
+        discountAmount = (unitPrice * qty * discountPercentage) / 100;
+      } else if (
+        item.discountAmount !== "" &&
+        item.discountAmount !== undefined
+      ) {
+        discountAmount = discountAmount >= 0 ? discountAmount : 0;
+        discountPercentage =
+          unitPrice > 0 && qty > 0
+            ? (discountAmount / (unitPrice * qty)) * 100
+            : 0;
+      } else {
+        // Calculate discount as (mrp - salesPrice) * qty if discountAmount is empty or zero
+        discountAmount = (mrp - item.salesPrice) * qty;
+        discountAmount = discountAmount >= 0 ? discountAmount : 0;
+        discountPercentage =
+          unitPrice > 0 && qty > 0
+            ? (discountAmount / (unitPrice * qty)) * 100
+            : 0;
+      }
 
-    newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
-    return { ...prev, items: newItems };
-  });
+      // Calculate special discount
+      const {
+        discount: specialDiscount,
+        scheme,
+        schemeType,
+      } = calculateSpecialDiscount(item, invoiceDate);
 
-  if (product && !product.category_name) {
-    toast.warn(`No category assigned to product: ${product.product_name}`);
-  }
+      // Calculate total: qty * unitPrice - (discountAmount + specialDiscount)
+      const total = qty * unitPrice - (discountAmount + specialDiscount);
 
-  setErrors((prev) => ({ ...prev, [`itemDescription${index}`]: undefined }));
-  setTimeout(() => itemRefs.current[index]?.qty?.current?.focus(), 0);
-};
+      const profit = total - qty * buyingCost;
 
-const addItem = () => {
-  setFormData((prev) => ({
-    ...prev,
-    items: [
-      ...prev.items,
-      {
-        id: Date.now(),
-        description: "",
-        qty: 1,
-        unitPrice: "",
-        salesPrice: 0,
+      return {
+        ...item,
+        discountAmount: discountAmount >= 0 ? discountAmount : 0,
+        discountPercentage,
+        specialDiscount,
+        discountScheme: scheme,
+        discountSchemeType: schemeType,
+        total: total >= 0 ? total : 0,
+        totalBuyingCost: qty * buyingCost,
+        mrp,
+        profit: profit >= 0 ? profit : 0,
+      };
+    },
+    [calculateSpecialDiscount]
+  );
+
+  const handleInputChange = (e, section, field, index = null) => {
+    const { name, value } = e.target;
+    const targetName = name || field;
+    let processedValue = value;
+
+    setFormData((prev) => {
+      const newData = { ...prev };
+      if (index !== null && section === "items") {
+        const newItems = [...newData.items];
+        if (
+          targetName === "qty" ||
+          targetName === "unitPrice" ||
+          targetName === "discountAmount" ||
+          targetName === "discountPercentage"
+        ) {
+          processedValue = value === "" ? "" : parseFloat(value) || 0;
+          newItems[index] = {
+            ...newItems[index],
+            [targetName]: processedValue,
+          };
+          newItems[index] = updateItemTotal(
+            newItems[index],
+            newData.invoice.date
+          );
+        } else {
+          newItems[index] = {
+            ...newItems[index],
+            [targetName]: processedValue,
+          };
+        }
+        newData.items = newItems;
+      } else {
+        if (
+          section === "purchaseDetails" &&
+          (targetName === "amount" || targetName === "taxPercentage")
+        ) {
+          processedValue = value === "" ? "" : parseFloat(value) || 0;
+        }
+        newData[section] = {
+          ...newData[section],
+          [targetName]: processedValue,
+        };
+        if (section === "invoice" && targetName === "date") {
+          newData.items = newData.items.map((item) =>
+            updateItemTotal(item, processedValue)
+          );
+        }
+      }
+      return newData;
+    });
+
+    setErrors((prev) => ({
+      ...prev,
+      [`${
+        section === "items"
+          ? `item${
+              targetName.charAt(0).toUpperCase() + targetName.slice(1)
+            }${index}`
+          : `${section}${
+              targetName.charAt(0).toUpperCase() + targetName.slice(1)
+            }`
+      }`]: undefined,
+      items: undefined,
+      purchaseAmount: undefined,
+    }));
+  };
+
+  const handleCustomerSelect = (selectedOption) => {
+    const customer = selectedOption
+      ? customers.find((c) => c.id === selectedOption.value)
+      : null;
+    setFormData((prev) => ({
+      ...prev,
+      customer: {
+        id: customer ? customer.id : null,
+        name: customer ? customer.customer_name : "",
+        address: customer ? customer.address || "" : "",
+        phone: customer ? customer.phone || "" : "",
+        email: customer ? customer.email || "" : "",
+      },
+    }));
+    setErrors((prev) => ({
+      ...prev,
+      customerName: undefined,
+      customerEmail: undefined,
+    }));
+    setTimeout(() => customerAddressRef.current?.focus(), 0);
+  };
+
+  const handleProductSelect = (selectedOption, index) => {
+    const product = selectedOption
+      ? products.find((p) => p.product_id === selectedOption.value)
+      : null;
+
+    setFormData((prev) => {
+      const newItems = [...prev.items];
+      if (!newItems[index]) {
+        // If index is invalid, do nothing or add a new item
+        return prev;
+      }
+      const qty = parseFloat(newItems[index].qty) || 1;
+      const mrp = product ? parseFloat(product.mrp) || 0 : 0;
+      // Set unitPrice to mrp instead of salesPrice
+      const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
+      const stock = product
+        ? parseFloat(product.opening_stock_quantity) || 0
+        : 0;
+
+      newItems[index] = {
+        ...newItems[index],
+        productId: product ? product.product_id : null,
+        categoryId: product ? product.category_id : null,
+        description: product ? product.product_name : "",
+        unitPrice: mrp,
+        mrp,
+        salesPrice: product ? parseFloat(product.sales_price) || mrp : 0,
+        buyingCost,
+        stock,
         discountAmount: "",
         discountPercentage: "",
-        specialDiscount: 0,
-        total: 0,
-        totalBuyingCost: 0,
-        productId: null,
-        buyingCost: 0,
-        categoryId: null,
-        mrp: 0,
-      },
-    ],
-  }));
-  setTimeout(
-    () =>
-      itemRefs.current[formData.items.length]?.description?.current?.focus(),
-    0
-  );
-};
+        totalBuyingCost: qty * buyingCost,
+      };
 
-const removeItem = (index) => {
-  if (formData.items.length <= 1) {
-    toast.warn("Cannot remove the only item.");
-    return;
-  }
-  setFormData((prev) => ({
-    ...prev,
-    items: prev.items.filter((_, i) => i !== index),
-  }));
-};
+      newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
+      return { ...prev, items: newItems };
+    });
 
-const calculateSubtotal = useCallback(() => {
-  return formData.items.reduce((sum, item) => {
-    const total = parseFloat(item.total) || 0;
-    return sum + total;
-  }, 0);
-}, [formData.items]);
-
-const calculateTax = useCallback(
-  (subtotal) => {
-    const taxPercentage =
-      parseFloat(formData.purchaseDetails.taxPercentage) || 0;
-    return subtotal * (taxPercentage / 100);
-  },
-  [formData.purchaseDetails.taxPercentage]
-);
-
-const calculateTotal = useCallback(() => {
-  const subtotal = calculateSubtotal();
-  return subtotal + calculateTax(subtotal);
-}, [calculateSubtotal, calculateTax]);
-
-const calculateBalance = useCallback(() => {
-  return (
-    (parseFloat(formData.purchaseDetails.amount) || 0) - calculateTotal()
-  );
-}, [calculateTotal, formData.purchaseDetails.amount]);
-
-const validateForm = () => {
-  const newErrors = {};
-  const { invoice, customer, items, purchaseDetails } = formData;
-  const total = calculateTotal();
-  const amountPaid = parseFloat(purchaseDetails.amount) || 0;
-
-  if (!invoice.date) newErrors.invoiceDate = "Invoice date is required";
-  if (!invoice.time || !/^\d{2}:\d{2}$/.test(invoice.time))
-    newErrors.invoiceTime = "Invalid time format (HH:MM)";
-  if (!customer.name?.trim())
-    newErrors.customerName = "Customer name is required";
-  if (customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))
-    newErrors.customerEmail = "Invalid email address";
-  if (!items.length) newErrors.items = "At least one item is required";
-  if (
-    purchaseDetails.taxPercentage !== "" &&
-    parseFloat(purchaseDetails.taxPercentage) < 0
-  ) {
-    newErrors.purchaseTaxPercentage = "Tax percentage cannot be negative";
-  }
-  if (purchaseDetails.amount !== "" && amountPaid < 0)
-    newErrors.purchaseAmount = "Amount paid cannot be negative";
-
-  // Validate amount paid based on payment method
-  const fullPaymentMethods = ["cash", "card", "online", "cheque"];
-  if (
-    fullPaymentMethods.includes(purchaseDetails.method) &&
-    purchaseDetails.amount !== "" &&
-    amountPaid < total
-  ) {
-    newErrors.purchaseAmount = `Amount paid must be at least LKR ${total.toFixed(
-      2
-    )} for ${purchaseDetails.method} payments`;
-  }
-  if (
-    purchaseDetails.method === "credit" &&
-    purchaseDetails.amount !== "" &&
-    amountPaid >= total
-  ) {
-    newErrors.purchaseAmount = `Amount paid must be less than LKR ${total.toFixed(
-      2
-    )} for credit payments`;
-  }
-
-  items.forEach((item, idx) => {
-    if (!item.productId && !item.description?.trim())
-      newErrors[`itemDescription${idx}`] =
-        "Description or product is required";
-    if (item.qty === "" || parseFloat(item.qty) <= 0)
-      newErrors[`itemQty${idx}`] = "Quantity must be positive";
-    if (item.unitPrice === "" || parseFloat(item.unitPrice) < 0)
-      newErrors[`itemUnitPrice${idx}`] = "Unit price must be non-negative";
-    if (
-      item.discountAmount !== "" &&
-      parseFloat(item.discountAmount) < 0
-    )
-      newErrors[`itemDiscountAmount${idx}`] =
-        "Discount amount cannot be negative";
-    if (
-      item.discountPercentage !== "" &&
-      (parseFloat(item.discountPercentage) < 0 ||
-        parseFloat(item.discountPercentage) > 100)
-    ) {
-      newErrors[`itemDiscountPercentage${idx}`] =
-        "Discount percentage must be between 0 and 100";
+    if (product && !product.category_name) {
+      toast.warn(`No category assigned to product: ${product.product_name}`);
     }
-    if (item.specialDiscount < 0)
-      newErrors[`itemSpecialDiscount${idx}`] =
-        "Special discount cannot be negative";
-    const product = products.find((p) => p.product_id === item.productId);
-    if (
-      product &&
-      parseFloat(item.qty) > parseFloat(product.opening_stock_quantity)
-    ) {
-      newErrors[
-        `itemQty${idx}`
-      ] = `Quantity exceeds stock (${product.opening_stock_quantity})`;
+
+    setErrors((prev) => ({ ...prev, [`itemDescription${index}`]: undefined }));
+    setTimeout(() => itemRefs.current[index]?.qty?.current?.focus(), 0);
+  };
+
+  const addItem = () => {
+    setFormData((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: Date.now(),
+          description: "",
+          qty: 1,
+          unitPrice: "",
+          salesPrice: 0,
+          discountAmount: "",
+          discountPercentage: "",
+          specialDiscount: 0,
+          total: 0,
+          totalBuyingCost: 0,
+          productId: null,
+          buyingCost: 0,
+          categoryId: null,
+          mrp: 0,
+          stock: 0,
+        },
+      ],
+    }));
+    setTimeout(
+      () =>
+        itemRefs.current[formData.items.length]?.description?.current?.focus(),
+      0
+    );
+  };
+
+  const removeItem = (index) => {
+    if (formData.items.length <= 1) {
+      toast.warn("Cannot remove the only item.");
+      return;
     }
-  });
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  };
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
+  const calculateSubtotal = useCallback(() => {
+    return formData.items.reduce((sum, item) => {
+      const total = parseFloat(item.total) || 0;
+      return sum + total;
+    }, 0);
+  }, [formData.items]);
 
-const handleSubmit = useCallback(
-  async (e) => {
+  const calculateTax = useCallback(
+    (subtotal) => {
+      const taxPercentage =
+        parseFloat(formData.purchaseDetails.taxPercentage) || 0;
+      return subtotal * (taxPercentage / 100);
+    },
+    [formData.purchaseDetails.taxPercentage]
+  );
+
+  const calculateTotal = useCallback(() => {
+    const subtotal = calculateSubtotal();
+    return subtotal + calculateTax(subtotal);
+  }, [calculateSubtotal, calculateTax]);
+
+  const calculateBalance = useCallback(() => {
+    return (
+      (parseFloat(formData.purchaseDetails.amount) || 0) - calculateTotal()
+    );
+  }, [calculateTotal, formData.purchaseDetails.amount]);
+
+  const validateForm = () => {
+    const newErrors = {};
+    const { invoice, customer, items, purchaseDetails } = formData;
+    const total = calculateTotal();
+    const amountPaid = parseFloat(purchaseDetails.amount) || 0;
+
+    if (!invoice.date) newErrors.invoiceDate = "Invoice date is required";
+    if (!invoice.time || !/^\d{2}:\d{2}$/.test(invoice.time))
+      newErrors.invoiceTime = "Invalid time format (HH:MM)";
+    if (!customer.name?.trim())
+      newErrors.customerName = "Customer name is required";
+    if (customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))
+      newErrors.customerEmail = "Invalid email address";
+    if (!items.length) newErrors.items = "At least one item is required";
+    if (
+      purchaseDetails.taxPercentage !== "" &&
+      parseFloat(purchaseDetails.taxPercentage) < 0
+    ) {
+      newErrors.purchaseTaxPercentage = "Tax percentage cannot be negative";
+    }
+    if (purchaseDetails.amount !== "" && amountPaid < 0)
+      newErrors.purchaseAmount = "Amount paid cannot be negative";
+
+    // Validate amount paid based on payment method
+    const fullPaymentMethods = ["cash", "card", "online", "cheque"];
+    if (
+      fullPaymentMethods.includes(purchaseDetails.method) &&
+      purchaseDetails.amount !== "" &&
+      amountPaid < total
+    ) {
+      newErrors.purchaseAmount = `Amount paid must be at least ${formatCurrency(total)} for ${purchaseDetails.method} payments`;
+    }
+    if (
+      purchaseDetails.method === "credit" &&
+      purchaseDetails.amount !== "" &&
+      amountPaid >= total
+    ) {
+      newErrors.purchaseAmount = `Amount paid must be less than ${formatCurrency(total)} for credit payments`;
+    }
+
+    items.forEach((item, idx) => {
+      if (!item.productId && !item.description?.trim())
+        newErrors[`itemDescription${idx}`] =
+          "Description or product is required";
+      if (item.qty === "" || parseFloat(item.qty) <= 0)
+        newErrors[`itemQty${idx}`] = "Quantity must be positive";
+      if (item.unitPrice === "" || parseFloat(item.unitPrice) < 0)
+        newErrors[`itemUnitPrice${idx}`] = "Unit price must be non-negative";
+      if (item.discountAmount !== "" && parseFloat(item.discountAmount) < 0)
+        newErrors[`itemDiscountAmount${idx}`] =
+          "Discount amount cannot be negative";
+      if (
+        item.discountPercentage !== "" &&
+        (parseFloat(item.discountPercentage) < 0 ||
+          parseFloat(item.discountPercentage) > 100)
+      ) {
+        newErrors[`itemDiscountPercentage${idx}`] =
+          "Discount percentage must be between 0 and 100";
+      }
+      if (item.specialDiscount < 0)
+        newErrors[`itemSpecialDiscount${idx}`] =
+          "Special discount cannot be negative";
+      const product = products.find((p) => p.product_id === item.productId);
+      if (
+        product &&
+        parseFloat(item.qty) > parseFloat(product.opening_stock_quantity)
+      ) {
+        newErrors[`itemQty${idx}`] =
+          `Quantity exceeds available stock (${product.opening_stock_quantity})`;
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!validateForm()) {
+        toast.warn("Please fix validation errors.");
+        return;
+      }
+
+      setLoading(true);
+      const payload = {
+        invoice: formData.invoice,
+        customer: {
+          id: formData.customer.id || null,
+          name: formData.customer.name,
+          address: formData.customer.address || null,
+          phone: formData.customer.phone || null,
+          email: formData.customer.email || null,
+        },
+        items: formData.items.map((item) => ({
+          id: isEditMode && item.id ? item.id : undefined,
+          product_id: item.productId || null,
+          description: item.description || "Item",
+          qty: parseFloat(item.qty) || 0,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          salesPrice: parseFloat(item.sales_price) || 0,
+          discountAmount: parseFloat(item.discountAmount) || 0,
+          discountPercentage: parseFloat(item.discountPercentage) || 0,
+          specialDiscount: parseFloat(item.specialDiscount) || 0,
+          total: parseFloat(item.total) || 0,
+          totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
+        })),
+        purchaseDetails: {
+          method: formData.purchaseDetails.method,
+          amount: parseFloat(formData.purchaseDetails.amount) || 0,
+          taxPercentage:
+            parseFloat(formData.purchaseDetails.taxPercentage) || 0,
+        },
+        status: formData.status,
+      };
+
+      try {
+        if (isEditMode) {
+          await onUpdateInvoice(payload, formData.id);
+          toast.success("Invoice updated successfully!");
+        } else {
+          await onGenerateInvoice(payload);
+          toast.success("Invoice created successfully!");
+          localStorage.removeItem(draftKey);
+          setFormData({
+            invoice: {
+              no: "",
+              date: format(new Date(), "yyyy-MM-dd"),
+              time: format(new Date(), "HH:mm"),
+            },
+            customer: { id: null, name: "", address: "", phone: "", email: "" },
+            items: [
+              {
+                id: Date.now(),
+                description: "",
+                qty: 1,
+                unitPrice: "",
+                salesPrice: 0,
+                discountAmount: "",
+                discountPercentage: "",
+                specialDiscount: 0,
+                total: 0,
+                totalBuyingCost: 0,
+                productId: null,
+                buyingCost: 0,
+                categoryId: null,
+                mrp: 0,
+                stock: 0,
+              },
+            ],
+            purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
+            status: "pending",
+            id: null,
+          });
+          setErrors({});
+          invoiceNoRef.current?.focus();
+        }
+      } catch (error) {
+        const message =
+          error.response?.data?.message || "Failed to save invoice.";
+        const details = error.response?.data?.errors
+          ? Object.entries(error.response.data.errors)
+              .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+              .join("\n")
+          : "No detailed errors provided.";
+        console.error("API Error Details:", {
+          message,
+          details,
+          response: error.response?.data,
+        });
+        toast.error(`${message}\n${details}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [formData, isEditMode, onGenerateInvoice, onUpdateInvoice, products]
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        handleSubmit(e);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSubmit, onCancel]);
+
+  const getFieldOrder = useCallback(() => {
+    const fields = [
+      { ref: invoiceNoRef, name: "invoiceNo", type: "input" },
+      { ref: invoiceDateRef, name: "invoiceDate", type: "input" },
+      { ref: invoiceTimeRef, name: "invoiceTime", type: "input" },
+      { ref: customerNameRef, name: "customerName", type: "select" },
+      { ref: customerAddressRef, name: "customerAddress", type: "input" },
+      { ref: customerPhoneRef, name: "customerPhone", type: "input" },
+      { ref: customerEmailRef, name: "customerEmail", type: "input" },
+    ];
+    formData.items.forEach((_, index) => {
+      fields.push(
+        {
+          ref: itemRefs.current[index]?.description,
+          name: `itemDescription${index}`,
+          type: "select",
+          index,
+        },
+        {
+          ref: itemRefs.current[index]?.qty,
+          name: `itemQty${index}`,
+          type: "input",
+          index,
+        },
+        {
+          ref: itemRefs.current[index]?.unitPrice,
+          name: `itemUnitPrice${index}`,
+          type: "input",
+          index,
+        },
+        {
+          ref: itemRefs.current[index]?.discountAmount,
+          name: `itemDiscountAmount${index}`,
+          type: "input",
+          index,
+        },
+        {
+          ref: itemRefs.current[index]?.discountPercentage,
+          name: `itemDiscountPercentage${index}`,
+          type: "input",
+          index,
+        }
+      );
+    });
+    fields.push(
+      { ref: purchaseMethodRef, name: "purchaseMethod", type: "select-native" },
+      { ref: purchaseAmountRef, name: "purchaseAmount", type: "input" },
+      { ref: taxPercentageRef, name: "purchaseTaxPercentage", type: "input" }
+    );
+    return fields;
+  }, [formData.items]);
+
+  const handleEnterKey = (e, currentRef, itemIndex = null) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
-    if (!validateForm()) {
-      toast.warn("Please fix validation errors.");
+
+    const fields = getFieldOrder();
+    const currentFieldIndex = fields.findIndex(
+      (field) => field.ref?.current === currentRef.current
+    );
+    if (currentFieldIndex === -1) return;
+
+    const currentField = fields[currentFieldIndex];
+    if (
+      currentField.type === "select" &&
+      currentField.name === "customerName" &&
+      !formData.customer.name
+    )
+      return;
+    if (
+      currentField.type === "select" &&
+      currentField.name.startsWith("itemDescription") &&
+      !formData.items[itemIndex]?.productId
+    )
+      return;
+
+    // Add new item if Enter pressed on discountAmount of last item
+    if (
+      currentField.name === `itemDiscountAmount${formData.items.length - 1}`
+    ) {
+      addItem();
       return;
     }
 
-    setLoading(true);
-    const payload = {
-      invoice: formData.invoice,
-      customer: {
-        id: formData.customer.id || null,
-        name: formData.customer.name,
-        address: formData.customer.address || null,
-        phone: formData.customer.phone || null,
-        email: formData.customer.email || null,
-      },
-      items: formData.items.map((item) => ({
-        id: isEditMode && item.id ? item.id : undefined,
-        product_id: item.productId || null,
-        description: item.description || "Item",
-        qty: parseFloat(item.qty) || 0,
-        unitPrice: parseFloat(item.unitPrice) || 0,
-        salesPrice: parseFloat(item.unitPrice) || 0,
-        discountAmount: parseFloat(item.discountAmount) || 0,
-        discountPercentage: parseFloat(item.discountPercentage) || 0,
-        specialDiscount: parseFloat(item.specialDiscount) || 0,
-        total: parseFloat(item.total) || 0,
-        totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
-      })),
-      purchaseDetails: {
-        method: formData.purchaseDetails.method,
-        amount: parseFloat(formData.purchaseDetails.amount) || 0,
-        taxPercentage: parseFloat(formData.purchaseDetails.taxPercentage) || 0,
-      },
-      status: formData.status,
-    };
-
-    try {
-      if (isEditMode) {
-        await onUpdateInvoice(payload, formData.id);
-        toast.success("Invoice updated!");
-      } else {
-        await onGenerateInvoice(payload);
-        toast.success("Invoice created!");
-        localStorage.removeItem(draftKey);
-        setFormData({
-          invoice: {
-            no: "",
-            date: new Date().toISOString().split("T")[0],
-            time: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            }),
-          },
-          customer: { id: null, name: "", address: "", phone: "", email: "" },
-          items: [
-            {
-              id: Date.now(),
-              description: "",
-              qty: 1,
-              unitPrice: "",
-              salesPrice: 0,
-              discountAmount: "",
-              discountPercentage: "",
-              specialDiscount: 0,
-              total: 0,
-              totalBuyingCost: 0,
-              productId: null,
-              buyingCost: 0,
-              categoryId: null,
-              mrp: 0,
-            },
-          ],
-          purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
-          status: "pending",
-          id: null,
-        });
-        setErrors({});
-        invoiceNoRef.current?.focus();
-      }
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to save invoice.";
-      const details = error.response?.data?.errors
-        ? Object.entries(error.response.data.errors)
-            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-            .join("\n")
-        : "No detailed errors provided.";
-      console.error("API Error Details:", {
-        message,
-        details,
-        response: error.response?.data,
-      });
-      toast.error(`${message}\n${details}`);
-    } finally {
-      setLoading(false);
+    if (currentField.name === `itemQty${formData.items.length - 1}`) {
+      addItem();
+      return;
     }
-  },
-  [formData, isEditMode, onGenerateInvoice, onUpdateInvoice, products]
-);
 
-useEffect(() => {
-  const handleKeyDown = (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-      e.preventDefault();
-      handleSubmit(e);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onCancel();
+    if (currentField.ref === purchaseAmountRef) {
+      document.getElementById("invoiceForm")?.requestSubmit();
+      return;
+    }
+
+    for (let i = currentFieldIndex + 1; i < fields.length; i++) {
+      const nextField = fields[i];
+      if (nextField.ref?.current) {
+        nextField.ref.current.focus();
+        if (nextField.type === "input") nextField.ref.current.select?.();
+        break;
+      }
     }
   };
-  window.addEventListener("keydown", handleKeyDown);
-  return () => window.removeEventListener("keydown", handleKeyDown);
-}, [handleSubmit, onCancel]);
 
-const getFieldOrder = useCallback(() => {
-  const fields = [
-    { ref: invoiceNoRef, name: "invoiceNo", type: "input" },
-    { ref: invoiceDateRef, name: "invoiceDate", type: "input" },
-    { ref: invoiceTimeRef, name: "invoiceTime", type: "input" },
-    { ref: customerNameRef, name: "customerName", type: "select" },
-    { ref: customerAddressRef, name: "customerAddress", type: "input" },
-    { ref: customerPhoneRef, name: "customerPhone", type: "input" },
-    { ref: customerEmailRef, name: "customerEmail", type: "input" },
-  ];
-  formData.items.forEach((_, index) => {
-    fields.push(
-      {
-        ref: itemRefs.current[index]?.description,
-        name: `itemDescription${index}`,
-        type: "select",
-        index,
-      },
-      {
-        ref: itemRefs.current[index]?.qty,
-        name: `itemQty${index}`,
-        type: "input",
-        index,
-      },
-      {
-        ref: itemRefs.current[index]?.unitPrice,
-        name: `itemUnitPrice${index}`,
-        type: "input",
-        index,
-      },
-      {
-        ref: itemRefs.current[index]?.discountAmount,
-        name: `itemDiscountAmount${index}`,
-        type: "input",
-        index,
-      },
-      {
-        ref: itemRefs.current[index]?.discountPercentage,
-        name: `itemDiscountPercentage${index}`,
-        type: "input",
-        index,
-      }
-    );
-  });
-  fields.push(
-    { ref: purchaseMethodRef, name: "purchaseMethod", type: "select-native" },
-    { ref: purchaseAmountRef, name: "purchaseAmount", type: "input" },
-    { ref: taxPercentageRef, name: "purchaseTaxPercentage", type: "input" }
+  const customerOptions = useMemo(
+    () => customers.map((c) => ({ value: c.id, label: c.customer_name })),
+    [customers]
   );
-  return fields;
-}, [formData.items]);
 
-const handleEnterKey = (e, currentRef, itemIndex = null) => {
-  if (e.key !== "Enter" || e.shiftKey) return;
-  e.preventDefault();
+  const filteredProductOptions = useMemo(() => {
+    return products
+      .filter(
+        (product) =>
+          product.product_name
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .map((p) => {
+        const categoryName = p.category_name || "Unknown";
+        const productScheme = discountSchemes.find((scheme) => {
+          if (!scheme.active || scheme.applies_to !== "product") return false;
+          return (
+            scheme.target?.trim().toLowerCase() ===
+            (p.description?.trim().toLowerCase() ||
+              p.product_name?.trim().toLowerCase())
+          );
+        });
+        const categoryScheme = discountSchemes.find((scheme) => {
+          if (!scheme.active || scheme.applies_to !== "category") return false;
+          return (
+            scheme.target?.trim().toLowerCase() ===
+            categoryName?.trim().toLowerCase()
+          );
+        });
 
-  const fields = getFieldOrder();
-  const currentFieldIndex = fields.findIndex(
-    (field) => field.ref?.current === currentRef.current
-  );
-  if (currentFieldIndex === -1) return;
+        let discountInfo = "";
+        if (productScheme) {
+          discountInfo = `, Product Discount: ${
+            productScheme.type === "percentage"
+              ? `${productScheme.value}%`
+              : `LKR ${productScheme.value}`
+          }`;
+        } else if (categoryScheme) {
+          discountInfo = `, Category Discount: ${
+            categoryScheme.type === "percentage"
+              ? `${categoryScheme.value}%`
+              : `LKR ${categoryScheme.value}`
+          }`;
+        }
 
-  const currentField = fields[currentFieldIndex];
-  if (
-    currentField.type === "select" &&
-    currentField.name === "customerName" &&
-    !formData.customer.name
-  )
-    return;
-  if (
-    currentField.type === "select" &&
-    currentField.name.startsWith("itemDescription") &&
-    !formData.items[itemIndex]?.productId
-  )
-    return;
+        return {
+          value: p.product_id,
+          label: `${p.product_name} (${p.description || "No description"})`,
+          description: `${p.product_name} - Stock: ${p.opening_stock_quantity ?? "N/A"}, Category: ${categoryName}${discountInfo}`,
+          stock: p.opening_stock_quantity,
+          mrp: p.mrp,
+          salesPrice: p.sales_price,
+        };
+      });
+  }, [products, discountSchemes, searchTerm]);
 
-  if (currentField.name === `itemQty${formData.items.length - 1}`) {
-    addItem();
-    return;
-  }
-
-  if (currentField.ref === purchaseAmountRef) {
-    document.getElementById("invoiceForm")?.requestSubmit();
-    return;
-  }
-
-  for (let i = currentFieldIndex + 1; i < fields.length; i++) {
-    const nextField = fields[i];
-    if (nextField.ref?.current) {
-      nextField.ref.current.focus();
-      if (nextField.type === "input") nextField.ref.current.select?.();
-      break;
-    }
-  }
-};
-
-const customerOptions = useMemo(
-  () => customers.map((c) => ({ value: c.id, label: c.customer_name })),
-  [customers]
-);
-const productOptions = useMemo(() => {
-  return products.map((p) => {
-    const categoryName = p.category_name || "Unknown";
-    const productScheme = discountSchemes.find((scheme) => {
-      if (!scheme.active || scheme.applies_to !== "product") return false;
-      return (
-        scheme.target?.trim().toLowerCase() ===
-        (p.description?.trim().toLowerCase() ||
-          p.product_name?.trim().toLowerCase())
-      );
-    });
-    const categoryScheme = discountSchemes.find((scheme) => {
-      if (!scheme.active || scheme.applies_to !== "category") return false;
-      return (
-        scheme.target?.trim().toLowerCase() ===
-        categoryName?.trim().toLowerCase()
-      );
-    });
-    let discountInfo = "";
-    if (productScheme) {
-      discountInfo = `, Discount: Product ${productScheme.target} (${
-        productScheme.type === "percentage"
-          ? `${productScheme.value}%`
-          : `LKR ${productScheme.value}`
-      })`;
-    } else if (categoryScheme) {
-      discountInfo = `, Discount: Category ${categoryScheme.target} (${
-        categoryScheme.type === "percentage"
-          ? `${categoryScheme.value}%`
-          : `LKR ${categoryScheme.value}`
-      })`;
-    }
-    return {
-      value: p.product_id,
-      label: `${p.product_name} (Stock: ${
-        p.opening_stock_quantity ?? "N/A"
-      }, Category: ${categoryName}${discountInfo})`,
-    };
+  const getSelectStyles = (hasError) => ({
+    control: (provided, state) => ({
+      ...provided,
+      borderColor: hasError
+        ? "#ef4444"
+        : state.isFocused
+          ? "#3b82f6"
+          : "#d1d5db",
+      boxShadow: state.isFocused
+        ? "0 0 0 1px #3b82f6"
+        : hasError
+          ? "0 0 0 1px #ef4444"
+          : "none",
+      "&:hover": { borderColor: hasError ? "#ef4444" : "#9ca3af" },
+      minHeight: "42px",
+    }),
+    menu: (provided) => ({ ...provided, zIndex: 50 }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected
+        ? "#dbeafe"
+        : state.isFocused
+          ? "#eff6ff"
+          : "white",
+    }),
+    indicatorSeparator: () => ({ display: "none" }),
   });
-}, [products, discountSchemes]);
 
-const getSelectStyles = (hasError) => ({
-  control: (provided, state) => ({
-    ...provided,
-    borderColor: hasError
-      ? "#ef4444"
-      : state.isFocused
-      ? "#3b82f6"
-      : "#d1d5db",
-    boxShadow: state.isFocused
-      ? "0 0 0 1px #3b82f6"
-      : hasError
-      ? "0 0 0 1px #ef4444"
-      : "none",
-    "&:hover": { borderColor: hasError ? "#ef4444" : "#9ca3af" },
-    minHeight: "42px",
-  }),
-  menu: (provided) => ({ ...provided, zIndex: 50 }),
-  option: (provided, state) => ({
-    ...provided,
-    backgroundColor: state.isSelected
-      ? "#dbeafe"
-      : state.isFocused
-      ? "#eff6ff"
-      : "white",
-  }),
-  indicatorSeparator: () => ({ display: "none" }),
-});
+  const subtotal = useMemo(() => calculateSubtotal(), [calculateSubtotal]);
+  const tax = useMemo(() => calculateTax(subtotal), [calculateTax, subtotal]);
+  const total = useMemo(() => calculateTotal(), [calculateTotal]);
+  const balance = useMemo(() => calculateBalance(), [calculateBalance]);
 
-const subtotal = useMemo(() => calculateSubtotal(), [calculateSubtotal]);
-const tax = useMemo(() => calculateTax(subtotal), [calculateTax, subtotal]);
-const total = useMemo(() => calculateTotal(), [calculateTotal]);
-const balance = useMemo(() => calculateBalance(), [calculateBalance]);
+  const assignRef = (index, field, element) => {
+    if (!itemRefs.current[index]) itemRefs.current[index] = {};
+    itemRefs.current[index][field] = { current: element };
+  };
 
-const assignRef = (index, field, element) => {
-  if (!itemRefs.current[index]) itemRefs.current[index] = {};
-  itemRefs.current[index][field] = { current: element };
-};
-
-return (
-  <ErrorBoundary>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm">
-      <div className="relative w-full max-w-5xl max-h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col">
-        <h3 className="p-6 text-2xl font-bold text-blue-600 border-b border-gray-200">
-          {isEditMode ? "Edit Invoice" : "Create New Invoice"}
-        </h3>
-        <form
-          id="invoiceForm"
-          onSubmit={handleSubmit}
-          noValidate
-          className="flex-grow p-6 overflow-y-auto bg-gray-50"
-        >
-          <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
-            <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
-              Invoice Details
-            </h4>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div>
-                <label
-                  htmlFor="invoiceNo"
-                  className="block mb-1 text-sm font-medium"
-                >
-                  Invoice No
-                </label>
-                <input
-                  id="invoiceNo"
-                  ref={invoiceNoRef}
-                  type="text"
-                  value={formData.invoice.no}
-                  onChange={(e) => handleInputChange(e, "invoice", "no")}
-                  onKeyDown={(e) => handleEnterKey(e, invoiceNoRef)}
-                  className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                    errors.invoiceNo
-                      ? "border-red-500"
-                      : "border-gray-300 focus:border-blue-500"
-                  }`}
-                  placeholder="INV-2024-001"
-                  readOnly
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="invoiceDate"
-                  className="block mb-1 text-sm font-medium"
-                >
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="invoiceDate"
-                  ref={invoiceDateRef}
-                  type="date"
-                  value={formData.invoice.date}
-                  onChange={(e) => handleInputChange(e, "invoice", "date")}
-                  onKeyDown={(e) => handleEnterKey(e, invoiceDateRef)}
-                  className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                    errors.invoiceDate
-                      ? "border-red-500"
-                      : "border-gray-300 focus:border-blue-500"
-                  }`}
-                  required
-                />
-                {errors.invoiceDate && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.invoiceDate}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label
-                  htmlFor="invoiceTime"
-                  className="block mb-1 text-sm font-medium"
-                >
-                  Time <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="invoiceTime"
-                  ref={invoiceTimeRef}
-                  type="time"
-                  value={formData.invoice.time}
-                  onChange={(e) => handleInputChange(e, "invoice", "time")}
-                  onKeyDown={(e) => handleEnterKey(e, invoiceTimeRef)}
-                  className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                    errors.invoiceTime
-                      ? "border-red-500"
-                      : "border-gray-300 focus:border-blue-500"
-                  }`}
-                  required
-                />
-                {errors.invoiceTime && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.invoiceTime}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
-            <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
-              Customer Information
-            </h4>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div>
-                <label
-                  htmlFor="customerName"
-                  className="block mb-1 text-sm font-medium"
-                >
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  inputId="customerName"
-                  ref={customerNameRef}
-                  options={customerOptions}
-                  value={
-                    customerOptions.find(
-                      (option) => option.label === formData.customer.name
-                    ) || null
-                  }
-                  onChange={handleCustomerSelect}
-                  placeholder={
-                    customersLoading ? "Loading..." : "Select customer"
-                  }
-                  isClearable
-                  isSearchable
-                  isDisabled={customersLoading}
-                  styles={getSelectStyles(!!errors.customerName)}
-                  onKeyDown={(e) => handleEnterKey(e, customerNameRef)}
-                />
-                {errors.customerName && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.customerName}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label
-                  htmlFor="customerAddress"
-                  className="block mb-1 text-sm font-medium"
-                >
-                  Address
-                </label>
-                <input
-                  id="customerAddress"
-                  ref={customerAddressRef}
-                  type="text"
-                  value={formData.customer.address}
-                  onChange={(e) => handleInputChange(e, "customer", "address")}
-                  onKeyDown={(e) => handleEnterKey(e, customerAddressRef)}
-                  className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
-                  placeholder="123 Main St"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="customerPhone"
-                  className="block mb-1 text-sm font-medium"
-                >
-                  Phone
-                </label>
-                <input
-                  id="customerPhone"
-                  ref={customerPhoneRef}
-                  type="tel"
-                  value={formData.customer.phone}
-                  onChange={(e) => handleInputChange(e, "customer", "phone")}
-                  onKeyDown={(e) => handleEnterKey(e, customerPhoneRef)}
-                  className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
-                  placeholder="+94 123 456 7890"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="customerEmail"
-                  className="block mb-1 text-sm font-medium"
-                >
-                  Email
-                </label>
-                <input
-                  id="customerEmail"
-                  ref={customerEmailRef}
-                  type="email"
-                  value={formData.customer.email}
-                  onChange={(e) => handleInputChange(e, "customer", "email")}
-                  onKeyDown={(e) => handleEnterKey(e, customerEmailRef)}
-                  className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                    errors.customerEmail
-                      ? "border-red-500"
-                      : "border-gray-300 focus:border-blue-500"
-                  }`}
-                  placeholder="customer@example.com"
-                />
-                {errors.customerEmail && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.customerEmail}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <div className="flex justify-between mb-3">
-              <h4 className="text-lg font-semibold">
-                Invoice Items <span className="text-red-500">*</span>
-              </h4>
-              <button
-                type="button"
-                onClick={addItem}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-              >
-                Add Item
-              </button>
-            </div>
-            {errors.items && (
-              <p className="mb-2 text-sm text-red-600">{errors.items}</p>
-            )}
-            <div className="space-y-4">
-              {formData.items.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="relative p-4 bg-white border rounded-lg shadow-sm"
-                >
-                  {formData.items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(index)}
-                      className="absolute p-1 text-gray-400 rounded-full top-2 right-2 hover:text-red-600"
-                    >
-                      <svg
-                        className="w-5 h-5"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                  <div className="flex flex-wrap items-end gap-4">
-                    <div className="flex-1 min-w-[200px]">
-                      <label
-                        htmlFor={`itemDescription${index}`}
-                        className="block mb-1 text-sm font-medium"
-                      >
-                        Product <span className="text-red-500">*</span>
-                      </label>
-                      <Select
-                        inputId={`itemDescription${index}`}
-                        ref={(el) => assignRef(index, "description", el)}
-                        options={productOptions}
-                        value={
-                          productOptions.find(
-                            (option) => option.value === item.productId
-                          ) || null
-                        }
-                        onChange={(option) => handleProductSelect(option, index)}
-                        placeholder="Select product"
-                        isClearable
-                        isSearchable
-                        styles={getSelectStyles(
-                          !!errors[`itemDescription${index}`]
-                        )}
-                        onKeyDown={(e) =>
-                          handleEnterKey(
-                            e,
-                            itemRefs.current[index]?.description,
-                            index
-                          )
-                        }
-                      />
-                      {errors[`itemDescription${index}`] && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors[`itemDescription${index}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-20">
-                      <label
-                        htmlFor={`itemQty${index}`}
-                        className="block mb-1 text-sm font-medium"
-                      >
-                        Qty <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id={`itemQty${index}`}
-                        ref={(el) => assignRef(index, "qty", el)}
-                        type="number"
-                        value={item.qty}
-                        onChange={(e) =>
-                          handleInputChange(e, "items", "qty", index)
-                        }
-                        onKeyDown={(e) =>
-                          handleEnterKey(e, itemRefs.current[index]?.qty, index)
-                        }
-                        className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                          errors[`itemQty${index}`]
-                            ? "border-red-500"
-                            : "border-gray-300 focus:border-blue-500"
-                        }`}
-                        min="0.01"
-                        step="any"
-                        required
-                      />
-                      {errors[`itemQty${index}`] && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors[`itemQty${index}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-28">
-                      {item.mrp > 0 && item.salesPrice > 0 && (
-                        <p className="mt-1 text-xs text-red-600">
-                          MRP: LKR {item.mrp.toFixed(2)}, Sales Price: LKR{" "}
-                          {item.salesPrice.toFixed(2)}
-                        </p>
-                      )}
-                      <label
-                        htmlFor={`itemUnitPrice${index}`}
-                        className="block mb-1 text-sm font-medium"
-                      >
-                        Unit Price (LKR) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id={`itemUnitPrice${index}`}
-                        ref={(el) => assignRef(index, "unitPrice", el)}
-                        type="number"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          handleInputChange(e, "items", "unitPrice", index)
-                        }
-                        onKeyDown={(e) =>
-                          handleEnterKey(
-                            e,
-                            itemRefs.current[index]?.unitPrice,
-                            index
-                          )
-                        }
-                        className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                          errors[`itemUnitPrice${index}`]
-                            ? "border-red-500"
-                            : "border-gray-300 focus:border-blue-500"
-                        }`}
-                        min="0"
-                        step="0.01"
-                        required
-                      />
-                      {errors[`itemUnitPrice${index}`] && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors[`itemUnitPrice${index}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-28">
-                      <label
-                        htmlFor={`itemDiscountAmount${index}`}
-                        className="block mb-1 text-sm font-medium"
-                      >
-                        Disc. (LKR)
-                      </label>
-                      <input
-                        id={`itemDiscountAmount${index}`}
-                        ref={(el) => assignRef(index, "discountAmount", el)}
-                        type="number"
-                        value={item.discountAmount}
-                        onChange={(e) =>
-                          handleInputChange(e, "items", "discountAmount", index)
-                        }
-                        onKeyDown={(e) =>
-                          handleEnterKey(
-                            e,
-                            itemRefs.current[index]?.discountAmount,
-                            index
-                          )
-                        }
-                        className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                          errors[`itemDiscountAmount${index}`]
-                            ? "border-red-500"
-                            : "border-gray-300 focus:border-blue-500"
-                        }`}
-                        min="0"
-                        step="0.01"
-                      />
-                      {errors[`itemDiscountAmount${index}`] && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors[`itemDiscountAmount${index}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-20">
-                      <label
-                        htmlFor={`itemDiscountPercentage${index}`}
-                        className="block mb-1 text-sm font-medium"
-                      >
-                        Disc. (%)
-                      </label>
-                      <input
-                        id={`itemDiscountPercentage${index}`}
-                        ref={(el) => assignRef(index, "discountPercentage", el)}
-                        type="number"
-                        value={item.discountPercentage}
-                        onChange={(e) =>
-                          handleInputChange(
-                            e,
-                            "items",
-                            "discountPercentage",
-                            index
-                          )
-                        }
-                        onKeyDown={(e) =>
-                          handleEnterKey(
-                            e,
-                            itemRefs.current[index]?.discountPercentage,
-                            index
-                          )
-                        }
-                        className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                          errors[`itemDiscountPercentage${index}`]
-                            ? "border-red-500"
-                            : "border-gray-300 focus:border-blue-500"
-                        }`}
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
-                      {errors[`itemDiscountPercentage${index}`] && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors[`itemDiscountPercentage${index}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-28">
-                      <label
-                        htmlFor={`itemSpecialDiscount${index}`}
-                        className="block mb-1 text-sm font-medium"
-                      >
-                        Special Disc. (LKR)
-                      </label>
-                      <input
-                        id={`itemSpecialDiscount${index}`}
-                        type="number"
-                        value={item.specialDiscount}
-                        className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                          errors[`itemSpecialDiscount${index}`]
-                            ? "border-red-500"
-                            : item.specialDiscount > 0
-                            ? item.discountSchemeType === "product"
-                              ? "border-purple-500 bg-purple-50"
-                              : "border-green-500 bg-green-50"
-                            : "border-gray-300 focus:border-blue-500"
-                        }`}
-                        title={
-                          item.discountScheme
-                            ? item.discountSchemeType === "product"
-                              ? `Product Discount: ${
-                                  item.discountScheme.target
-                                } (${
-                                  item.discountScheme.type === "percentage"
-                                    ? `${item.discountScheme.value}%`
-                                    : `LKR ${item.discountScheme.value}`
-                                })`
-                              : `Category Discount: ${
-                                  item.discountScheme.target
-                                } (${
-                                  item.discountScheme.type === "percentage"
-                                    ? `${item.discountScheme.value}%`
-                                    : `LKR ${item.discountScheme.value}`
-                                })`
-                            : "No special discount available"
-                        }
-                        readOnly
-                      />
-                      {errors[`itemSpecialDiscount${index}`] && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {errors[`itemSpecialDiscount${index}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-28">
-                      <label className="block mb-1 text-sm font-medium">
-                        Total (LKR)
-                      </label>
-                      <span className="w-full p-2.5 text-right font-medium">
-                        {(parseFloat(item.total) || 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="p-4 bg-white border rounded-lg shadow-sm md:col-span-2">
+  return (
+    <ErrorBoundary>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm">
+        <div className="relative w-full h-full bg-white dark:bg-gray-800 overflow-y-auto flex flex-col">
+          <h3 className="p-6 text-2xl font-bold text-blue-600 border-b border-gray-200">
+            {isEditMode ? "Edit Invoice" : "Create New Invoice"}
+          </h3>
+          <form
+            id="invoiceForm"
+            onSubmit={handleSubmit}
+            noValidate
+            className="w-full h-full p-6 overflow-y-auto bg-gray-50"
+          >
+            <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
               <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
-                Payment Details
+                Invoice Details
               </h4>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <label
-                    htmlFor="purchaseMethod"
+                    htmlFor="invoiceNo"
                     className="block mb-1 text-sm font-medium"
                   >
-                    Payment Method
-                  </label>
-                  <select
-                    id="purchaseMethod"
-                    ref={purchaseMethodRef}
-                    value={formData.purchaseDetails.method}
-                    onChange={(e) =>
-                      handleInputChange(e, "purchaseDetails", "method")
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, purchaseMethodRef)}
-                    className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                    <option value="online">Online</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="credit">Credit</option>
-                  </select>
-                </div>
-                <div>
-                  <label
-                    htmlFor="purchaseAmount"
-                    className="block mb-1 text-sm font-medium"
-                  >
-                    Amount Paid (LKR)
+                    Invoice No
                   </label>
                   <input
-                    id="purchaseAmount"
-                    ref={purchaseAmountRef}
-                    type="number"
-                    value={formData.purchaseDetails.amount}
-                    onChange={(e) =>
-                      handleInputChange(e, "purchaseDetails", "amount")
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, purchaseAmountRef)}
+                    id="invoiceNo"
+                    ref={invoiceNoRef}
+                    type="text"
+                    value={formData.invoice.no}
+                    onChange={(e) => handleInputChange(e, "invoice", "no")}
+                    onKeyDown={(e) => handleEnterKey(e, invoiceNoRef)}
                     className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                      errors.purchaseAmount
+                      errors.invoiceNo
                         ? "border-red-500"
                         : "border-gray-300 focus:border-blue-500"
                     }`}
+                    placeholder="INV-2024-001"
+                    readOnly
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="invoiceDate"
+                    className="block mb-1 text-sm font-medium"
+                  >
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="invoiceDate"
+                    ref={invoiceDateRef}
+                    type="date"
+                    value={formData.invoice.date}
+                    onChange={(e) => handleInputChange(e, "invoice", "date")}
+                    onKeyDown={(e) => handleEnterKey(e, invoiceDateRef)}
+                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
+                      errors.invoiceDate
+                        ? "border-red-500"
+                        : "border-gray-300 focus:border-blue-500"
+                    }`}
+                    required
+                  />
+                  {errors.invoiceDate && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors.invoiceDate}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    htmlFor="invoiceTime"
+                    className="block mb-1 text-sm font-medium"
+                  >
+                    Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="invoiceTime"
+                    ref={invoiceTimeRef}
+                    type="time"
+                    value={formData.invoice.time}
+                    onChange={(e) => handleInputChange(e, "invoice", "time")}
+                    onKeyDown={(e) => handleEnterKey(e, invoiceTimeRef)}
+                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
+                      errors.invoiceTime
+                        ? "border-red-500"
+                        : "border-gray-300 focus:border-blue-500"
+                    }`}
+                    required
+                  />
+                  {errors.invoiceTime && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors.invoiceTime}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 mb-6 bg-white border rounded-lg shadow-sm">
+              <h4 className="pb-2 mb-3 text-lg font-semibold border-b">
+                Customer Information
+              </h4>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div>
+                  <label
+                    htmlFor="customerName"
+                    className="block mb-1 text-sm font-medium"
+                  >
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    inputId="customerName"
+                    ref={customerNameRef}
+                    options={customerOptions}
+                    value={
+                      customerOptions.find(
+                        (option) => option.label === formData.customer.name
+                      ) || null
+                    }
+                    onChange={handleCustomerSelect}
+                    placeholder={
+                      customersLoading ? "Loading..." : "Select customer"
+                    }
+                    isClearable
+                    isSearchable
+                    isDisabled={customersLoading}
+                    styles={getSelectStyles(!!errors.customerName)}
+                    onKeyDown={(e) => handleEnterKey(e, customerNameRef)}
+                  />
+                  {errors.customerName && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors.customerName}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    htmlFor="customerAddress"
+                    className="block mb-1 text-sm font-medium"
+                  >
+                    Address
+                  </label>
+                  <input
+                    id="customerAddress"
+                    ref={customerAddressRef}
+                    type="text"
+                    value={formData.customer.address}
+                    onChange={(e) =>
+                      handleInputChange(e, "customer", "address")
+                    }
+                    onKeyDown={(e) => handleEnterKey(e, customerAddressRef)}
+                    className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
+                    placeholder="123 Main St"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="customerPhone"
+                    className="block mb-1 text-sm font-medium"
+                  >
+                    Phone
+                  </label>
+                  <input
+                    id="customerPhone"
+                    ref={customerPhoneRef}
+                    type="tel"
+                    value={formData.customer.phone}
+                    onChange={(e) => handleInputChange(e, "customer", "phone")}
+                    onKeyDown={(e) => handleEnterKey(e, customerPhoneRef)}
+                    className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
+                    placeholder="+94 123 456 7890"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="customerEmail"
+                    className="block mb-1 text-sm font-medium"
+                  >
+                    Email
+                  </label>
+                  <input
+                    id="customerEmail"
+                    ref={customerEmailRef}
+                    type="email"
+                    value={formData.customer.email}
+                    onChange={(e) => handleInputChange(e, "customer", "email")}
+                    onKeyDown={(e) => handleEnterKey(e, customerEmailRef)}
+                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
+                      errors.customerEmail
+                        ? "border-red-500"
+                        : "border-gray-300 focus:border-blue-500"
+                    }`}
+                    placeholder="customer@example.com"
+                  />
+                  {errors.customerEmail && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors.customerEmail}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* New Item Selection Section */}
+            <div className="p-4 mb-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+              <h4 className="pb-2 mb-4 text-lg font-semibold text-gray-800 border-b border-gray-200">
+                Add New Item
+              </h4>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+                {/* Product Selection */}
+                <div className="md:col-span-5">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Product <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    options={filteredProductOptions}
+                    value={
+                      filteredProductOptions.find(
+                        (option) =>
+                          option.value ===
+                          formData.items[formData.items.length - 1]?.productId
+                      ) || null
+                    }
+                    placeholder="Search or select product"
+                    isClearable
+                    isSearchable
+                    onChange={(option) =>
+                      handleProductSelect(option, formData.items.length - 1)
+                    }
+                    onInputChange={(value) => setSearchTerm(value)}
+                    styles={getSelectStyles(
+                      !!errors[`itemDescription${formData.items.length - 1}`]
+                    )}
+                    className="basic-multi-select"
+                    classNamePrefix="select"
+                    noOptionsMessage={() => "No products found"}
+                    loadingMessage={() => "Loading..."}
+                  />
+                  {errors[`itemDescription${formData.items.length - 1}`] && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors[`itemDescription${formData.items.length - 1}`]}
+                    </p>
+                  )}
+                </div>
+
+                {/* Quantity */}
+                <div className="md:col-span-2">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Quantity <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                      errors[`itemQty${formData.items.length - 1}`]
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    }`}
+                    value={formData.items[formData.items.length - 1]?.qty || 1}
+                    onChange={(e) =>
+                      handleInputChange(
+                        e,
+                        "items",
+                        "qty",
+                        formData.items.length - 1
+                      )
+                    }
+                    onKeyDown={(e) =>
+                      handleEnterKey(
+                        e,
+                        itemRefs.current[formData.items.length - 1]?.qty
+                      )
+                    }
+                    ref={(el) =>
+                      assignRef(formData.items.length - 1, "qty", el)
+                    }
+                  />
+                  {errors[`itemQty${formData.items.length - 1}`] && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors[`itemQty${formData.items.length - 1}`]}
+                    </p>
+                  )}
+                </div>
+
+                {/* Unit Price */}
+                <div className="md:col-span-2">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Unit Price <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
                     min="0"
                     step="0.01"
-                  />
-                  {errors.purchaseAmount && (
-                    <p className="mt-1 text-xs text-red-600">
-                      {errors.purchaseAmount}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label
-                    htmlFor="taxPercentage"
-                    className="block mb-1 text-sm font-medium"
-                  >
-                    Tax (%)
-                  </label>
-                  <input
-                    id="taxPercentage"
-                    ref={taxPercentageRef}
-                    type="number"
-                    value={formData.purchaseDetails.taxPercentage}
-                    onChange={(e) =>
-                      handleInputChange(e, "purchaseDetails", "taxPercentage")
-                    }
-                    onKeyDown={(e) => handleEnterKey(e, taxPercentageRef)}
-                    className={`w-full p-2.5 border rounded-md focus:outline-none ${
-                      errors.purchaseTaxPercentage
+                    className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                      errors[`itemUnitPrice${formData.items.length - 1}`]
                         ? "border-red-500"
-                        : "border-gray-300 focus:border-blue-500"
+                        : "border-gray-300"
                     }`}
-                    min="0"
-                    step="0.1"
+                    value={
+                      formData.items[formData.items.length - 1]?.unitPrice || ""
+                    }
+                    onChange={(e) =>
+                      handleInputChange(
+                        e,
+                        "items",
+                        "unitPrice",
+                        formData.items.length - 1
+                      )
+                    }
+                    onKeyDown={(e) =>
+                      handleEnterKey(
+                        e,
+                        itemRefs.current[formData.items.length - 1]?.unitPrice
+                      )
+                    }
+                    ref={(el) =>
+                      assignRef(formData.items.length - 1, "unitPrice", el)
+                    }
                   />
-                  {errors.purchaseTaxPercentage && (
+                  {errors[`itemUnitPrice${formData.items.length - 1}`] && (
                     <p className="mt-1 text-xs text-red-600">
-                      {errors.purchaseTaxPercentage}
+                      {errors[`itemUnitPrice${formData.items.length - 1}`]}
                     </p>
                   )}
                 </div>
-              </div>
-            </div>
-            <div className="p-4 bg-gray-100 border rounded-lg shadow-sm">
-              <h4 className="mb-3 text-base font-semibold">Invoice Summary</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>LKR {subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>
-                    Tax ({formData.purchaseDetails.taxPercentage}%):
-                  </span>
-                  <span>LKR {tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between pt-2 text-base font-semibold border-t">
-                  <span>Total:</span>
-                  <span>LKR {total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Amount Paid:</span>
-                  <span>
-                    LKR {(parseFloat(formData.purchaseDetails.amount) || 0).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-2 text-lg border-t">
-                  <span>{balance < 0 ? "Balance Due:" : "Change:"}</span>
-                  <span
-                    className={balance < 0 ? "text-red-600" : "text-blue-600"}
-                  >
-                    LKR {Math.abs(balance).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div className="sticky bottom-0 py-4 mt-6 -mx-6 bg-gray-100 border-t rounded-b-xl">
-            <div className="flex justify-end px-6 space-x-4">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50"
-              >
-                Cancel (Esc)
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 ${
-                  loading ? "opacity-70" : ""
-                }`}
-              >
-                {loading
-                  ? "Processing..."
-                  : isEditMode
-                  ? "Update Invoice (Ctrl+S)"
-                  : "Save Invoice (Ctrl+S)"}
-              </button>
+                {/* Discount */}
+                <div className="md:col-span-2">
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Discount
+                  </label>
+                  <div className="flex">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`w-full p-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500 ${
+                        errors[`itemDiscountAmount${formData.items.length - 1}`]
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                      placeholder="Amount"
+                      value={
+                        formData.items[formData.items.length - 1]
+                          ?.discountAmount || ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(
+                          e,
+                          "items",
+                          "discountAmount",
+                          formData.items.length - 1
+                        )
+                      }
+                      onKeyDown={(e) =>
+                        handleEnterKey(
+                          e,
+                          itemRefs.current[formData.items.length - 1]
+                            ?.discountAmount
+                        )
+                      }
+                      ref={(el) =>
+                        assignRef(
+                          formData.items.length - 1,
+                          "discountAmount",
+                          el
+                        )
+                      }
+                    />
+                    <span className="inline-flex items-center px-3 text-sm text-gray-500 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md">
+                      LKR
+                    </span>
+                  </div>
+                  {errors[`itemDiscountAmount${formData.items.length - 1}`] && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors[`itemDiscountAmount${formData.items.length - 1}`]}
+                    </p>
+                  )}
+                </div>
+
+                {/* Add Button */}
+                <div className="md:col-span-1 flex items-end">
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="w-full h-[42px] px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors flex items-center justify-center"
+                  >
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
+                    Add
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </form>
+
+            {/* Items Table Section */}
+            <div className="p-4 mb-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold text-gray-800">
+                  Invoice Items
+                </h4>
+                <div className="text-sm text-gray-500">
+                  {formData.items.length} item(s)
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Product
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Qty
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Unit Price
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Discount
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Total
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {formData.items.map((item, index) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {item.description || "No description"}
+                              </div>
+                              {item.discountScheme && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  {item.discountSchemeType === "product"
+                                    ? `Product Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`
+                                    : `Category Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                          {item.qty}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                          {formatCurrency(item.unitPrice)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                          {item.discountAmount > 0 ? (
+                            <span className="text-red-600">
+                              -{formatCurrency(item.discountAmount)}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {formatCurrency(item.total)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md p-1"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50">
+                    <tr>
+                      <td
+                        colSpan="4"
+                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
+                      >
+                        Subtotal
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                        {formatCurrency(subtotal)}
+                      </td>
+                      <td></td>
+                    </tr>
+                    <tr>
+                      <td
+                        colSpan="4"
+                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
+                      >
+                        Tax ({formData.purchaseDetails.taxPercentage}%)
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                        {formatCurrency(tax)}
+                      </td>
+                      <td></td>
+                    </tr>
+                    <tr className="bg-gray-100">
+                      <td
+                        colSpan="4"
+                        className="px-6 py-4 text-right text-sm font-bold text-gray-700 uppercase"
+                      >
+                        Total
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                        {formatCurrency(total)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm md:col-span-2">
+                <h4 className="pb-2 mb-3 text-lg font-semibold text-gray-800 border-b border-gray-200">
+                  Payment Details
+                </h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="purchaseMethod"
+                      className="block mb-1 text-sm font-medium text-gray-700"
+                    >
+                      Payment Method
+                    </label>
+                    <select
+                      id="purchaseMethod"
+                      ref={purchaseMethodRef}
+                      value={formData.purchaseDetails.method}
+                      onChange={(e) =>
+                        handleInputChange(e, "purchaseDetails", "method")
+                      }
+                      onKeyDown={(e) => handleEnterKey(e, purchaseMethodRef)}
+                      className="w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="online">Online Payment</option>
+                      <option value="cheque">Cheque</option>
+                      <option value="credit">Credit</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="purchaseAmount"
+                      className="block mb-1 text-sm font-medium text-gray-700"
+                    >
+                      Amount Paid <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="purchaseAmount"
+                      ref={purchaseAmountRef}
+                      type="number"
+                      value={formData.purchaseDetails.amount}
+                      onChange={(e) =>
+                        handleInputChange(e, "purchaseDetails", "amount")
+                      }
+                      onKeyDown={(e) => handleEnterKey(e, purchaseAmountRef)}
+                      className={`w-full p-2.5 border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.purchaseAmount
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                    />
+                    {errors.purchaseAmount && (
+                      <p className="mt-1 text-xs text-red-600">
+                        {errors.purchaseAmount}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="taxPercentage"
+                      className="block mb-1 text-sm font-medium text-gray-700"
+                    >
+                      Tax (%) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="taxPercentage"
+                      ref={taxPercentageRef}
+                      type="number"
+                      value={formData.purchaseDetails.taxPercentage}
+                      onChange={(e) =>
+                        handleInputChange(e, "purchaseDetails", "taxPercentage")
+                      }
+                      onKeyDown={(e) => handleEnterKey(e, taxPercentageRef)}
+                      className={`w-full p-2.5 border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.purchaseTaxPercentage
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                      min="0"
+                      step="0.1"
+                      placeholder="0.0"
+                    />
+                    {errors.purchaseTaxPercentage && (
+                      <p className="mt-1 text-xs text-red-600">
+                        {errors.purchaseTaxPercentage}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <h4 className="pb-2 mb-3 text-lg font-semibold text-gray-800 border-b border-gray-200">
+                  Invoice Summary
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Subtotal:</span>
+                    <span className="text-sm font-medium">
+                      {formatCurrency(subtotal)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">
+                      Tax ({formData.purchaseDetails.taxPercentage}%):
+                    </span>
+                    <span className="text-sm font-medium">
+                      {formatCurrency(tax)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-3 border-t border-gray-200">
+                    <span className="text-base font-semibold">Total:</span>
+                    <span className="text-base font-semibold">
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Amount Paid:</span>
+                    <span className="text-sm font-medium">
+                      {formatCurrency(
+                        parseFloat(formData.purchaseDetails.amount) || 0
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-3 border-t border-gray-200">
+                    <span className="text-sm font-medium">
+                      {balance < 0 ? "Balance Due:" : "Change:"}
+                    </span>
+                    <span
+                      className={`text-sm font-medium ${
+                        balance < 0 ? "text-red-600" : "text-green-600"
+                      }`}
+                    >
+                      {formatCurrency(Math.abs(balance))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="sticky bottom-0 py-4 mt-6 -mx-6 bg-white border-t border-gray-200 rounded-b-xl">
+              <div className="flex justify-end px-6 space-x-4">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Cancel (Esc)
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    loading ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center">
+                      <svg
+                        className="w-4 h-4 mr-2 animate-spin"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : isEditMode ? (
+                    "Update Invoice (Ctrl+S)"
+                  ) : (
+                    "Save Invoice (Ctrl+S)"
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  </ErrorBoundary>
-);
+    </ErrorBoundary>
+  );
 };
 
 export default SalesInvoice;
