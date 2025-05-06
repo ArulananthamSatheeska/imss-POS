@@ -17,6 +17,7 @@ export const BarcodePage = () => {
   const [barcodesToPrint, setBarcodesToPrint] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const printRef = useRef();
   const dropdownRef = useRef();
   const templateSizeRef = useRef();
@@ -24,6 +25,350 @@ export const BarcodePage = () => {
   const quantityRef = useRef();
   const generateButtonRef = useRef();
   const printButtonRef = useRef();
+
+  const templates = {
+    "30mmx16mm": [
+      {
+        id: 1,
+        description: "Compact with expiry",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 2,
+        description: "Compact with seller",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Minimal with batch",
+        includes: { expiry: false, seller: false },
+      },
+      {
+        id: 4,
+        description: "Tiny with only barcode",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "38mmx25mm": [
+      {
+        id: 1,
+        description: "Medium with expiry and seller",
+        includes: { expiry: true, seller: true },
+      },
+      {
+        id: 2,
+        description: "Medium without expiry",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Medium without seller",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 4,
+        description: "Medium minimal",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "40mmx20mm": [
+      {
+        id: 1,
+        description: "Standard with all details",
+        includes: { expiry: true, seller: true },
+      },
+      {
+        id: 2,
+        description: "Standard without expiry",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Standard without seller",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 4,
+        description: "Standard minimal",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "50mmx25mm": [
+      {
+        id: 1,
+        description: "Full details with expiry and seller",
+        includes: { expiry: true, seller: true },
+      },
+      {
+        id: 2,
+        description: "No expiry date",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "No seller name",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 4,
+        description: "Minimal with only barcode and MRP",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "60mmx15mm": [
+      {
+        id: 1,
+        description: "Wide with expiry",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 2,
+        description: "Wide with seller",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Wide with batch",
+        includes: { expiry: false, seller: false },
+      },
+      {
+        id: 4,
+        description: "Wide minimal",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "75mmx25mm": [
+      {
+        id: 1,
+        description: "Wide with all details",
+        includes: { expiry: true, seller: true },
+      },
+      {
+        id: 2,
+        description: "Wide without expiry",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Wide without seller",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 4,
+        description: "Wide minimal",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "70mmx30mm": [
+      {
+        id: 1,
+        description: "Large with expiry and seller",
+        includes: { expiry: true, seller: true },
+      },
+      {
+        id: 2,
+        description: "Large without expiry",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Large without seller",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 4,
+        description: "Large minimal",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "100mmx50mm": [
+      {
+        id: 1,
+        description: "Extra large with all details",
+        includes: { expiry: true, seller: true },
+      },
+      {
+        id: 2,
+        description: "Extra large without expiry",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Extra large without seller",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 4,
+        description: "Extra large minimal",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+    "100mmx150mm": [
+      {
+        id: 1,
+        description: "Poster with all details",
+        includes: { expiry: true, seller: true },
+      },
+      {
+        id: 2,
+        description: "Poster without expiry",
+        includes: { expiry: false, seller: true },
+      },
+      {
+        id: 3,
+        description: "Poster without seller",
+        includes: { expiry: true, seller: false },
+      },
+      {
+        id: 4,
+        description: "Poster minimal",
+        includes: { expiry: false, seller: false },
+      },
+    ],
+  };
+
+  const paperSizeOptions = {
+    "30mmx16mm": ["30mm", "60mm"],
+    "38mmx25mm": ["38mm", "76mm"],
+    "40mmx20mm": ["40mm", "80mm"],
+    "50mmx25mm": ["50mm", "100mm"],
+    "60mmx15mm": ["60mm", "120mm"],
+    "75mmx25mm": ["75mm", "150mm"],
+    "70mmx30mm": ["70mm", "140mm"],
+    "100mmx50mm": ["100mm", "200mm"],
+    "100mmx150mm": ["100mm", "200mm"],
+  };
+
+  const renderTemplatePreview = (template, product, size, templateIndex) => {
+    const [labelWidth, labelHeight] = size.split("x").map((dim) => dim);
+    const isSmallTemplate = ["30mmx16mm", "38mmx25mm", "40mmx20mm"].includes(
+      size
+    );
+    const fontSize = isSmallTemplate ? "7px" : "8px";
+    const margin = isSmallTemplate ? "0.5px" : "1px";
+    const barcodeId = `preview-barcode-${templateIndex}`;
+    const barcodeWidth = isSmallTemplate ? 1.0 : 1.5; // Increased for better clarity
+    const barcodeHeight = isSmallTemplate ? 8 : 12; // Adjusted for better rendering
+    const barcodeCanvasWidth = isSmallTemplate ? "40px" : "60px"; // Fixed pixel width for sharpness
+
+    setTimeout(() => {
+      const canvas = document.getElementById(barcodeId);
+      if (canvas && product.barcode !== "N/A") {
+        try {
+          JsBarcode(canvas, product.barcode, {
+            format: "CODE128",
+            width: barcodeWidth,
+            height: barcodeHeight,
+            displayValue: false,
+            margin: 0,
+          });
+        } catch (error) {
+          console.error(
+            `Error generating preview barcode for template ${templateIndex}:`,
+            error
+          );
+        }
+      }
+    }, 0);
+
+    const previewContent =
+      template.id === 1
+        ? `
+      <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+        <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.product_name.toUpperCase()}
+        </h3>
+        ${
+          template.includes.expiry && product.expiry_date
+            ? `
+          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <strong>කල්. දිනය/EXP Date:</strong> ${product.expiry_date}
+          </div>`
+            : ""
+        }
+        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <strong>කු. අං/Batch No:</strong> ${product.batch_number}
+        </div>
+        <canvas id="${barcodeId}" style="margin: 0 auto; width: ${barcodeCanvasWidth}; height: auto;"></canvas>
+        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.barcode}
+        </div>
+        <div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <strong>MRP:</strong> ${product.mrp}
+        </div>
+        ${
+          template.includes.seller && product.supplier
+            ? `
+          <div style="font-size: ${fontSize}; margin-top: ${margin}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.supplier}
+          </div>`
+            : ""
+        }
+      </div>
+    `
+        : template.id === 2
+        ? `
+      <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+        <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.product_name.toUpperCase()}
+        </h3>
+        <canvas id="${barcodeId}" style="margin: 0 auto; width: ${barcodeCanvasWidth}; height: auto;"></canvas>
+        <div style="line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.barcode}
+        </div>
+        <div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <strong>MRP:</strong> ${product.mrp}
+        </div>
+        ${
+          template.includes.seller && product.supplier
+            ? `
+          <div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.supplier}
+          </div>`
+            : ""
+        }
+      </div>
+    `
+        : template.id === 3
+        ? `
+      <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+        <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.product_name.toUpperCase()}
+        </h3>
+        ${
+          template.includes.expiry && product.expiry_date
+            ? `
+          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <strong>කල්. දිනය/EXP:</strong> ${product.expiry_date}
+          </div>`
+            : ""
+        }
+        <canvas id="${barcodeId}" style="margin: 0 auto; width: ${barcodeCanvasWidth}; height: auto;"></canvas>
+        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.barcode}
+        </div>
+        <div style="font-size: ${fontSize}; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          MRP: ${product.mrp}
+        </div>
+      </div>
+    `
+        : `
+      <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+        <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.product_name.toUpperCase()}
+        </h3>
+        <canvas id="${barcodeId}" style="margin: 2px auto; width: ${barcodeCanvasWidth}; height: auto;"></canvas>
+        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${product.barcode}
+        </div>
+        <div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <strong>MRP:</strong> ${product.mrp}
+        </div>
+      </div>
+    `;
+
+    return previewContent;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -45,14 +390,13 @@ export const BarcodePage = () => {
       barcodesToPrint.forEach((product, index) => {
         const canvas = document.getElementById(`barcode-${index}`);
         if (canvas) {
-          const barcodeWidth =
-            parseInt(templateSize.split("x")[0].replace("mm", "")) <= 38
-              ? 0.8
-              : 1.2;
-          const barcodeHeight =
-            parseInt(templateSize.split("x")[1].replace("mm", "")) <= 20
-              ? 8
-              : 15;
+          const isSmallTemplate = [
+            "30mmx16mm",
+            "38mmx25mm",
+            "40mmx20mm",
+          ].includes(templateSize);
+          const barcodeWidth = isSmallTemplate ? 1.2 : 1.5; // Adjusted for better clarity
+          const barcodeHeight = isSmallTemplate ? 10 : 15; // Increased height for better rendering
 
           try {
             JsBarcode(canvas, product.barcode, {
@@ -115,8 +459,8 @@ export const BarcodePage = () => {
           batch_number: product.batch_number || "N/A",
           expiry_date: product.expiry_date
             ? new Date(product.expiry_date).toLocaleDateString()
-            : "N/A",
-          supplier: product.supplier || "Unknown Seller",
+            : null,
+          supplier: product.supplier || null,
           mrp: formattedMrp,
         };
       });
@@ -147,6 +491,7 @@ export const BarcodePage = () => {
     setBarcodesToPrint([]);
     setSearchQuery("");
     setHighlightedIndex(-1);
+    setSelectedTemplate(null);
   };
 
   const filteredProducts = products.filter(
@@ -169,11 +514,14 @@ export const BarcodePage = () => {
       return;
     }
 
-    setBarcodesToPrint([selectedProduct]);
-    console.log(
-      `Prepared to generate ${quantity} barcodes for:`,
-      selectedProduct.product_name
+    setBarcodesToPrint(
+      Array.from({ length: quantity }, () => ({ ...selectedProduct }))
     );
+    setSelectedTemplate(null);
+  };
+
+  const handleSelectTemplate = (template) => {
+    setSelectedTemplate(template);
   };
 
   const handlePrint = () => {
@@ -181,21 +529,19 @@ export const BarcodePage = () => {
       toast.error("Please generate a barcode before printing.");
       return;
     }
-
-    const printBarcodes = Array.from(
-      { length: quantity },
-      () => selectedProduct
-    );
+    if (!selectedTemplate) {
+      toast.error("Please select a template before printing.");
+      return;
+    }
 
     const barcodeImages = [];
-    printBarcodes.forEach((product, index) => {
+    barcodesToPrint.forEach((product, index) => {
       const canvas = document.createElement("canvas");
-      const barcodeWidth =
-        parseInt(templateSize.split("x")[0].replace("mm", "")) <= 38
-          ? 0.8
-          : 1.2;
-      const barcodeHeight =
-        parseInt(templateSize.split("x")[1].replace("mm", "")) <= 20 ? 8 : 15;
+      const isSmallTemplate = ["30mmx16mm", "38mmx25mm", "40mmx20mm"].includes(
+        templateSize
+      );
+      const barcodeWidth = isSmallTemplate ? 1.2 : 1.5; // Adjusted for clarity
+      const barcodeHeight = isSmallTemplate ? 10 : 15; // Adjusted for better rendering
 
       try {
         JsBarcode(canvas, product.barcode, {
@@ -207,48 +553,128 @@ export const BarcodePage = () => {
         });
         barcodeImages[index] = canvas.toDataURL("image/png");
       } catch (error) {
-        console.error(`Error generating barcode for index ${index}:`, error);
+        console.error(
+          `Error generating barcode for print index ${index}:`,
+          error
+        );
         toast.error("Failed to prepare barcode for printing.");
+        barcodeImages[index] = "";
       }
     });
 
     const [labelWidth, labelHeight] = templateSize.split("x").map((dim) => dim);
-    const isSmallTemplate =
-      templateSize === "30mmx16mm" || templateSize === "60mmx15mm";
+    const isSmallTemplate = ["30mmx16mm", "38mmx25mm", "40mmx20mm"].includes(
+      templateSize
+    );
     const fontSize = isSmallTemplate ? "7px" : "8px";
     const margin = isSmallTemplate ? "0.5px" : "1px";
-    const barcodeFlex = templateSize === "30mmx16mm" ? "25%" : "30%";
+    const barcodeCanvasWidth = isSmallTemplate ? "40px" : "60px"; // Fixed pixel width for sharpness
 
-    const printContent = printBarcodes
-      .map(
-        (product, index) => `
-        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: left; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm;">
-          <div style="display: flex; align-items: center; margin: 0 0 ${margin} 0; overflow: hidden;">
-            <h3 style="flex: 1; margin: 0; font-weight: bold; font-size: 8px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+    const printContent = barcodesToPrint
+      .map((product, index) => {
+        if (!barcodeImages[index]) return "";
+
+        return selectedTemplate.id === 1
+          ? `
+        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+          <div style="flex: 1; overflow: hidden;">
+            <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${product.product_name.toUpperCase()}
             </h3>
-            <div class="barcode-number" style="flex: 0 0 ${barcodeFlex}; font-size: ${fontSize}; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${product.barcode}
-            </div>
           </div>
+          ${
+            selectedTemplate.includes.expiry && product.expiry_date
+              ? `<div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              <strong>කල්. දිනය/EXP Date:</strong> ${product.expiry_date}
+            </div>`
+              : ""
+          }
           <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            කල්. දිනය/ EXP Date: ${product.expiry_date}
-          </div>
-          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            කු. අං/ Batch No: ${product.batch_number}
+            <strong>කු. අං/Batch No:</strong> ${product.batch_number}
           </div>
           <img src="${
             barcodeImages[index]
-          }" style="margin: 0 auto; display: block; width: 80%; height: auto;" />
-          <div class="mrp" style="text-align: center; font-size: ${fontSize}; position: absolute; bottom: 10px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            MRP: ${product.mrp}
+          }" style="margin: 0 auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
+          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.barcode}
           </div>
-          <div class="seller" style="text-align: center; font-size: ${fontSize}; position: absolute; bottom: 1px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            Import&Distributed by: ${product.supplier}
+          <div class="mrp" style="text-align: center; font-size: ${fontSize}; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <strong>MRP:</strong> ${product.mrp}
+          </div>
+          ${
+            selectedTemplate.includes.seller && product.supplier
+              ? `<div class="seller" style="text-align: center; font-size: ${fontSize}; margin-top: ${margin}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${product.supplier}
+            </div>`
+              : ""
+          }
+        </div>
+      `
+          : selectedTemplate.id === 2
+          ? `
+        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; align-items: center; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+          <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.product_name.toUpperCase()}
+          </h3>
+          <img src="${
+            barcodeImages[index]
+          }" style="width: ${barcodeCanvasWidth}; height: auto;" />
+          <div style="line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.barcode}
+          </div>
+          <div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <strong>MRP:</strong> ${product.mrp}
+          </div>
+          ${
+            selectedTemplate.includes.seller && product.supplier
+              ? `<div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${product.supplier}
+            </div>`
+              : ""
+          }
+        </div>
+      `
+          : selectedTemplate.id === 3
+          ? `
+        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+          <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.product_name.toUpperCase()}
+          </h3>
+          ${
+            selectedTemplate.includes.expiry && product.expiry_date
+              ? `<div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              <strong>කල්. දිනය/EXP:</strong> ${product.expiry_date}
+            </div>`
+              : ""
+          }
+          <img src="${
+            barcodeImages[index]
+          }" style="margin: 0 auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
+          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.barcode}
+          </div>
+          <div class="mrp" style="text-align: center; font-size: ${fontSize}; font-weight: bold; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            MRP: ${product.mrp}
           </div>
         </div>
       `
-      )
+          : `
+        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+          <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.product_name.toUpperCase()}
+          </h3>
+          <img src="${
+            barcodeImages[index]
+          }" style="margin: 2px auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
+          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${product.barcode}
+          </div>
+          <div class="mrp" style="text-align: center; font-size: ${fontSize}; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <strong>MRP:</strong> ${product.mrp}
+          </div>
+        </div>
+      `;
+      })
       .join("");
 
     const paperWidth = paperSize;
@@ -358,19 +784,6 @@ export const BarcodePage = () => {
     }
   }, [highlightedIndex]);
 
-  const paperSizeOptions = {
-    "30mmx20mm": ["30mm", "60mm"],
-    "38mmx25mm": ["38mm", "76mm"],
-    "30mmx16mm": ["30mm", "60mm"],
-    "40mmx20mm": ["40mm", "80mm"],
-    "50mmx25mm": ["50mm", "100mm"],
-    "60mmx15mm": ["60mm", "120mm"],
-    "75mmx25mm": ["75mm", "150mm"],
-    "70mmx30mm": ["70mm", "140mm"],
-    "100mmx50mm": ["100mm", "200mm"],
-    "100mmx150mm": ["100mm", "200mm"],
-  };
-
   const templateSizeOptions = Object.keys(paperSizeOptions);
 
   const handleTemplateSizeKeyDown = (e) => {
@@ -382,6 +795,7 @@ export const BarcodePage = () => {
           const newTemplateSize = templateSizeOptions[currentIndex + 1];
           setTemplateSize(newTemplateSize);
           setPaperSize(paperSizeOptions[newTemplateSize][0]);
+          setSelectedTemplate(null);
         }
         break;
       case "ArrowUp":
@@ -390,6 +804,7 @@ export const BarcodePage = () => {
           const newTemplateSize = templateSizeOptions[currentIndex - 1];
           setTemplateSize(newTemplateSize);
           setPaperSize(paperSizeOptions[newTemplateSize][0]);
+          setSelectedTemplate(null);
         }
         break;
       case "Enter":
@@ -458,7 +873,7 @@ export const BarcodePage = () => {
         padding: "30px",
         display: "flex",
         justifyContent: "center",
-        fontFamily: "'Roboto', sans-serif",
+        fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
       }}
     >
       <div
@@ -480,6 +895,7 @@ export const BarcodePage = () => {
             fontWeight: "bold",
             textTransform: "uppercase",
             letterSpacing: "1px",
+            fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
           }}
         >
           Barcode Generator
@@ -495,6 +911,7 @@ export const BarcodePage = () => {
               marginBottom: "20px",
               fontSize: "14px",
               textAlign: "center",
+              fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
             }}
           >
             {Object.values(errors).filter(Boolean).join(", ")}
@@ -510,6 +927,7 @@ export const BarcodePage = () => {
               padding: "20px",
               color: "#666",
               fontSize: "16px",
+              fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
             }}
           >
             <div
@@ -536,6 +954,7 @@ export const BarcodePage = () => {
                 padding: "20px",
                 borderRadius: "10px",
                 boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+                fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
               }}
             >
               <input
@@ -559,6 +978,7 @@ export const BarcodePage = () => {
                   boxShadow: "inset 0 1px 3px rgba(0, 0, 0, 0.1)",
                   outline: "none",
                   transition: "border-color 0.3s ease",
+                  fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                 }}
                 onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
                 onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
@@ -573,6 +993,7 @@ export const BarcodePage = () => {
                     border: "1px solid #e5e7eb",
                     borderRadius: "8px",
                     backgroundColor: "#fff",
+                    fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                   }}
                 >
                   {filteredProducts.length > 0 ? (
@@ -593,6 +1014,8 @@ export const BarcodePage = () => {
                           color: "#374151",
                           fontSize: "15px",
                           transition: "background-color 0.2s ease",
+                          fontFamily:
+                            "'Noto Sans Sinhala', 'Roboto', sans-serif",
                         }}
                       >
                         {product.product_name} - {product.barcode}
@@ -605,6 +1028,7 @@ export const BarcodePage = () => {
                         textAlign: "center",
                         color: "#9ca3af",
                         fontSize: "14px",
+                        fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                       }}
                     >
                       No products found
@@ -623,6 +1047,7 @@ export const BarcodePage = () => {
                     padding: "20px",
                     borderRadius: "10px",
                     boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+                    fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                   }}
                 >
                   <h3
@@ -639,13 +1064,16 @@ export const BarcodePage = () => {
                     style={{ display: "grid", gap: "10px", color: "#4b5563" }}
                   >
                     <div>
-                      <strong>Batch No:</strong> {selectedProduct.batch_number}
+                      <strong>කු. අං/Batch No:</strong>{" "}
+                      {selectedProduct.batch_number || "N/A"}
                     </div>
                     <div>
-                      <strong>EXP Date:</strong> {selectedProduct.expiry_date}
+                      <strong>කල්. දිනය/EXP Date:</strong>{" "}
+                      {selectedProduct.expiry_date || "N/A"}
                     </div>
                     <div>
-                      <strong>Seller:</strong> {selectedProduct.supplier}
+                      <strong>Seller:</strong>{" "}
+                      {selectedProduct.supplier || "N/A"}
                     </div>
                     <div>
                       <strong>Barcode:</strong> {selectedProduct.barcode}
@@ -666,6 +1094,7 @@ export const BarcodePage = () => {
                     padding: "20px",
                     borderRadius: "10px",
                     boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+                    fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                   }}
                 >
                   <div>
@@ -688,6 +1117,7 @@ export const BarcodePage = () => {
                       onChange={(e) => {
                         setTemplateSize(e.target.value);
                         setPaperSize(paperSizeOptions[e.target.value][0]);
+                        setSelectedTemplate(null);
                       }}
                       onKeyDown={handleTemplateSizeKeyDown}
                       disabled={loading}
@@ -702,6 +1132,7 @@ export const BarcodePage = () => {
                         boxShadow: "inset 0 1px 3px rgba(0, 0, 0, 0.1)",
                         outline: "none",
                         transition: "border-color 0.3s ease",
+                        fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                       }}
                       onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
                       onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
@@ -745,6 +1176,7 @@ export const BarcodePage = () => {
                         boxShadow: "inset 0 1px 3px rgba(0, 0, 0, 0.1)",
                         outline: "none",
                         transition: "border-color 0.3s ease",
+                        fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                       }}
                       onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
                       onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
@@ -792,168 +1224,228 @@ export const BarcodePage = () => {
                         boxShadow: "inset 0 1px 3px rgba(0, 0, 0, 0.1)",
                         outline: "none",
                         transition: "border-color 0.3s ease",
+                        fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                       }}
                       onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
                       onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
                     />
                   </div>
                 </div>
+
+                {barcodesToPrint.length > 0 && (
+                  <div
+                    style={{
+                      marginBottom: "30px",
+                      backgroundColor: "#f8fafc",
+                      padding: "20px",
+                      borderRadius: "10px",
+                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+                      fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: "18px",
+                        color: "#1e3a8a",
+                        marginBottom: "15px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Select Template
+                    </h3>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(150px, 1fr))",
+                        gap: "15px",
+                        overflowX: "auto",
+                        paddingBottom: "10px",
+                      }}
+                    >
+                      {templates[templateSize].map((template, index) => (
+                        <div
+                          key={template.id}
+                          onClick={() => handleSelectTemplate(template)}
+                          style={{
+                            border: `2px solid ${
+                              selectedTemplate?.id === template.id
+                                ? "#3b82f6"
+                                : "#e5e7eb"
+                            }`,
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            transition: "border-color 0.2s ease",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            dangerouslySetInnerHTML={{
+                              __html: renderTemplatePreview(
+                                template,
+                                selectedProduct,
+                                templateSize,
+                                index
+                              ),
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
-            {selectedProduct && barcodesToPrint.length > 0 && (
-              <div style={{ marginTop: "30px" }}>
-                <h3
-                  style={{
-                    fontSize: "20px",
-                    color: "#1e3a8a",
-                    marginBottom: "20px",
-                    textAlign: "center",
-                    fontWeight: "600",
-                  }}
-                >
-                  Generated Barcode (Preview)
-                </h3>
-                <div
-                  ref={printRef}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(50mm, 1fr))",
-                    gap: "20px",
-                    justifyItems: "center",
-                  }}
-                >
-                  {barcodesToPrint.slice(0, 1).map((product, index) => {
-                    const [labelWidth, labelHeight] = templateSize
-                      .split("x")
-                      .map((dim) => dim);
-                    const isSmallTemplate =
-                      templateSize === "30mmx16mm" ||
-                      templateSize === "60mmx15mm";
-                    const fontSize = isSmallTemplate ? "7px" : "8px";
-                    const margin = isSmallTemplate ? "0.5px" : "1px";
-                    const barcodeFlex =
-                      templateSize === "30mmx16mm" ? "25%" : "30%";
+            {selectedProduct &&
+              barcodesToPrint.length > 0 &&
+              selectedTemplate && (
+                <div style={{ marginTop: "30px" }}>
+                  <h3
+                    style={{
+                      fontSize: "20px",
+                      color: "#1e3a8a",
+                      marginBottom: "20px",
+                      textAlign: "center",
+                      fontWeight: "600",
+                      fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
+                    }}
+                  >
+                    Generated Barcode (Preview)
+                  </h3>
+                  <div
+                    ref={printRef}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(50mm, 1fr))",
+                      gap: "20px",
+                      justifyItems: "center",
+                    }}
+                  >
+                    {barcodesToPrint.slice(0, 1).map((product, index) => {
+                      const [labelWidth, labelHeight] = templateSize
+                        .split("x")
+                        .map((dim) => dim);
+                      const isSmallTemplate = [
+                        "30mmx16mm",
+                        "38mmx25mm",
+                        "40mmx20mm",
+                      ].includes(templateSize);
+                      const fontSize = isSmallTemplate ? "7px" : "8px";
+                      const margin = isSmallTemplate ? "0.5px" : "1px";
+                      const barcodeCanvasWidth = isSmallTemplate
+                        ? "40px"
+                        : "60px"; // Fixed pixel width for sharpness
 
-                    return (
-                      <div
-                        key={`${product.barcode}-${index}`}
-                        className="barcode-label"
-                        style={{
-                          border: "1px solid #000",
-                          padding: "2px",
-                          textAlign: "left",
-                          fontSize: fontSize,
-                          width: labelWidth,
-                          height: labelHeight,
-                          backgroundColor: "#fff",
-                          boxSizing: "border-box",
-                          position: "relative",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            margin: `0 0 ${margin} 0`,
-                            overflow: "hidden",
-                          }}
-                        >
-                          <h3
-                            style={{
-                              flex: 1,
-                              margin: 0,
-                              fontWeight: "bold",
-                              fontSize: "8px",
-                              textAlign: "left",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {product.product_name.toUpperCase()}
+                      const printContent =
+                        selectedTemplate.id === 1
+                          ? `
+                      <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+                        <div style="flex: 1; overflow: hidden;">
+                          <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${product.product_name.toUpperCase()}
                           </h3>
-                          <div
-                            className="barcode-number"
-                            style={{
-                              flex: `0 0 ${barcodeFlex}`,
-                              fontSize: fontSize,
-                              textAlign: "right",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {product.barcode}
-                          </div>
                         </div>
-                        <div
-                          style={{
-                            margin: `${margin} 0`,
-                            lineHeight: "1.1",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          කල්. දිනය/ EXP Date: {product.expiry_date}
+                        ${
+                          selectedTemplate.includes.expiry &&
+                          product.expiry_date
+                            ? `<div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <strong>කල්. දිනය/EXP Date:</strong> ${product.expiry_date}
+                          </div>`
+                            : ""
+                        }
+                        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          <strong>කු. අං/Batch No:</strong> ${
+                            product.batch_number
+                          }
                         </div>
-                        <div
-                          style={{
-                            margin: `${margin} 0`,
-                            lineHeight: "1.1",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          කු. අං/ Batch No: {product.batch_number}
+                        <canvas id="barcode-${index}" style="margin: 0 auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
+                        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${product.barcode}
                         </div>
-                        <canvas
-                          id={`barcode-${index}`}
-                          style={{
-                            margin: "0 auto",
-                            display: "block",
-                            width: "80%",
-                            height: "auto",
-                          }}
-                        />
-                        <div
-                          className="mrp"
-                          style={{
-                            textAlign: "center",
-                            fontSize: fontSize,
-                            position: "absolute",
-                            bottom: "10px",
-                            width: "100%",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          MRP: {product.mrp}
+                        <div class="mrp" style="text-align: center; font-size: ${fontSize}; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          <strong>MRP:</strong> ${product.mrp}
                         </div>
-                        <div
-                          className="seller"
-                          style={{
-                            textAlign: "center",
-                            fontSize: fontSize,
-                            position: "absolute",
-                            bottom: "1px",
-                            width: "100%",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          Import&Distributed by: {product.supplier}
+                        ${
+                          selectedTemplate.includes.seller && product.supplier
+                            ? `<div class="seller" style="text-align: center; font-size: ${fontSize}; margin-top: ${margin}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${product.supplier}
+                          </div>`
+                            : ""
+                        }
+                      </div>
+                    `
+                          : selectedTemplate.id === 2
+                          ? `
+                      <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; align-items: center; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+                        <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${product.product_name.toUpperCase()}
+                        </h3>
+                        <canvas id="barcode-${index}" style="width: ${barcodeCanvasWidth}; height: auto;" />
+                        <div style="line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${product.barcode}
+                        </div>
+                        <div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          <strong>MRP:</strong> ${product.mrp}
+                        </div>
+                        ${
+                          selectedTemplate.includes.seller && product.supplier
+                            ? `<div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${product.supplier}
+                          </div>`
+                            : ""
+                        }
+                      </div>
+                    `
+                          : selectedTemplate.id === 3
+                          ? `
+                      <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+                        <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${product.product_name.toUpperCase()}
+                        </h3>
+                        ${
+                          selectedTemplate.includes.expiry &&
+                          product.expiry_date
+                            ? `<div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <strong>කල්. දිනය/EXP:</strong> ${product.expiry_date}
+                          </div>`
+                            : ""
+                        }
+                        <canvas id="barcode-${index}" style="margin: 0 auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
+                        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${product.barcode}
+                        </div>
+                        <div class="mrp" style="text-align: center; font-size: ${fontSize}; font-weight: bold; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          MRP: ${product.mrp}
                         </div>
                       </div>
-                    );
-                  })}
+                    `
+                          : `
+                      <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
+                        <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${product.product_name.toUpperCase()}
+                        </h3>
+                        <canvas id="barcode-${index}" style="margin: 2px auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
+                        <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${product.barcode}
+                        </div>
+                        <div class="mrp" style="text-align: center; font-size: ${fontSize}; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          <strong>MRP:</strong> ${product.mrp}
+                        </div>
+                      </div>
+                    `;
+
+                      return (
+                        <div
+                          key={`${product.barcode}-${index}`}
+                          dangerouslySetInnerHTML={{ __html: printContent }}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {selectedProduct && (
               <div
@@ -982,6 +1474,7 @@ export const BarcodePage = () => {
                     transition:
                       "background-color 0.3s ease, transform 0.2s ease",
                     boxShadow: "0 3px 8px rgba(0, 0, 0, 0.1)",
+                    fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                   }}
                   onMouseEnter={(e) =>
                     !loading && (e.target.style.backgroundColor = "#1e40af")
@@ -1003,29 +1496,39 @@ export const BarcodePage = () => {
                     ref={printButtonRef}
                     onClick={handlePrint}
                     onKeyDown={handlePrintButtonKeyDown}
+                    disabled={!selectedTemplate}
                     style={{
                       padding: "12px 30px",
-                      backgroundColor: "#28a745",
+                      backgroundColor: !selectedTemplate
+                        ? "#d1d5db"
+                        : "#28a745",
                       color: "#fff",
                       border: "none",
                       borderRadius: "8px",
                       fontSize: "16px",
                       fontWeight: "500",
-                      cursor: "pointer",
+                      cursor: !selectedTemplate ? "not-allowed" : "pointer",
                       transition:
                         "background-color 0.3s ease, transform 0.2s ease",
                       boxShadow: "0 3px 8px rgba(0, 0, 0, 0.1)",
+                      fontFamily: "'Noto Sans Sinhala', 'Roboto', sans-serif",
                     }}
                     onMouseEnter={(e) =>
+                      selectedTemplate &&
                       (e.target.style.backgroundColor = "#218838")
                     }
                     onMouseLeave={(e) =>
+                      selectedTemplate &&
                       (e.target.style.backgroundColor = "#28a745")
                     }
                     onMouseDown={(e) =>
+                      selectedTemplate &&
                       (e.target.style.transform = "scale(0.98)")
                     }
-                    onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+                    onMouseUp={(e) =>
+                      selectedTemplate &&
+                      (e.target.style.transform = "scale(1)")
+                    }
                   >
                     Print Barcodes
                   </button>

@@ -9,7 +9,7 @@ class SalesReturnItem extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['sales_return_id', 'product_id', 'product_name', 'quantity', 'buying_cost', 'reason'];
+    protected $fillable = ['sales_return_id', 'product_id', 'product_name', 'quantity', 'selling_cost', 'reason'];
 
     public function product()
     {
