@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import axios from "axios";
 import { useRegister } from "../../context/RegisterContext";
+import logo from "./logo.jpg";
 
 const BillPrintModal = ({
   initialProducts = [],
@@ -143,10 +144,10 @@ const BillPrintModal = ({
 
   const calculateTotals = () => {
     let totalQty = 0;
-    let subTotal = 0; // Total of unit prices
+    let subTotal = 0;
     let totalItemDiscounts = 0;
     let totalSpecialDiscounts = 0;
-    let grandTotal = 0; // Total of item totals
+    let grandTotalBeforeTax = 0;
 
     initialProducts.forEach((p) => {
       const qty = parseFloat(p.qty || 0);
@@ -159,15 +160,15 @@ const BillPrintModal = ({
       subTotal += unitPrice * qty;
       totalItemDiscounts += unitDiscount * qty;
       totalSpecialDiscounts += specialDiscount;
-      grandTotal += itemTotal;
+      grandTotalBeforeTax += itemTotal;
     });
 
     const taxRate = parseFloat(initialTax || 0);
     const billDiscount = parseFloat(initialBillDiscount || 0);
     const shipping = parseFloat(initialShipping || 0);
-    const taxAmount = grandTotal * (taxRate / 100);
-    const finalTotalDiscount = totalItemDiscounts + totalSpecialDiscounts + billDiscount;
-    const finalTotal = grandTotal + taxAmount - billDiscount + shipping;
+    const taxAmount = grandTotalBeforeTax * (taxRate / 100);
+    const finalTotal =
+      grandTotalBeforeTax + taxAmount - billDiscount + shipping;
 
     return {
       totalQty,
@@ -175,9 +176,8 @@ const BillPrintModal = ({
       totalItemDiscounts,
       totalSpecialDiscounts,
       totalBillDiscount: billDiscount,
-      finalTotalDiscount,
       taxAmount,
-      grandTotal,
+      grandTotalBeforeTax,
       finalTotal,
     };
   };
@@ -223,31 +223,36 @@ const BillPrintModal = ({
 
   // Handle saving the bill
   const handleSave = async () => {
-    // Validate credit customer requirement
     if (paymentType === "credit") {
       if (!selectedCustomer?.id) {
         alert("Please select a customer for credit sales.");
         return;
       }
-      // Removed check for is_credit_customer to allow all customers
-      // if (!selectedCustomer.is_credit_customer) {
-      //   alert("The selected customer is not approved for credit purchases.");
-      //   return;
-      // }
     }
+
+    // Ensure we're using the latest calculated totals
+    const currentTotals = calculateTotals();
 
     const billData = {
       bill_number: billNumber,
       customer_id: selectedCustomer?.id || null,
       customer_name: selectedCustomer?.name || "Walk-in Customer",
-      subtotal: parseFloat(totals.subTotal.toFixed(2)),
-      discount: parseFloat(totals.finalTotalDiscount.toFixed(2)),
-      tax: parseFloat(totals.taxAmount.toFixed(2)),
+      subtotal: parseFloat(currentTotals.subTotal.toFixed(2)),
+      discount: parseFloat(
+        (
+          currentTotals.totalItemDiscounts +
+          currentTotals.totalSpecialDiscounts +
+          currentTotals.totalBillDiscount
+        ).toFixed(2)
+      ),
+      tax: parseFloat(currentTotals.taxAmount.toFixed(2)),
       shipping: parseFloat(initialShipping || 0),
-      total: parseFloat(totals.finalTotal.toFixed(2)),
+      total: parseFloat(currentTotals.finalTotal.toFixed(2)),
       payment_type: paymentType,
       received_amount: parseFloat(receivedAmount.toFixed(2)),
-      balance_amount: parseFloat(balanceAmount.toFixed(2)),
+      balance_amount: parseFloat(
+        (receivedAmount - currentTotals.finalTotal).toFixed(2)
+      ),
       sale_type: saleType,
       items: initialProducts.map((product) => ({
         product_id: product.product_id,
@@ -861,32 +866,18 @@ const BillPrintModal = ({
               <h3 className="text-lg font-semibold text-gray-800">
                 Billing Summary
               </h3>
-              <div className="space-y-1">
-                <p className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(totals.subTotal)}</span>
+              <div className="pt-4 mt-4 border-t">
+                <p>
+                  <strong>Subtotal (MRP):</strong>{" "}
+                  {formatCurrency(totals.subTotalMRP)}
                 </p>
-                <p className="flex justify-between text-sm">
-                  <span>Discounts (Item + Special):</span>
-                  <span>{formatCurrency(totals.totalItemDiscounts + totals.totalSpecialDiscounts)}</span>
+                <p>
+                  <strong>Item Discounts:</strong>{" "}
+                  {formatCurrency(totals.totalItemDiscounts)}
                 </p>
-                <p className="flex justify-between text-sm">
-                  <span>Bill Discount:</span>
-                  <span>{formatCurrency(totals.totalBillDiscount)}</span>
-                </p>
-                <p className="flex justify-between text-sm">
-                  <span>Tax ({initialTax}%):</span>
-                  <span>{formatCurrency(totals.taxAmount)}</span>
-                </p>
-                <p className="flex justify-between text-sm">
-                  <span>Shipping:</span>
-                  <span>{formatCurrency(initialShipping)}</span>
-                </p>
-                <p className="flex justify-between pt-2 mt-2 text-base font-bold border-t border-gray-200">
-                  <span>Grand Total:</span>
-                  <span className="text-indigo-600">
-                    {formatCurrency(totals.finalTotal)}
-                  </span>
+                <p className="text-lg font-bold">
+                  <strong>Grand Total:</strong>{" "}
+                  {formatCurrency(totals.finalTotal)}
                 </p>
               </div>
             </div>
@@ -909,13 +900,19 @@ const BillPrintModal = ({
           <div ref={printRef} className="print-container">
             {/* Header */}
             <div className="text-center bill-header">
-              <div className="text-xl font-bold uppercase shop-name">
-                MUNSI TEX
-              </div>
+              <img
+                src={logo}
+                alt="Logo"
+                className="mx-auto my-0 mb-2 p-0"
+                style={{ width: "70px", height: "auto", objectFit: "contain" }}
+              />
+              {/* <div className="text-xl font-bold uppercase shop-name">
+                SHARVAKSHA FOOD CITY
+              </div> */}
               <div className="text-sm shop-address">
-                MOSQUE BUILDING, POLICE ROAD
+                Main Street Thambiluvil 01
               </div>
-              <div className="text-sm shop-contact">Mob: 0769859513</div>
+              <div className="text-sm shop-contact">Mob: 0750296343</div>
               <hr className="my-1 border-t border-black" />
             </div>
 
@@ -1016,42 +1013,28 @@ const BillPrintModal = ({
             </table>
 
             {/* Summary Section */}
+
             <div className="mt-2 text-sm text-right bill-summary">
               <p>
-                <strong>Subtotal:</strong>{" "}
-                {formatCurrency(totals.subTotalMRP || 0)}
+                <strong>Subtotal:</strong> {totals.subTotalMRP.toFixed(2)}
               </p>
               <p>
-                <strong>Discount:</strong>{" "}
-                {formatCurrency(
-                  (totals.totalItemDiscounts || 0) +
-                    (totals.totalSpecialDiscounts || 0) +
-                    (initialBillDiscount || 0)
-                )}
-              </p>
-              <p className="font-bold text-lg">
-                <strong>Grand Total:</strong>{" "}
-                {formatCurrency(totals.finalTotal || 0)}
-                <strong>Subtotal:</strong> {formatCurrency(totals.subTotal)}
+                <strong>Item Discounts:</strong>{" "}
+                {totals.totalItemDiscounts.toFixed(2)}
               </p>
               <p>
-                <strong>Discount:</strong>{" "}
-                {formatCurrency(totals.totalItemDiscounts + totals.totalSpecialDiscounts + totals.totalBillDiscount)}
+                <strong>Bill Discount:</strong>{" "}
+                {totals.totalBillDiscount.toFixed(2)}
+              </p>
+
+              <p className="total-amount">
+                <strong>Grand Total:</strong> {totals.finalTotal.toFixed(2)}
               </p>
               <p>
-                <strong>Tax ({initialTax}%):</strong> {formatCurrency(totals.taxAmount)}
+                <strong>Received:</strong> {receivedAmount.toFixed(2)}
               </p>
               <p>
-                <strong>Shipping:</strong> {formatCurrency(initialShipping)}
-              </p>
-              <p className="text-lg font-bold">
-                <strong>Grand Total:</strong> {formatCurrency(totals.finalTotal)}
-              </p>
-              <p>
-                <strong>Received:</strong> {formatCurrency(receivedAmount)}
-              </p>
-              <p>
-                <strong>Balance:</strong> {formatCurrency(balanceAmount)}
+                <strong>Balance:</strong> {balanceAmount.toFixed(2)}
               </p>
             </div>
 
