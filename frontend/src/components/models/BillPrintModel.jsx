@@ -97,50 +97,51 @@ const BillPrintModal = ({
   }, [showConfirmation]);
 
   // Calculate totals
-  const calculateTotals = () => {
-    let totalQty = 0;
-    let subTotalMRP = 0;
-    let totalItemDiscounts = 0;
-    let totalSpecialDiscounts = 0;
-    let grandTotalBeforeAdjustments = 0;
+  // Commented out to use passed initialTotals prop instead
+  // const calculateTotals = () => {
+  //   let totalQty = 0;
+  //   let subTotalMRP = 0;
+  //   let totalItemDiscounts = 0;
+  //   let totalSpecialDiscounts = 0;
+  //   let grandTotalBeforeAdjustments = 0;
 
-    initialProducts.forEach((p) => {
-      const qty = parseFloat(p.qty || 0);
-      const mrp = parseFloat(p.mrp || 0);
-      const unitDiscount = parseFloat(p.discount || 0);
-      const unitPrice = parseFloat(p.price || 0);
-      const specialDiscount = parseFloat(p.specialDiscount || 0);
+  //   initialProducts.forEach((p) => {
+  //     const qty = parseFloat(p.qty || 0);
+  //     const mrp = parseFloat(p.mrp || 0);
+  //     const unitDiscount = parseFloat(p.discount || 0);
+  //     const unitPrice = parseFloat(p.price || 0);
+  //     const specialDiscount = parseFloat(p.specialDiscount || 0);
 
-      totalQty += qty;
-      subTotalMRP += mrp * qty;
-      totalItemDiscounts += unitDiscount * qty;
-      totalSpecialDiscounts += specialDiscount;
-      grandTotalBeforeAdjustments += unitPrice * qty - specialDiscount;
-    });
+  //     totalQty += qty;
+  //     subTotalMRP += mrp * qty;
+  //     totalItemDiscounts += unitDiscount * qty;
+  //     totalSpecialDiscounts += specialDiscount;
+  //     grandTotalBeforeAdjustments += unitPrice * qty - specialDiscount;
+  //   });
 
-    const taxRate = parseFloat(initialTax || 0);
-    const billDiscount = parseFloat(initialBillDiscount || 0);
-    const shipping = parseFloat(initialShipping || 0);
-    const taxAmount = grandTotalBeforeAdjustments * (taxRate / 100);
-    const finalTotalDiscount =
-      totalItemDiscounts + totalSpecialDiscounts + billDiscount;
-    const finalTotal =
-      grandTotalBeforeAdjustments + taxAmount - billDiscount + shipping;
+  //   const taxRate = parseFloat(initialTax || 0);
+  //   const billDiscount = parseFloat(initialBillDiscount || 0);
+  //   const shipping = parseFloat(initialShipping || 0);
+  //   const taxAmount = grandTotalBeforeAdjustments * (taxRate / 100);
+  //   const finalTotalDiscount =
+  //     totalItemDiscounts + totalSpecialDiscounts + billDiscount;
+  //   const finalTotal =
+  //     grandTotalBeforeAdjustments + taxAmount - billDiscount + shipping;
 
-    return {
-      totalQty,
-      subTotalMRP,
-      totalItemDiscounts,
-      totalSpecialDiscounts,
-      totalBillDiscount: billDiscount,
-      finalTotalDiscount,
-      taxAmount,
-      grandTotalBeforeAdjustments,
-      finalTotal,
-    };
-  };
+  //   return {
+  //     totalQty,
+  //     subTotalMRP,
+  //     totalItemDiscounts,
+  //     totalSpecialDiscounts,
+  //     totalBillDiscount: billDiscount,
+  //     finalTotalDiscount,
+  //     taxAmount,
+  //     grandTotalBeforeAdjustments,
+  //     finalTotal,
+  //   };
+  // };
 
-  const totals = calculateTotals();
+  const totals = initialTotals || {};
 
   // Handle customer selection
   const handleCustomerChange = (e) => {
@@ -184,13 +185,14 @@ const BillPrintModal = ({
     // Validate credit customer requirement
     if (paymentType === "credit") {
       if (!selectedCustomer?.id) {
-        alert("Please select a credit-approved customer for credit sales.");
+        alert("Please select a customer for credit sales.");
         return;
       }
-      if (!selectedCustomer.is_credit_customer) {
-        alert("The selected customer is not approved for credit purchases.");
-        return;
-      }
+      // Removed check for is_credit_customer to allow all customers
+      // if (!selectedCustomer.is_credit_customer) {
+      //   alert("The selected customer is not approved for credit purchases.");
+      //   return;
+      // }
     }
 
     const billData = {
@@ -394,13 +396,14 @@ const BillPrintModal = ({
   const handleConfirmPrint = () => {
     if (paymentType === "credit") {
       if (!selectedCustomer?.id) {
-        alert("Please select a credit-approved customer for credit sales.");
+        alert("Please select a customer for credit sales.");
         return;
       }
-      if (!selectedCustomer.is_credit_customer) {
-        alert("The selected customer is not approved for credit purchases.");
-        return;
-      }
+      // Removed check for is_credit_customer to allow all customers
+      // if (!selectedCustomer.is_credit_customer) {
+      //   alert("The selected customer is not approved for credit purchases.");
+      //   return;
+      // }
     }
 
     if (paymentType !== "credit" && receivedAmount < totals.finalTotal) {
@@ -415,13 +418,14 @@ const BillPrintModal = ({
   const handleConfirmSave = () => {
     if (paymentType === "credit") {
       if (!selectedCustomer?.id) {
-        alert("Please select a credit-approved customer for credit sales.");
+        alert("Please select a customer for credit sales.");
         return;
       }
-      if (!selectedCustomer.is_credit_customer) {
-        alert("The selected customer is not approved for credit purchases.");
-        return;
-      }
+      // Removed check for is_credit_customer to allow all customers
+      // if (!selectedCustomer.is_credit_customer) {
+      //   alert("The selected customer is not approved for credit purchases.");
+      //   return;
+      // }
     }
 
     setShowConfirmation(false);
@@ -966,14 +970,19 @@ const BillPrintModal = ({
             <div className="bill-summary text-right text-sm mt-2">
               <p>
                 <strong>Subtotal:</strong>{" "}
-                {formatCurrency(grandTotal + initialBillDiscount)}
+                {formatCurrency(totals.subTotalMRP || 0)}
               </p>
               <p>
                 <strong>Discount:</strong>{" "}
-                {formatCurrency(totalItemDiscount + initialBillDiscount)}
+                {formatCurrency(
+                  (totals.totalItemDiscounts || 0) +
+                    (totals.totalSpecialDiscounts || 0) +
+                    (initialBillDiscount || 0)
+                )}
               </p>
               <p className="font-bold text-lg">
-                <strong>Grand Total:</strong> {formatCurrency(grandTotal)}
+                <strong>Grand Total:</strong>{" "}
+                {formatCurrency(totals.finalTotal || 0)}
               </p>
               <p>
                 <strong>Received:</strong> {formatCurrency(receivedAmount)}
