@@ -1183,9 +1183,6 @@ const SalesReport = () => {
                                             Special Disc
                                           </th>
                                           <th className="px-2 py-1 font-medium text-right">
-                                            Buying Price
-                                          </th>
-                                          <th className="px-2 py-1 font-medium text-right">
                                             Total
                                           </th>
                                         </tr>
@@ -1219,11 +1216,6 @@ const SalesReport = () => {
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
                                               {formatCurrency(
                                                 item.special_discount || 0
-                                              )}
-                                            </td>
-                                            <td className="px-2 py-1 text-right text-gray-600 dark:text-gray-300">
-                                              {formatCurrency(
-                                                item.total_buying_cost || 0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 font-semibold text-right text-gray-900 dark:text-white">
