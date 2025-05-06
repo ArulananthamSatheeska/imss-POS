@@ -1698,17 +1698,11 @@ const TOUCHPOSFORM = () => {
       )}
 
       {lowStockWarning && (
-<<<<<<< HEAD
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl dark:bg-slate-800">
-            <h3 className="mb-4 text-lg font-bold dark:text-white">Low Stock Warning</h3>
-=======
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full dark:bg-slate-800">
-            <h3 className="text-lg font-bold mb-4 dark:text-white">
+            <h3 className="mb-4 text-lg font-bold dark:text-white">
               Low Stock Warning
             </h3>
->>>>>>> e20d5c6013ddc20b17d52a6918a610e125c804b5
             <p className="mb-4 dark:text-white">
               Only {lowStockWarning.remainingStock} units of{" "}
               {lowStockWarning.productName} remaining! Do you want to proceed
