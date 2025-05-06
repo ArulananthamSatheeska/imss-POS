@@ -1237,6 +1237,18 @@ const TOUCHPOSFORM = () => {
                               let value = parseFloat(e.target.value);
                               if (isNaN(value) || value < 0) {
                                 value = 0;
+                            className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                            value={product.qty}
+                            onChange={(e) =>
+                              updateProductQuantity(index, e.target.value)
+                            }
+                            onBlur={(e) => {
+                              // Ensure value is not empty or negative on blur
+                              if (
+                                e.target.value === "" ||
+                                parseFloat(e.target.value) < 0
+                              ) {
+                                updateProductQuantity(index, 0);
                               }
                               const maxDiscount =
                                 product.price * (product.qty || 0);
@@ -1561,7 +1573,7 @@ const TOUCHPOSFORM = () => {
             </div>
 
             {categories.length <= 8 && (
-              <div className="flex overflow-x-auto pb-2 gap-1 sm:gap-2">
+              <div className="flex gap-1 pb-2 overflow-x-auto sm:gap-2">
                 {categories.map((category) => (
                   <button
                     key={category.id}
@@ -1616,7 +1628,7 @@ const TOUCHPOSFORM = () => {
             </div>
 
             {brands.length <= 8 && (
-              <div className="flex overflow-x-auto pb-2 gap-1 sm:gap-2">
+              <div className="flex gap-1 pb-2 overflow-x-auto sm:gap-2">
                 {brands.map((brand) => (
                   <button
                     key={brand.id}
@@ -1777,9 +1789,9 @@ const TOUCHPOSFORM = () => {
       )}
 
       {lowStockWarning && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full dark:bg-slate-800">
-            <h3 className="text-lg font-bold mb-4 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl dark:bg-slate-800">
+            <h3 className="mb-4 text-lg font-bold dark:text-white">
               Low Stock Warning
             </h3>
             <p className="mb-4 dark:text-white">
@@ -1868,7 +1880,7 @@ const TOUCHPOSFORM = () => {
                   }
                   setLowStockWarning(null);
                 }}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600"
               >
                 Proceed
               </button>
