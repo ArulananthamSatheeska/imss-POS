@@ -12,7 +12,11 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             AdminUserSeeder::class,
             MultipleUsersSeeder::class, // Add the multiple users seeder
-            AddDeletedUsersPermission::class
+            AddDeletedUsersPermission::class,
+            UserSeeder::class,
+            SuperAdminUserSeeder::class,
+            RoleSeeder::class,
+        
         ]);
     }
 }

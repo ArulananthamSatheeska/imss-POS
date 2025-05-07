@@ -6,16 +6,16 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-class AdminUserSeeder extends Seeder
+class SuperAdminUserSeeder extends Seeder
 {
     public function run()
     {
-        $admin = User::firstOrCreate(
-            ['email' => 'Sharvaksha@imss.lk'],
+        $superadmin = User::firstOrCreate(
+            ['email' => 'info@imss.lk'],
             [
-                'name' => 'Sharvaksha',
-                'password' => Hash::make('sharvaksha@123'),
-                'role' => 'admin',
+                'name' => 'IMSS',
+                'password' => Hash::make('imss@2025'),
+                'role' => 'superadmin',
                 'status' => 'active',
                 'photo' => null,
                 'email_verified_at' => now(),
@@ -24,9 +24,6 @@ class AdminUserSeeder extends Seeder
             ]
         );
 
-        $admin->assignRole('admin');
-
-       
-
+        $superadmin->assignRole('superadmin');
     }
 }

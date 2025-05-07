@@ -68,23 +68,23 @@ const PurchasingEntryForm = () => {
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
         : Array.isArray(suppliersRes.data)
-        ? suppliersRes.data
-        : [];
+          ? suppliersRes.data
+          : [];
       const storesData = Array.isArray(storesRes.data.data)
         ? storesRes.data.data
         : Array.isArray(storesRes.data)
-        ? storesRes.data
-        : [];
+          ? storesRes.data
+          : [];
       const productsData = Array.isArray(productsRes.data.data)
         ? productsRes.data.data
         : Array.isArray(productsRes.data)
-        ? productsRes.data
-        : [];
+          ? productsRes.data
+          : [];
       const purchasesData = Array.isArray(purchasesRes.data.data)
         ? purchasesRes.data.data
         : Array.isArray(purchasesRes.data)
-        ? purchasesRes.data
-        : [];
+          ? purchasesRes.data
+          : [];
 
       setSuppliers(suppliersData);
       setStores(storesData);
@@ -486,8 +486,8 @@ const PurchasingEntryForm = () => {
           <!-- Header -->
           <div class="flex justify-between mb-4">
             <div>
-              <h2 class="text-3xl font-bold text-blue-900">SK JEELAN</h2>
-              <p class="text-gray-600">PVT(Ltd)</p>
+              <h2 class="text-3xl font-bold text-blue-900">Sharvaksha</h2>
+              <p class="text-gray-600"></p>
             </div>
             <h1 class="text-4xl font-bold text-blue-900 uppercase text-right">Purchase Invoice</h1>
           </div>
@@ -618,143 +618,193 @@ const PurchasingEntryForm = () => {
     printWindow.document.close();
   };
 
-const ViewInvoiceModal = ({ invoice, onClose }) => {
-  if (!invoice) return null;
+  const ViewInvoiceModal = ({ invoice, onClose }) => {
+    if (!invoice) return null;
 
-  return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto p-8">
-        <div className="flex justify-between items-center mb-6 border-b border-gray-300 dark:border-gray-700 pb-4">
-          <h2 className="text-2xl font-extrabold text-gray-900 dark:text-gray-100">
-            Purchase Invoice Details
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
-            aria-label="Close modal"
-          >
-            <FiX size={28} />
-          </button>
-        </div>
+    return (
+      <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center z-50 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto p-8">
+          <div className="flex justify-between items-center mb-6 border-b border-gray-300 dark:border-gray-700 pb-4">
+            <h2 className="text-2xl font-extrabold text-gray-900 dark:text-gray-100">
+              Purchase Invoice Details
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
+              aria-label="Close modal"
+            >
+              <FiX size={28} />
+            </button>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Invoice Info
-            </h3>
-            <ul className="space-y-1 text-gray-800 dark:text-gray-200">
-              <li>
-                <span className="font-semibold">Bill Number:</span> {invoice.billNumber}
-              </li>
-              <li>
-                <span className="font-semibold">Invoice Number:</span> {invoice.invoiceNumber}
-              </li>
-              <li>
-                <span className="font-semibold">Purchase Date:</span> {invoice.purchaseDate}
-              </li>
-              <li>
-                <span className="font-semibold">Payment Method:</span> {invoice.paymentMethod}
-              </li>
-            </ul>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Invoice Info
+              </h3>
+              <ul className="space-y-1 text-gray-800 dark:text-gray-200">
+                <li>
+                  <span className="font-semibold">Bill Number:</span>{" "}
+                  {invoice.billNumber}
+                </li>
+                <li>
+                  <span className="font-semibold">Invoice Number:</span>{" "}
+                  {invoice.invoiceNumber}
+                </li>
+                <li>
+                  <span className="font-semibold">Purchase Date:</span>{" "}
+                  {invoice.purchaseDate}
+                </li>
+                <li>
+                  <span className="font-semibold">Payment Method:</span>{" "}
+                  {invoice.paymentMethod}
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Supplier & Store
+              </h3>
+              <ul className="space-y-1 text-gray-800 dark:text-gray-200">
+                <li>
+                  <span className="font-semibold">Supplier:</span>{" "}
+                  {invoice.supplierName}
+                </li>
+                <li>
+                  <span className="font-semibold">Store:</span>{" "}
+                  {invoice.storeName}
+                </li>
+                <li>
+                  <span className="font-semibold">Paid Amount:</span>{" "}
+                  {formatCurrency(invoice.paidAmount)}
+                </li>
+                <li>
+                  <span className="font-semibold">Status:</span>{" "}
+                  {invoice.status}
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Summary
+              </h3>
+              <ul className="space-y-1 text-gray-800 dark:text-gray-200">
+                <li>
+                  <span className="font-semibold">
+                    Invoice Discount Percentage:
+                  </span>{" "}
+                  {invoice.discountPercentage.toFixed(2)}%
+                </li>
+                <li>
+                  <span className="font-semibold">
+                    Invoice Discount Amount:
+                  </span>{" "}
+                  {formatCurrency(invoice.discountAmount)}
+                </li>
+                <li>
+                  <span className="font-semibold">Tax Percentage:</span>{" "}
+                  {invoice.taxPercentage.toFixed(2)}%
+                </li>
+                <li>
+                  <span className="font-semibold">Tax Amount:</span>{" "}
+                  {formatCurrency(invoice.tax)}
+                </li>
+                <li className="font-bold text-lg">
+                  Total: {formatCurrency(invoice.total)}
+                </li>
+                <li>
+                  <span className="font-semibold">Balance:</span>{" "}
+                  {formatCurrency(invoice.total - invoice.paidAmount)}
+                </li>
+              </ul>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Supplier & Store
-            </h3>
-            <ul className="space-y-1 text-gray-800 dark:text-gray-200">
-              <li>
-                <span className="font-semibold">Supplier:</span> {invoice.supplierName}
-              </li>
-              <li>
-                <span className="font-semibold">Store:</span> {invoice.storeName}
-              </li>
-              <li>
-                <span className="font-semibold">Paid Amount:</span> {formatCurrency(invoice.paidAmount)}
-              </li>
-              <li>
-                <span className="font-semibold">Status:</span> {invoice.status}
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Summary
-            </h3>
-            <ul className="space-y-1 text-gray-800 dark:text-gray-200">
-              <li>
-                <span className="font-semibold">Invoice Discount Percentage:</span> {invoice.discountPercentage.toFixed(2)}%
-              </li>
-              <li>
-                <span className="font-semibold">Invoice Discount Amount:</span> {formatCurrency(invoice.discountAmount)}
-              </li>
-              <li>
-                <span className="font-semibold">Tax Percentage:</span> {invoice.taxPercentage.toFixed(2)}%
-              </li>
-              <li>
-                <span className="font-semibold">Tax Amount:</span> {formatCurrency(invoice.tax)}
-              </li>
-              <li className="font-bold text-lg">
-                Total: {formatCurrency(invoice.total)}
-              </li>
-              <li>
-                <span className="font-semibold">Balance:</span> {formatCurrency(invoice.total - invoice.paidAmount)}
-              </li>
-            </ul>
-          </div>
-        </div>
 
-        <div className="mb-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Items</h3>
-          <div className="overflow-x-auto rounded-lg border border-gray-300 dark:border-gray-700">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-100 dark:bg-slate-700">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Item</th>
-                  <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">Quantity</th>
-                  <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">Free Items</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Buying Cost</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Discount (%)</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Discount (LKR)</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Subtotal</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {invoice.items.map((item) => (
-                  <tr key={item.id} className="text-gray-900 dark:text-gray-300">
-                    <td className="px-4 py-2">{item.description}</td>
-                    <td className="px-4 py-2 text-center">{item.quantity}</td>
-                    <td className="px-4 py-2 text-center">{item.freeItems}</td>
-                    <td className="px-4 py-2 text-right">{formatCurrency(item.buyingCost)}</td>
-                    <td className="px-4 py-2 text-right">{item.discountPercentage.toFixed(2)}%</td>
-                    <td className="px-4 py-2 text-right">{formatCurrency(item.discountAmount)}</td>
-                    <td className="px-4 py-2 text-right">{formatCurrency(item.subtotal)}</td>
-                    <td className="px-4 py-2 text-right">{formatCurrency(item.total)}</td>
+          <div className="mb-6">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+              Items
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-gray-300 dark:border-gray-700">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-100 dark:bg-slate-700">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Item
+                    </th>
+                    <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Quantity
+                    </th>
+                    <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Free Items
+                    </th>
+                    <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Buying Cost
+                    </th>
+                    <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Discount (%)
+                    </th>
+                    <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Discount (LKR)
+                    </th>
+                    <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Subtotal
+                    </th>
+                    <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Total
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {invoice.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="text-gray-900 dark:text-gray-300"
+                    >
+                      <td className="px-4 py-2">{item.description}</td>
+                      <td className="px-4 py-2 text-center">{item.quantity}</td>
+                      <td className="px-4 py-2 text-center">
+                        {item.freeItems}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {formatCurrency(item.buyingCost)}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {item.discountPercentage.toFixed(2)}%
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {formatCurrency(item.discountAmount)}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {formatCurrency(item.subtotal)}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {formatCurrency(item.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        <div className="flex justify-end gap-4">
-          <button
-            onClick={() => handlePrint(invoice)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2"
-          >
-            <FiPrinter size={20} /> Print
-          </button>
-          <button
-            onClick={onClose}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold"
-          >
-            Close
-          </button>
+          <div className="flex justify-end gap-4">
+            <button
+              onClick={() => handlePrint(invoice)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2"
+            >
+              <FiPrinter size={20} /> Print
+            </button>
+            <button
+              onClick={onClose}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const paginatedPurchases = filteredPurchases.slice(
     (currentPage - 1) * itemsPerPage,
