@@ -305,14 +305,14 @@ const POSForm = ({
           );
           const unitPrice = parseFloat(product.price || 0);
           const unitDiscount = Math.max(0, (product.mrp || 0) - unitPrice);
-          const total =
-            unitPrice * product.qty - (unitDiscount + specialDiscount);
+          const qty = product.qty || 1;
+          const combinedDiscount = unitDiscount + specialDiscount;
+          const total = qty * ((product.mrp || 0) - combinedDiscount);
 
           return {
             ...product,
             schemeName: schemeName,
-            discount: unitDiscount,
-            specialDiscount: specialDiscount,
+            discount: combinedDiscount,
             total: total >= 0 ? total : 0,
           };
         })
@@ -487,7 +487,7 @@ const POSForm = ({
       supplier: item.supplier || "N/A",
       category: item.category_name || "N/A",
       store_location: item.store_location || "N/A",
-  });
+    });
     setSearchQuery(item.product_name);
     setSearchResults([]);
     setQuantity(1);
@@ -529,10 +529,16 @@ const POSForm = ({
     );
 
     const productWithQty = { ...selectedProduct, qty: currentQuantity };
-    const specialDiscount = calculateSpecialDiscount(
+    const totalSpecialDiscount = calculateSpecialDiscount(
       productWithQty,
       saleType,
       new Date().toISOString().split("T")[0]
+    );
+    const specialDiscountPerUnit = totalSpecialDiscount / currentQuantity;
+
+    const discountAmountPerUnit = Math.max(
+      0,
+      (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
     );
 
     const existingProductIndex = products.findIndex(
@@ -554,22 +560,25 @@ const POSForm = ({
         setStockWarning("");
       }
 
-      const updatedProductWithQty = { ...existingProduct, qty: newQuantity };
-      const newSpecialDiscount = calculateSpecialDiscount(
-        updatedProductWithQty,
-        saleType,
-        new Date().toISOString().split("T")[0]
-      );
-
       updatedProducts[existingProductIndex] = {
         ...existingProduct,
         qty: newQuantity,
         price: existingProduct.price || 0,
-        discount: existingProduct.discount || 0,
+        discountPerUnit:
+          existingProduct.discountPerUnit || discountAmountPerUnit,
+        specialDiscountPerUnit:
+          existingProduct.specialDiscountPerUnit || specialDiscountPerUnit,
+        discount:
+          (existingProduct.discountPerUnit || discountAmountPerUnit) +
+          (existingProduct.specialDiscountPerUnit || specialDiscountPerUnit),
         discount_percentage: existingProduct.discount_percentage || 0,
         schemeName: schemeName,
-        specialDiscount: newSpecialDiscount,
-        total: (existingProduct.price || 0) * newQuantity - ((existingProduct.discount || 0) + newSpecialDiscount),
+        total:
+          newQuantity *
+          ((existingProduct.mrp || 0) -
+            ((existingProduct.discountPerUnit || discountAmountPerUnit) +
+              (existingProduct.specialDiscountPerUnit ||
+                specialDiscountPerUnit))),
         supplier: selectedProduct.supplier,
         category: selectedProduct.category,
         store_location: selectedProduct.store_location,
@@ -589,24 +598,20 @@ const POSForm = ({
         ...selectedProduct,
         qty: currentQuantity,
         price: selectedProduct.sales_price || 0,
-        discount: Math.max(
-          0,
-          (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
-        ),
+        discountPerUnit: discountAmountPerUnit,
+        specialDiscountPerUnit: specialDiscountPerUnit,
+        discount: discountAmountPerUnit + specialDiscountPerUnit,
         discount_percentage:
           selectedProduct.mrp && selectedProduct.sales_price
-            ? (Math.max(
-                0,
-                (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
-              ) /
+            ? ((discountAmountPerUnit + specialDiscountPerUnit) /
                 selectedProduct.mrp) *
               100
             : 0,
         schemeName: schemeName,
-        specialDiscount: specialDiscount,
         total:
-          (selectedProduct.sales_price || 0) * currentQuantity -
-          specialDiscount,
+          currentQuantity *
+          ((selectedProduct.mrp || 0) -
+            (discountAmountPerUnit + specialDiscountPerUnit)),
         serialNumber: products.length + 1,
         supplier: selectedProduct.supplier,
         category: selectedProduct.category,
@@ -646,27 +651,19 @@ const POSForm = ({
         setStockWarning("");
       }
 
-      const updatedProductWithQty = { ...productToUpdate, qty: newQty };
-      const newSpecialDiscount = calculateSpecialDiscount(
-        updatedProductWithQty,
-        saleType,
-        new Date().toISOString().split("T")[0]
-      );
-      const newDiscount = Math.max(
-        0,
-        (productToUpdate.mrp || 0) - (productToUpdate.price || 0)
-      );
+      const discountPerUnit = productToUpdate.discountPerUnit || 0;
+      const specialDiscountPerUnit =
+        productToUpdate.specialDiscountPerUnit || 0;
+      const combinedDiscountPerUnit = discountPerUnit + specialDiscountPerUnit;
 
       return prevProducts.map((product, i) => {
         if (i === index) {
-          const newTotal =
-            product.price * newQty - (newDiscount + newSpecialDiscount);
+          const total = newQty * ((product.mrp || 0) - combinedDiscountPerUnit);
           return {
             ...product,
             qty: newQty,
-            discount: newDiscount,
-            specialDiscount: newSpecialDiscount,
-            total: newTotal >= 0 ? newTotal : 0,
+            discount: combinedDiscountPerUnit,
+            total: total >= 0 ? total : 0,
           };
         }
         return product;
@@ -684,25 +681,29 @@ const POSForm = ({
       prevProducts.map((product, i) => {
         if (i === index) {
           const updatedProductWithQty = { ...product, qty: product.qty || 1 };
-          const newSpecialDiscount = calculateSpecialDiscount(
+          const totalSpecialDiscount = calculateSpecialDiscount(
             updatedProductWithQty,
             saleType,
             new Date().toISOString().split("T")[0]
           );
-          const newDiscount = Math.max(0, (product.mrp || 0) - newPrice);
-          // Recalculate discount percentage based on current discount
+          const specialDiscountPerUnit =
+            totalSpecialDiscount / (product.qty || 1);
+          const newDiscountPerUnit = Math.max(0, (product.mrp || 0) - newPrice);
           const newDiscountPercentage =
-            newPrice > 0 ? (newDiscount / newPrice) * 100 : 0;
-          const newTotal =
-            newPrice * product.qty - (newDiscount + newSpecialDiscount);
+            newPrice > 0 ? (newDiscountPerUnit / newPrice) * 100 : 0;
+          const combinedDiscountPerUnit =
+            newDiscountPerUnit + specialDiscountPerUnit;
+          const qty = product.qty || 1;
+          const total = qty * ((product.mrp || 0) - combinedDiscountPerUnit);
           return {
             ...product,
             price: newPrice,
-            discount: newDiscount,
+            discountPerUnit: newDiscountPerUnit,
+            specialDiscountPerUnit: specialDiscountPerUnit,
+            discount: combinedDiscountPerUnit,
             discount_percentage: newDiscountPercentage,
             schemeName: null,
-            specialDiscount: newSpecialDiscount,
-            total: newTotal >= 0 ? newTotal : 0,
+            total: total >= 0 ? total : 0,
           };
         }
         return product;
@@ -720,23 +721,26 @@ const POSForm = ({
       prevProducts.map((product, i) => {
         if (i === index) {
           const updatedProductWithQty = { ...product, qty: product.qty || 1 };
-          const newSpecialDiscount = calculateSpecialDiscount(
+          const totalSpecialDiscount = calculateSpecialDiscount(
             updatedProductWithQty,
             saleType,
             new Date().toISOString().split("T")[0]
           );
-          // Calculate discount percentage
+          const specialDiscountPerUnit =
+            totalSpecialDiscount / (product.qty || 1);
           const newDiscountPercentage =
             product.price > 0 ? (newDiscount / product.price) * 100 : 0;
-          const newTotal =
-            product.price * product.qty - (newDiscount + newSpecialDiscount);
+          const combinedDiscountPerUnit = newDiscount + specialDiscountPerUnit;
+          const qty = product.qty || 1;
+          const total = qty * ((product.mrp || 0) - combinedDiscountPerUnit);
           return {
             ...product,
-            discount: newDiscount,
+            discountPerUnit: newDiscount,
+            specialDiscountPerUnit: specialDiscountPerUnit,
+            discount: combinedDiscountPerUnit,
             discount_percentage: newDiscountPercentage,
             schemeName: null,
-            specialDiscount: newSpecialDiscount,
-            total: newTotal >= 0 ? newTotal : 0,
+            total: total >= 0 ? total : 0,
           };
         }
         return product;
@@ -754,21 +758,24 @@ const POSForm = ({
       prevProducts.map((product, i) => {
         if (i === index) {
           const updatedProductWithQty = { ...product, qty: product.qty || 1 };
-          const newSpecialDiscount = calculateSpecialDiscount(
+          const totalSpecialDiscount = calculateSpecialDiscount(
             updatedProductWithQty,
             saleType,
             new Date().toISOString().split("T")[0]
           );
-          // Calculate discount amount from percentage
+          const specialDiscountPerUnit =
+            totalSpecialDiscount / (product.qty || 1);
           const newDiscount = (product.price * newPercentage) / 100;
+          const combinedDiscountPerUnit = newDiscount + specialDiscountPerUnit;
           const newTotal =
-            product.price * product.qty - (newDiscount + newSpecialDiscount);
+            ((product.mrp || 0) - combinedDiscountPerUnit) * product.qty;
           return {
             ...product,
-            discount: newDiscount,
+            discountPerUnit: newDiscount,
+            specialDiscountPerUnit: specialDiscountPerUnit,
+            discount: combinedDiscountPerUnit,
             discount_percentage: newPercentage,
             schemeName: null,
-            specialDiscount: newSpecialDiscount,
             total: newTotal >= 0 ? newTotal : 0,
           };
         }
@@ -808,20 +815,16 @@ const POSForm = ({
     let totalQty = 0;
     let subTotalMRP = 0;
     let totalItemDiscounts = 0;
-    let totalSpecialDiscounts = 0;
     let grandTotalBeforeAdjustments = 0;
 
     products.forEach((p) => {
       const qty = p.qty || 0;
       const mrp = parseFloat(p.mrp || 0);
-      const unitPrice = p.price || 0;
       const unitDiscount = p.discount || 0;
-      const specialDiscount = p.specialDiscount || 0;
 
       totalQty += qty;
       subTotalMRP += mrp * qty;
       totalItemDiscounts += unitDiscount * qty;
-      totalSpecialDiscounts += specialDiscount;
       grandTotalBeforeAdjustments += p.total;
     });
 
@@ -829,8 +832,7 @@ const POSForm = ({
     const currentBillDiscount = parseFloat(billDiscount || 0);
     const currentShipping = parseFloat(shipping || 0);
     const taxAmount = grandTotalBeforeAdjustments * (currentTaxRate / 100);
-    const finalTotalDiscount =
-      totalItemDiscounts + totalSpecialDiscounts + currentBillDiscount;
+    const finalTotalDiscount = totalItemDiscounts + currentBillDiscount;
     const finalTotal =
       grandTotalBeforeAdjustments +
       taxAmount -
@@ -841,9 +843,6 @@ const POSForm = ({
       totalQty,
       subTotalMRP: isNaN(subTotalMRP) ? 0 : subTotalMRP,
       totalItemDiscounts: isNaN(totalItemDiscounts) ? 0 : totalItemDiscounts,
-      totalSpecialDiscounts: isNaN(totalSpecialDiscounts)
-        ? 0
-        : totalSpecialDiscounts,
       totalBillDiscount: isNaN(currentBillDiscount) ? 0 : currentBillDiscount,
       finalTotalDiscount: isNaN(finalTotalDiscount) ? 0 : finalTotalDiscount,
       taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
@@ -1470,25 +1469,13 @@ const POSForm = ({
                     scope="col"
                     className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]"
                   >
-                    U.Price
+                    MRP
                   </th>
                   <th
                     scope="col"
                     className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
                   >
-                    U.Disc
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
-                  >
-                    Disc %
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
-                  >
-                    Sp.Disc
+                    Disc
                   </th>
                   <th
                     scope="col"
@@ -1505,7 +1492,7 @@ const POSForm = ({
                 {products.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="9"
+                      colSpan="7"
                       className="py-6 italic text-center text-gray-500 dark:text-gray-400"
                     >
                       No items added to the bill yet.
@@ -1582,36 +1569,13 @@ const POSForm = ({
                           min="0"
                           className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                           value={formatNumberWithCommas(
-                            parseFloat(
-                              product.mrp - product.sales_price
-                            ).toFixed(2)
+                            parseFloat(product.discount || 0).toFixed(2)
                           )}
                           onChange={(e) =>
                             updateProductDiscount(index, e.target.value)
                           }
                           onFocus={(e) => e.target.select()}
                         />
-                      </td>
-                      <td className="px-3 py-2 text-right border-r dark:border-gray-700">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                          value={product.discount_percentage}
-                          onChange={(e) =>
-                            updateProductDiscountPercentage(
-                              index,
-                              e.target.value
-                            )
-                          }
-                          onFocus={(e) => e.target.select()}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
-                        {formatNumberWithCommas(
-                          product.specialDiscount?.toFixed(2) ?? 0.0
-                        )}
                       </td>
                       <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">
                         {formatNumberWithCommas(
@@ -1715,15 +1679,6 @@ const POSForm = ({
               <span className="font-medium">
                 Rs.{" "}
                 {formatNumberWithCommas(totals.totalItemDiscounts.toFixed(2))}
-              </span>
-            </div>
-            <div className="flex justify-between text-red-300">
-              <span>(-) Special Discounts:</span>
-              <span className="font-medium">
-                Rs.{" "}
-                {formatNumberWithCommas(
-                  totals.totalSpecialDiscounts.toFixed(2)
-                )}
               </span>
             </div>
             <div className="flex justify-between">

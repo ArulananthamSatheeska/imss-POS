@@ -31,6 +31,13 @@ const BillPrintModal = ({
     contact_number: "0750296343",
   });
 
+  // Added products state to allow editing discounts
+  const [products, setProducts] = useState(() =>
+    initialProducts.map((p) => ({
+      ...p,
+    }))
+  );
+
   // Customer creation state
   const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
@@ -98,89 +105,10 @@ const BillPrintModal = ({
   }, [showConfirmation]);
 
   // Calculate totals
-  // Commented out to use passed initialTotals prop instead
+  // Removed internal totals calculation to rely on passed initialTotals prop
   // const calculateTotals = () => {
-  //   let totalQty = 0;
-  //   let subTotalMRP = 0;
-  //   let totalItemDiscounts = 0;
-  //   let totalSpecialDiscounts = 0;
-  //   let grandTotalBeforeAdjustments = 0;
-
-  //   initialProducts.forEach((p) => {
-  //     const qty = parseFloat(p.qty || 0);
-  //     const mrp = parseFloat(p.mrp || 0);
-  //     const unitDiscount = parseFloat(p.discount || 0);
-  //     const unitPrice = parseFloat(p.price || 0);
-  //     const specialDiscount = parseFloat(p.specialDiscount || 0);
-
-  //     totalQty += qty;
-  //     subTotalMRP += mrp * qty;
-  //     totalItemDiscounts += unitDiscount * qty;
-  //     totalSpecialDiscounts += specialDiscount;
-  //     grandTotalBeforeAdjustments += unitPrice * qty - specialDiscount;
-  //   });
-
-  //   const taxRate = parseFloat(initialTax || 0);
-  //   const billDiscount = parseFloat(initialBillDiscount || 0);
-  //   const shipping = parseFloat(initialShipping || 0);
-  //   const taxAmount = grandTotalBeforeAdjustments * (taxRate / 100);
-  //   const finalTotalDiscount =
-  //     totalItemDiscounts + totalSpecialDiscounts + billDiscount;
-  //   const finalTotal =
-  //     grandTotalBeforeAdjustments + taxAmount - billDiscount + shipping;
-
-  //   return {
-  //     totalQty,
-  //     subTotalMRP,
-  //     totalItemDiscounts,
-  //     totalSpecialDiscounts,
-  //     totalBillDiscount: billDiscount,
-  //     finalTotalDiscount,
-  //     taxAmount,
-  //     grandTotalBeforeAdjustments,
-  //     finalTotal,
-  //   };
+  //   // Removed
   // };
-
-  const calculateTotals = () => {
-    let totalQty = 0;
-    let subTotal = 0;
-    let totalItemDiscounts = 0;
-    let totalSpecialDiscounts = 0;
-    let grandTotalBeforeTax = 0;
-
-    initialProducts.forEach((p) => {
-      const qty = parseFloat(p.qty || 0);
-      const unitPrice = parseFloat(p.price || 0);
-      const unitDiscount = parseFloat(p.discount || 0);
-      const specialDiscount = parseFloat(p.specialDiscount || 0);
-      const itemTotal = parseFloat(p.total || 0);
-
-      totalQty += qty;
-      subTotal += unitPrice * qty;
-      totalItemDiscounts += unitDiscount * qty;
-      totalSpecialDiscounts += specialDiscount;
-      grandTotalBeforeTax += itemTotal;
-    });
-
-    const taxRate = parseFloat(initialTax || 0);
-    const billDiscount = parseFloat(initialBillDiscount || 0);
-    const shipping = parseFloat(initialShipping || 0);
-    const taxAmount = grandTotalBeforeTax * (taxRate / 100);
-    const finalTotal =
-      grandTotalBeforeTax + taxAmount - billDiscount + shipping;
-
-    return {
-      totalQty,
-      subTotal,
-      totalItemDiscounts,
-      totalSpecialDiscounts,
-      totalBillDiscount: billDiscount,
-      taxAmount,
-      grandTotalBeforeTax,
-      finalTotal,
-    };
-  };
 
   const totals = initialTotals || {};
 
@@ -254,7 +182,7 @@ const BillPrintModal = ({
         (receivedAmount - currentTotals.finalTotal).toFixed(2)
       ),
       sale_type: saleType,
-      items: initialProducts.map((product) => ({
+      items: products.map((product) => ({
         product_id: product.product_id,
         product_name: product.product_name,
         quantity: parseFloat(product.qty),
@@ -808,23 +736,20 @@ const BillPrintModal = ({
                       <th className="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-700 uppercase">
                         No.
                       </th>
-                      <th className="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-700 uppercase">
-                        Item Name
-                      </th>
                       <th className="px-3 py-2 text-xs font-medium tracking-wider text-center text-gray-700 uppercase">
                         Qty
+                      </th>
+                      <th className="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-700 uppercase">
+                        Item Name
                       </th>
                       <th className="px-3 py-2 text-xs font-medium tracking-wider text-center text-gray-700 uppercase">
                         MRP
                       </th>
                       <th className="px-3 py-2 text-xs font-medium tracking-wider text-center text-gray-700 uppercase">
-                        U.Price
+                        Discount
                       </th>
                       <th className="px-3 py-2 text-xs font-medium tracking-wider text-center text-gray-700 uppercase">
-                        U.Dis
-                      </th>
-                      <th className="px-3 py-2 text-xs font-medium tracking-wider text-center text-gray-700 uppercase">
-                        Sp.Dis
+                        Price
                       </th>
                       <th className="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-700 uppercase">
                         Total
@@ -832,34 +757,42 @@ const BillPrintModal = ({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {initialProducts.map((product, index) => (
-                      <tr key={product.product_id + "-" + index}>
-                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
-                          {index + 1}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
-                          {product.product_name}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
-                          {product.qty}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
-                          {formatCurrency(product.mrp)}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
-                          {formatCurrency(product.price)}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
-                          {formatCurrency(product.discount)}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
-                          {formatCurrency(product.specialDiscount || 0)}
-                        </td>
-                        <td className="px-3 py-2 text-sm font-semibold text-right text-gray-700 whitespace-nowrap">
-                          {formatCurrency(product.total)}
-                        </td>
-                      </tr>
-                    ))}
+                    {products.map((product, index) => {
+                      const unitSpecialDiscount =
+                        (product.specialDiscount || 0) / (product.qty || 1);
+                      const totalDiscountPerUnit =
+                        product.discountPerUnit + unitSpecialDiscount;
+                      const price = (product.mrp || 0) - totalDiscountPerUnit;
+                      const total = (product.qty || 0) * price;
+
+                      return (
+                        <tr key={product.product_id + "-" + index}>
+                          <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
+                            {index + 1}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
+                            {product.qty}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
+                            {product.product_name}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
+                            {formatCurrency(product.mrp)}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
+                            {formatCurrency(
+                              product.discountPerUnit + unitSpecialDiscount
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
+                            {formatCurrency(price)}
+                          </td>
+                          <td className="px-3 py-2 text-sm font-semibold text-right text-gray-700 whitespace-nowrap">
+                            {formatCurrency(total)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1015,30 +948,30 @@ const BillPrintModal = ({
               </tbody>
             </table>
 
-            {/* Summary Section */}
-
-            <div className="mt-2 text-sm text-right bill-summary">
-              <p>
-                <strong>Subtotal:</strong> {totals.subTotalMRP.toFixed(2)}
-              </p>
-              <p>
-                <strong>Item Discounts:</strong>{" "}
-                {totals.totalItemDiscounts.toFixed(2)}
-              </p>
-              <p>
-                <strong>Bill Discount:</strong>{" "}
-                {totals.totalBillDiscount.toFixed(2)}
-              </p>
-
-              <p className="total-amount">
-                <strong>Grand Total:</strong> {totals.finalTotal.toFixed(2)}
-              </p>
-              <p>
-                <strong>Received:</strong> {receivedAmount.toFixed(2)}
-              </p>
-              <p>
-                <strong>Balance:</strong> {balanceAmount.toFixed(2)}
-              </p>
+            <div className="p-4 space-y-2 rounded-md bg-gray-50">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Billing Summary
+              </h3>
+              <div className="pt-4 mt-4 border-t">
+                <p>
+                  <strong>Subtotal (MRP):</strong>{" "}
+                  {formatCurrency(totals.subTotalMRP)}
+                </p>
+                <p>
+                  <strong>Item Discounts:</strong>{" "}
+                  {formatCurrency(totals.totalItemDiscounts)}
+                </p>
+                {totals.totalBillDiscount > 0 && (
+                  <p>
+                    <strong>Bill Discount:</strong>{" "}
+                    {formatCurrency(totals.totalBillDiscount)}
+                  </p>
+                )}
+                <p className="text-lg font-bold">
+                  <strong>Grand Total:</strong>{" "}
+                  {formatCurrency(totals.finalTotal)}
+                </p>
+              </div>
             </div>
 
             {/* Terms & Conditions */}
