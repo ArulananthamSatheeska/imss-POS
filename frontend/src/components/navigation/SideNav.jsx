@@ -186,8 +186,8 @@ const SideNav = ({ isPosOpen }) => {
       roles: ["admin", "manager"],
       subItems: [
         {
-          path: "/DailyProfit",
-          label: "Daily Profit",
+          path: "/ItemWiseProfit",
+          label: "Item wise Profit",
           icon: TrendingUp,
           roles: ["admin", "manager"],
         },
@@ -197,10 +197,21 @@ const SideNav = ({ isPosOpen }) => {
           icon: Calendar,
           roles: ["admin", "manager"],
         },
-        // { path: "/CompanyWiseProfit", label: "Company Wise Profit", icon: FileBarChart, roles: ['admin', 'manager'] },
+        {
+          path: "/CustomerWiseProfit",
+          label: "Customer Wise Profit",
+          icon: Calendar,
+          roles: ["admin", "manager"],
+        },
         {
           path: "/SupplierWiseProfit",
           label: "Supplier Wise Profit",
+          icon: ShoppingCart,
+          roles: ["admin", "manager"],
+        },
+        {
+          path: "/StoreAndLocationWiseProfit",
+          label: "Store and Location Wise Profit",
           icon: ShoppingCart,
           roles: ["admin", "manager"],
         },

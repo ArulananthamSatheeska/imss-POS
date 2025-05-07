@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\BillNumberGenerator;
+use App\Models\Supplier;
 
 class SaleController extends Controller
 {
@@ -58,6 +59,10 @@ class SaleController extends Controller
             'items.*.discount' => 'required|numeric|min:0',
             'items.*.special_discount' => 'nullable|numeric|min:0',
             'items.*.total' => 'required|numeric|min:0',
+            'items.*.supplier' => 'nullable|string|max:255',
+            'items.*.category' => 'nullable|string|max:255',
+            'items.*.store_location' => 'nullable|string|max:255',
+            
         ]);
 
         DB::beginTransaction();
@@ -158,6 +163,9 @@ class SaleController extends Controller
                         'discount' => $discountAmount,
                         'special_discount' => $specialDiscount,
                         'total' => max(0, $totalPrice),
+                        'supplier' => $item['supplier'] ?? ($product ? $product->supplier : null),
+                        'category' => $item['category'] ?? ($product ? $product->category_name : null),
+                        'store_location' => $item['store_location'] ?? ($product ? $product->store_location : null),
                     ]);
                 } else {
                     // If product not found, save as is with provided unit_price
@@ -211,6 +219,9 @@ class SaleController extends Controller
             'items.*.discount' => 'required|numeric|min:0',
             'items.*.special_discount' => 'nullable|numeric|min:0',
             'items.*.total' => 'required|numeric|min:0',
+            'items.*.supplier' => 'nullable|string|max:255',
+            'items.*.category' => 'nullable|string|max:255',
+            'items.*.store_location' => 'nullable|string|max:255',
         ]);
 
         DB::beginTransaction();
@@ -304,6 +315,9 @@ class SaleController extends Controller
                         'discount' => $discountAmount,
                         'special_discount' => $specialDiscount,
                         'total' => max(0, $totalPrice),
+                        'supplier' => $item['supplier'] ?? ($product ? $product->supplier : null),
+                        'category' => $item['category'] ?? ($product ? $product->category_name : null),
+                        'store_location' => $item['store_location'] ?? ($product ? $product->store_location : null),
                     ]);
                 } else {
                     // If product not found, save as is with provided unit_price

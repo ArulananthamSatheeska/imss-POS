@@ -102,6 +102,9 @@ const SalesInvoice = ({
           buyingCost: 0,
           categoryId: null,
           mrp: 0,
+          supplier: "",
+          category: "",
+          store_location: "",
         },
       ],
       purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
@@ -155,6 +158,9 @@ const SalesInvoice = ({
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
             ),
+            supplier: item.supplier || "",
+            category: item.category || "",
+            store_location: item.store_location || "",
           };
         }),
         purchaseDetails: {
@@ -206,6 +212,9 @@ const SalesInvoice = ({
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
             ),
+            supplier: item.supplier || "",
+            category: item.category || "",
+            store_location: item.store_location || "",
           };
         }),
         purchaseDetails: {
@@ -567,10 +576,23 @@ const handleCustomerSelect = (selectedOption) => {
   setTimeout(() => customerAddressRef.current?.focus(), 0);
 };
 
-const handleProductSelect = (selectedOption, index) => {
-  const product = selectedOption
-    ? products.find((p) => p.product_id === selectedOption.value)
-    : null;
+const handleProductSelect = async (selectedOption, index) => {
+    const productId = selectedOption ? selectedOption.value : null;
+    let product = products.find((p) => p.product_id === productId);
+  // Fetch additional product details
+  let supplier = "", category = "", store_location = "";
+  if (productId) {
+    try {
+      const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
+      const productData = response.data.data;
+      supplier = productData.supplier || "N/A";
+      category = productData.category || "N/A";
+      store_location = productData.store_location || "N/A";
+    } catch (error) {
+      console.error("Error fetching product details:", error);
+      toast.error("Failed to fetch product details.");
+    }
+  }
   setFormData((prev) => {
     const newItems = [...prev.items];
     const qty = parseFloat(newItems[index].qty) || 1;
@@ -590,6 +612,9 @@ const handleProductSelect = (selectedOption, index) => {
       discountAmount: "",
       discountPercentage: "",
       totalBuyingCost: qty * buyingCost,
+      supplier,
+      category,
+      store_location,
     };
 
     newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
@@ -786,6 +811,9 @@ const handleSubmit = useCallback(
         specialDiscount: parseFloat(item.specialDiscount) || 0,
         total: parseFloat(item.total) || 0,
         totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
+        supplier: item.supplier || null,
+        category: item.category || null,
+        store_location: item.store_location || null,
       })),
       purchaseDetails: {
         method: formData.purchaseDetails.method,

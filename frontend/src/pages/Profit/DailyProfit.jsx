@@ -89,9 +89,9 @@ const DailyProfitReport = () => {
     };
 
     return (
-        <div className="p-4 bg-transparent min-h-screen flex flex-col">
+        <div className="flex flex-col min-h-screen p-4 bg-transparent">
             {/* Header */}
-            <div className="bg-blue-600 text-white text-center p-2 rounded-t-lg">
+            <div className="p-2 text-center text-white bg-blue-600 rounded-t-lg">
                 <h1 className="text-2xl font-bold">Daily Profit Report</h1>
             </div>
 
@@ -99,12 +99,12 @@ const DailyProfitReport = () => {
                 {/* Date Picker */}
                 <div className="flex-1 min-w-[200px]">
                     <label className="flex flex-col">
-                        <span className="font-medium mb-1">Select Date:</span>
+                        <span className="mb-1 font-medium">Select Date:</span>
                         <input
                             type="date"
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
-                            className="border border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </label>
                 </div>
@@ -119,21 +119,21 @@ const DailyProfitReport = () => {
                 <div className="flex flex-wrap gap-4">
                     <button
                         onClick={exportToExcel}
-                        className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-300"
+                        className="px-4 py-2 text-white transition duration-300 bg-green-500 rounded-lg hover:bg-green-600"
                         disabled={!reportData.length}
                     >
                         Export to Excel
                     </button>
                     <button
                         onClick={exportToPDF}
-                        className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-300"
+                        className="px-4 py-2 text-white transition duration-300 bg-red-500 rounded-lg hover:bg-red-600"
                         disabled={!reportData.length}
                     >
                         Export to PDF
                     </button>
                     <button
                         onClick={() => window.print()}
-                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
+                        className="px-4 py-2 text-white transition duration-300 bg-blue-500 rounded-lg hover:bg-blue-600"
                         disabled={!reportData.length}
                     >
                         Print
@@ -159,30 +159,30 @@ const DailyProfitReport = () => {
                     </div>
 
                     {/* Summary Section */}
-                    <div className="bg-transparent rounded-lg shadow-lg text-center p-4 mt-4">
-                        <h2 className="text-xl font-bold mb-4">Daily Summary</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="bg-cyan-800 p-4 rounded-lg">
+                    <div className="p-4 mt-4 text-center bg-transparent rounded-lg shadow-lg">
+                        <h2 className="mb-4 text-xl font-bold">Daily Summary</h2>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div className="p-4 rounded-lg bg-cyan-800">
                                 <p className="text-sm text-cyan-500">Total Sales</p>
-                                <p className="text-2xl text-cyan-300 font-bold">LKR {summary.totalSellingPriceAll || 0}</p>
+                                <p className="text-2xl font-bold text-cyan-300">LKR {summary.totalSellingPriceAll || 0}</p>
                             </div>
-                            <div className="bg-rose-800 p-4 rounded-lg">
+                            <div className="p-4 rounded-lg bg-rose-800">
                                 <p className="text-sm text-pink-500">Total Profit</p>
-                                <p className="text-2xl text-pink-300 font-bold">LKR {summary.totalProfitAll || 0}</p>
+                                <p className="text-2xl font-bold text-pink-300">LKR {summary.totalProfitAll || 0}</p>
                             </div>
-                            <div className="bg-lime-800 p-4 rounded-lg">
+                            <div className="p-4 rounded-lg bg-lime-800">
                                 <p className="text-sm text-lime-500">Total Cost</p>
-                                <p className="text-2xl text-lime-300 font-bold">LKR {summary.totalCostPriceAll || 0}</p>
+                                <p className="text-2xl font-bold text-lime-300">LKR {summary.totalCostPriceAll || 0}</p>
                             </div>
-                            <div className="bg-fuchsia-800 p-4 rounded-lg">
+                            <div className="p-4 rounded-lg bg-fuchsia-800">
                                 <p className="text-sm text-fuchsia-500">Profit Margin</p>
-                                <p className="text-2xl text-fuchsia-300 font-bold">{summary.totalProfitPercentage || '0.00%'}</p>
+                                <p className="text-2xl font-bold text-fuchsia-300">{summary.totalProfitPercentage || '0.00%'}</p>
                             </div>
                         </div>
                     </div>
                 </>
             ) : (
-                !loading && <p className="text-gray-500 text-center">No data available for selected date</p>
+                !loading && <p className="text-center text-gray-500">No data available for selected date</p>
             )}
         </div>
     );

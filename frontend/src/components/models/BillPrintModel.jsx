@@ -213,6 +213,9 @@ const BillPrintModal = ({
         discount: parseFloat(product.discount || 0),
         special_discount: parseFloat(product.specialDiscount || 0),
         total: parseFloat(product.total || 0),
+        supplier: product.supplier || "N/A",
+        category: product.category_name || "N/A",
+        store_location: product.store_location || "N/A",
       })),
     };
 
