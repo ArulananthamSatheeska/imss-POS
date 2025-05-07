@@ -215,6 +215,12 @@ const SideNav = ({ isPosOpen }) => {
           icon: ShoppingCart,
           roles: ["admin", "manager"],
         },
+        {
+          path: "/CategoryWiseProfit",
+          label: "Category Wise Profit",
+          icon: ShoppingCart,
+          roles: ["admin", "manager"],
+        },
       ],
     },
     {

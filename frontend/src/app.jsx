@@ -84,6 +84,7 @@ import { CustomerWiseProfit } from "./pages/Profit/CustomerWiseProfit.jsx";
 import { StoreAndLocationWiseProfit } from "./pages/Profit/StoreAndLocationWiseProfit.jsx";
 import DailyProfitReport from "./pages/Profit/DailyProfit.jsx";
 import { SupplierWiseProfit } from "./pages/Profit/SupplierWiseProfit.jsx";
+import { CategoryWiseProfit } from "./pages/Profit/CategoryWiseProfit.jsx";
 
 // === App Component ===
 function App() {
@@ -198,6 +199,10 @@ function App() {
                   <Route
                     path="StoreAndLocationWiseProfit"
                     element={<StoreAndLocationWiseProfit />}
+                  />
+                  <Route
+                    path="CategoryWiseProfit"
+                    element={<CategoryWiseProfit />}
                   />
                   <Route path="ReportTable" element={<ReportTable />} />
                   <Route path="StockRecheck" element={<StockRecheck />} />
