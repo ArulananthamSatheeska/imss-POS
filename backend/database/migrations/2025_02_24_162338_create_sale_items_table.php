@@ -18,6 +18,9 @@ class CreateSaleItemsTable extends Migration
         $table->decimal('special_discount', 10, 2)->nullable();
         $table->decimal('total', 10, 2);
         $table->decimal('cost_price', 10, 2)->nullable();
+        $table->string('supplier')->nullable(); 
+        $table->string('category')->nullable(); 
+        $table->string('store_location')->nullable(); 
         $table->timestamps();
 
         // Foreign key constraint

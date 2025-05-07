@@ -36,6 +36,9 @@ class InvoiceItem extends Model
         'total',
         'special_discount',
         'total_buying_cost',
+        'supplier',
+        'category',
+        'store_location',
     ];
 
 

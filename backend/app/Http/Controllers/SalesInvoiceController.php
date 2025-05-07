@@ -43,6 +43,9 @@ class SalesInvoiceController extends Controller
             'items.*.specialDiscount' => 'required|numeric|min:0',
             'items.*.totalBuyingCost' => 'required|numeric|min:0',
             'status' => 'nullable|string|in:pending,paid,cancelled',
+            'items.*.supplier' => 'nullable|string|max:255',
+            'items.*.category' => 'nullable|string|max:255',
+            'items.*.store_location' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -82,6 +85,9 @@ class SalesInvoiceController extends Controller
                 'special_discount' => $itemInput['specialDiscount'] ?? 0,
                 'total' => $itemTotal,
                 'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0,
+                'supplier' => $itemInput['supplier'] ?? null,
+                'category' => $itemInput['category'] ?? null,
+                'store_location' => $itemInput['store_location'] ?? null,
             ];
         }
 
@@ -169,6 +175,9 @@ class SalesInvoiceController extends Controller
             'items.*.specialDiscount' => 'required|numeric|min:0',
             'items.*.totalBuyingCost' => 'required|numeric|min:0',
             'status' => 'nullable|string|in:pending,paid,cancelled',
+            'items.*.supplier' => 'nullable|string|max:255',
+            'items.*.category' => 'nullable|string|max:255',
+            'items.*.store_location' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {

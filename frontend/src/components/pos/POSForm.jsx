@@ -237,6 +237,8 @@ const POSForm = ({
               category_name: categoryName,
               sales_price: parseFloat(p.sales_price || 0),
               mrp: parseFloat(p.mrp || 0),
+              supplier: p.supplier || "N/A",
+              store_location: p.store_location || "N/A",
             };
           });
           setItems(productsWithOpeningStock);
@@ -480,7 +482,12 @@ const POSForm = ({
       console.error("Invalid item selected:", item);
       return;
     }
-    setSelectedProduct(item);
+    setSelectedProduct({
+      ...item,
+      supplier: item.supplier || "N/A",
+      category: item.category_name || "N/A",
+      store_location: item.store_location || "N/A",
+  });
     setSearchQuery(item.product_name);
     setSearchResults([]);
     setQuantity(1);
@@ -562,9 +569,10 @@ const POSForm = ({
         discount_percentage: existingProduct.discount_percentage || 0,
         schemeName: schemeName,
         specialDiscount: newSpecialDiscount,
-        total:
-          (existingProduct.price || 0) * newQuantity -
-          ((existingProduct.discount || 0) + newSpecialDiscount),
+        total: (existingProduct.price || 0) * newQuantity - ((existingProduct.discount || 0) + newSpecialDiscount),
+        supplier: selectedProduct.supplier,
+        category: selectedProduct.category,
+        store_location: selectedProduct.store_location,
       };
       setProducts(updatedProducts);
     } else {
@@ -600,6 +608,9 @@ const POSForm = ({
           (selectedProduct.sales_price || 0) * currentQuantity -
           specialDiscount,
         serialNumber: products.length + 1,
+        supplier: selectedProduct.supplier,
+        category: selectedProduct.category,
+        store_location: selectedProduct.store_location,
       };
       setProducts([...products, newProduct]);
     }

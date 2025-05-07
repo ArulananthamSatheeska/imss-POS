@@ -1,259 +1,239 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import ReportTable from '../../components/reports/ReportTable';
 
 const SupplierWiseProfit = () => {
-    // Helper functions for default dates
-    const getCurrentDate = () => {
-        const today = new Date();
-        return today.toISOString().split('T')[0]; // YYYY-MM-DD format
-    };
-    const getOneMonthBeforeDate = () => {
-        const today = new Date();
-        const oneMonthBefore = new Date(today.setMonth(today.getMonth() - 1));
-        return oneMonthBefore.toISOString().split('T')[0]; // YYYY-MM-DD format
-    };
-
-    // State management
-    const [fromDate, setFromDate] = useState(getOneMonthBeforeDate());
-    const [toDate, setToDate] = useState(getCurrentDate());
-    const [paymentMethodFilter, setPaymentMethodFilter] = useState('cash'); // Default to 'cash'
-    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedSupplier, setSelectedSupplier] = useState('');
+    const [suppliers, setSuppliers] = useState([]);
     const [reportData, setReportData] = useState([]);
     const [summary, setSummary] = useState({});
-    const [isLoading, setIsLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
 
-    // Fetch report data from the backend
-    const fetchReportData = async () => {
-        try {
-            setIsLoading(true);
-            const response = await axios.get("http://127.0.0.1:8000/api/sales/supplier-wise-profit-report", {
-                params: { fromDate, toDate, paymentMethod: paymentMethodFilter },
-            });
-            setReportData(response.data.reportData || []);
-            setSummary(response.data.summary || {});
-            setError('');
-        } catch (error) {
-            console.error("Error fetching supplier wise profit report:", error);
-            setError('Failed to fetch report. Check the console for details.');
-        } finally {
-            setIsLoading(false);
+    // Format currency for LKR
+    const formatCurrency = (amount) => {
+        const numericAmount = Number(amount);
+        if (isNaN(numericAmount)) {
+            return 'LKR 0.00';
         }
+        return new Intl.NumberFormat('en-LK', {
+            style: 'currency',
+            currency: 'LKR',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(numericAmount);
     };
 
-    // Fetch data when filters change
+    // Fetch suppliers from backend
     useEffect(() => {
-        fetchReportData();
-    }, [fromDate, toDate, paymentMethodFilter]);
+        const fetchSuppliers = async () => {
+            try {
+                const response = await axios.get('http://127.0.0.1:8000/api/suppliers');
+                setSuppliers(response.data);
+            } catch (error) {
+                console.error('Error fetching suppliers:', error);
+                setError('Failed to load suppliers');
+            }
+        };
+        fetchSuppliers();
+    }, []);
 
-    // Filtered data based on search query
-    const filteredData = reportData.filter((row) => {
-        return Object.values(row).some((value) =>
-            value.toString().toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    });
+    // Fetch sales items for the selected supplier
+    useEffect(() => {
+        if (!selectedSupplier) {
+            setReportData([]);
+            setSummary({});
+            return;
+        }
 
-    // Flatten data for export
-    const flattenDataForExport = () => {
-        return filteredData.map((row) => ({
-            'Supplier Name': row.supplierName,
-            'Total Cost Price': row.totalCostPrice,
-            'Total Selling Price': row.totalSellingPrice,
-            'Total Profit': row.totalProfit,
-            'Profit %': row.profitPercentage,
-        }));
-    };
+        const fetchSupplierSales = async () => {
+            setLoading(true);
+            setError('');
+            try {
+                const params = {};
+                if (fromDate) params.from = fromDate;
+                if (toDate) params.to = toDate;
 
-    // Export to Excel
-    const exportToExcel = () => {
-        const flatData = flattenDataForExport();
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(flatData);
-        XLSX.utils.book_append_sheet(wb, ws, "Supplier Wise Profit Report");
-        XLSX.writeFile(wb, "Supplier_Wise_Profit_Report.xlsx");
-    };
+                const response = await axios.get(`http://127.0.0.1:8000/api/supplier-profit/${selectedSupplier}`, { params });
+                const salesData = response.data.items || [];
 
-    // Export to PDF
-    const exportToPDF = () => {
-        const flatData = flattenDataForExport();
-        const doc = new jsPDF();
+                // Process sales data for the table
+                const processedData = salesData.map((item) => ({
+                    product_name: item.product_name || 'Unknown Product',
+                    total_quantity_sold: item.quantity_sold || 0,
+                    total_sales_amount: formatCurrency(item.sales_amount || 0),
+                    total_cost: formatCurrency(item.cost || 0),
+                    total_profit: formatCurrency(item.profit || 0),
+                    profit_percentage: item.profit_percentage
+                        ? `${parseFloat(item.profit_percentage).toFixed(2)}%`
+                        : '0.00%',
+                }));
 
-        // Add title
-        doc.setFontSize(18);
-        doc.text("Supplier Wise Profit Report", 10, 10);
+                // Use summary from backend
+                const summaryData = {
+                    totalSellingPriceAll: formatCurrency(response.data.summary?.total_sales_amount || 0),
+                    totalProfitAll: formatCurrency(response.data.summary?.total_profit || 0),
+                    totalCostPriceAll: formatCurrency(response.data.summary?.total_cost || 0),
+                    totalProfitPercentage: response.data.summary?.total_profit_percentage || '0.00%',
+                };
 
-        // Define table columns and rows
-        const columns = [
-            'Supplier Name',
-            'Total Cost Price',
-            'Total Selling Price',
-            'Total Profit',
-            'Profit %',
-        ];
-        const rows = flatData.map((row) => [
-            row['Supplier Name'],
-            row['Total Cost Price'],
-            row['Total Selling Price'],
-            row['Total Profit'],
-            row['Profit %'],
-        ]);
+                setReportData(processedData);
+                setSummary(summaryData);
+            } catch (error) {
+                console.error('Error fetching supplier sales:', error);
+                if (error.response?.status === 404) {
+                    setError('Selected supplier not found');
+                } else if (error.response?.status === 500) {
+                    setError('Server error: Unable to fetch supplier sales data');
+                } else {
+                    setError('Failed to load sales data for the selected supplier');
+                }
+                setReportData([]);
+                setSummary({});
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        // Add table
-        doc.autoTable({
-            head: [columns],
-            body: rows,
-            startY: 20,
-        });
-
-        // Save the PDF
-        doc.save("Supplier_Wise_Profit_Report.pdf");
-    };
+        fetchSupplierSales();
+    }, [selectedSupplier, fromDate, toDate]);
 
     return (
-        <div className="p-4 bg-white dark:bg-slate-800 text-black dark:text-white min-h-screen flex flex-col">
+        <div className="flex flex-col min-h-screen p-4 bg-transparent">
             {/* Header */}
-            <div className="bg-blue-600 text-white text-center p-4 rounded-t-lg">
+            <div className="p-2 text-center text-white bg-blue-600 rounded-t-lg">
                 <h1 className="text-2xl font-bold">Supplier Wise Profit Report</h1>
             </div>
 
-            {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-4">
-                <label className="flex flex-col">
-                    <span className="font-medium mb-1">From:</span>
-                    <input
-                        type="date"
-                        value={fromDate}
-                        onChange={(e) => setFromDate(e.target.value)}
-                        className="border text-black border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </label>
-                <label className="flex flex-col">
-                    <span className="font-medium mb-1">To:</span>
-                    <input
-                        type="date"
-                        value={toDate}
-                        onChange={(e) => setToDate(e.target.value)}
-                        className="border text-black border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </label>
-                <label className="flex flex-col">
-                    <span className="font-medium mb-1">Search:</span>
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search suppliers..."
-                        className="border text-black border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </label>
-                <label className="flex flex-col">
-                    <span className="font-medium mb-1">Payment Method:</span>
-                    <select
-                        value={paymentMethodFilter}
-                        onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                        className="border text-black border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                {/* Supplier Dropdown */}
+                <div className="flex-1 min-w-[200px]">
+                    <label className="flex flex-col">
+                        <span className="mb-1 font-medium">Select Supplier:</span>
+                        <select
+                            value={selectedSupplier}
+                            onChange={(e) => setSelectedSupplier(e.target.value)}
+                            className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Select a supplier</option>
+                            {suppliers.map((supplier) => (
+                                <option key={supplier.id} value={supplier.id}>
+                                    {supplier.supplier_name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+
+                {/* Date Filters */}
+                <div className="flex-1 min-w-[200px]">
+                    <label className="flex flex-col">
+                        <span className="mb-1 font-medium">From Date:</span>
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </label>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                    <label className="flex flex-col">
+                        <span className="mb-1 font-medium">To Date:</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </label>
+                </div>
+
+                {/* Status Messages */}
+                <div className="flex-1 min-w-[200px]">
+                    {loading && <p className="text-blue-500">Loading...</p>}
+                    {error && <p className="text-red-500">{error}</p>}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-4">
+                    <button
+                        className="px-4 py-2 text-white transition duration-300 bg-green-500 rounded-lg hover:bg-green-600"
+                        disabled={!reportData.length}
                     >
-                        <option value="cash">Cash</option>
-                        <option value="card">Card</option>
-                        <option value="online">Online</option>
-                        <option value="credit">Credit</option>
-                    </select>
-                </label>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-4 mb-4">
-                <button
-                    onClick={exportToExcel}
-                    className="bg-green-500 text-white dark:text-slate-600 px-4 py-2 rounded-lg hover:bg-green-600 transition duration-300"
-                >
-                    Export to Excel
-                </button>
-                <button
-                    onClick={exportToPDF}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-300"
-                >
-                    Export to PDF
-                </button>
-                <button
-                    onClick={() => window.print()}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
-                >
-                    Print
-                </button>
-            </div>
-
-            {/* Loading State */}
-            {isLoading && (
-                <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                    <p className="mt-2">Loading report data...</p>
+                        Export to Excel
+                    </button>
+                    <button
+                        className="px-4 py-2 text-white transition duration-300 bg-red-500 rounded-lg hover:bg-red-600"
+                        disabled={!reportData.length}
+                    >
+                        Export to PDF
+                    </button>
+                    <button
+                        className="px-4 py-2 text-white transition duration-300 bg-blue-500 rounded-lg hover:bg-blue-600"
+                        disabled={!reportData.length}
+                    >
+                        Print
+                    </button>
                 </div>
-            )}
-
-            {/* Error State */}
-            {error && (
-                <div className="text-center py-4 text-red-600 font-semibold">
-                    {error}
-                </div>
-            )}
+            </div>
 
             {/* Report Table */}
-            {!isLoading && !error && (
-                <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white dark:bg-slate-800 text-black dark:text-white">
-                        <thead className="bg-white dark:bg-slate-800 text-black dark:text-white">
-                            <tr>
-                                <th className="px-4 py-2">Supplier Name</th>
-                                <th className="px-4 py-2">Total Cost Price</th>
-                                <th className="px-4 py-2">Total Selling Price</th>
-                                <th className="px-4 py-2">Total Profit</th>
-                                <th className="px-4 py-2">Profit %</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredData.map((row, index) => (
-                                <tr key={index} className="border-b">
-                                    <td className="px-4 py-2">{row.supplierName}</td>
-                                    <td className="px-4 py-2 text-right">{row.totalCostPrice}</td>
-                                    <td className="px-4 py-2 text-right">{row.totalSellingPrice}</td>
-                                    <td className="px-4 py-2 text-right">{row.totalProfit}</td>
-                                    <td className="px-4 py-2 text-right">{row.profitPercentage}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            {reportData.length > 0 ? (
+                <>
+                    <div className="overflow-auto" style={{ maxHeight: '400px' }}>
+                        <ReportTable
+                            data={reportData}
+                            columns={[
+                                { header: 'Product Name', field: 'product_name' },
+                                { header: 'Qty Sold', field: 'total_quantity_sold' },
+                                { header: 'Sales Amount', field: 'total_sales_amount' },
+                                { header: 'Cost', field: 'total_cost' },
+                                { header: 'Profit', field: 'total_profit' },
+                                { header: 'Profit %', field: 'profit_percentage' },
+                            ]}
+                        />
+                    </div>
 
-            {/* Summary Section */}
-            {!isLoading && !error && (
-                <div className="bg-white dark:bg-slate-700 rounded-lg shadow-lg p-4 mt-4">
-                    <h2 className="text-xl font-bold mb-4">Summary</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="bg-cyan-700 p-4 text-center rounded-lg">
-                            <p className="text-blue-300">Total Profit</p>
-                            <p className="text-2xl font-bold text-cyan-400">
-                                LKR {summary.totalProfitAll || 0}
-                            </p>
-                        </div>
-                        <div className="bg-emerald-700 p-4 text-center rounded-lg">
-                            <p className="text-green-300">Average Profit %</p>
-                            <p className="text-2xl font-bold text-green-400">
-                                {summary.averageProfitPercentageAll || '0.00%'}
-                            </p>
-                        </div>
-                        <div className="bg-fuchsia-700 p-4 text-center rounded-lg">
-                            <p className="text-fuchsia-300">Total Cost Price</p>
-                            <p className="text-2xl font-bold text-fuchsia-400">
-                                LKR {summary.totalCostPriceAll || 0}
-                            </p>
+                    {/* Summary Section */}
+                    <div className="p-4 mt-4 text-center bg-transparent rounded-lg shadow-lg">
+                        <h2 className="mb-4 text-xl font-bold">Supplier Summary</h2>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div className="p-4 rounded-lg bg-cyan-800">
+                                <p className="text-sm text-cyan-500">Total Sales</p>
+                                <p className="text-2xl font-bold text-cyan-300">
+                                    {summary.totalSellingPriceAll || 'LKR 0.00'}
+                                </p>
+                            </div>
+                            <div className="p-4 rounded-lg bg-rose-800">
+                                <p className="text-sm text-pink-500">Total Profit</p>
+                                <p className="text-2xl font-bold text-pink-300">
+                                    {summary.totalProfitAll || 'LKR 0.00'}
+                                </p>
+                            </div>
+                            <div className="p-4 rounded-lg bg-lime-800">
+                                <p className="text-sm text-lime-500">Total Cost</p>
+                                <p className="text-2xl font-bold text-lime-300">
+                                    {summary.totalCostPriceAll || 'LKR 0.00'}
+                                </p>
+                            </div>
+                            <div className="p-4 rounded-lg bg-fuchsia-800">
+                                <p className="text-sm text-fuchsia-500">Profit Margin</p>
+                                <p className="text-2xl font-bold text-fuchsia-300">
+                                    {summary.totalProfitPercentage || '0.00%'}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </>
+            ) : (
+                !loading && (
+                    <p className="text-center text-gray-500">
+                        No data available for selected supplier
+                    </p>
+                )
             )}
         </div>
     );
