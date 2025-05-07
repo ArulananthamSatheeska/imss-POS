@@ -111,10 +111,10 @@ const SalesInvoice = ({
           buyingCost: 0,
           categoryId: null,
           mrp: 0,
+          stock: 0,
           supplier: "",
           category: "",
           store_location: "",
-          stock: 0,
         },
       ],
       purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
@@ -221,13 +221,9 @@ const SalesInvoice = ({
             stock,
             discountAmount: "",
             discountPercentage: "",
-            specialDiscount: parseFloat(item.specialDiscount || 0),
-            total: parseFloat(
-              item.total || qty * unitPrice - (item.specialDiscount || 0)
-            ),
-            totalBuyingCost: parseFloat(
-              item.totalBuyingCost || qty * buyingCost
-            ),
+            specialDiscount: 0,
+            total: 0,
+            totalBuyingCost: 0,
             supplier: item.supplier || "",
             category: item.category || "",
             store_location: item.store_location || "",
@@ -598,10 +594,23 @@ const SalesInvoice = ({
     setTimeout(() => customerAddressRef.current?.focus(), 0);
   };
 
-  const handleProductSelect = (selectedOption, index) => {
-    const product = selectedOption
-      ? products.find((p) => p.product_id === selectedOption.value)
-      : null;
+  const handleProductSelect = async (selectedOption, index) => {
+    const productId = selectedOption ? selectedOption.value : null;
+    let product = products.find((p) => p.product_id === productId);
+    // Fetch additional product details
+    let supplier = "", category = "", store_location = "";
+    if (productId) {
+      try {
+        const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
+        const productData = response.data.data;
+        supplier = productData.supplier || "N/A";
+        category = productData.category || "N/A";
+        store_location = productData.store_location || "N/A";
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+        toast.error("Failed to fetch product details.");
+      }
+    }
 
     setFormData((prev) => {
       const newItems = [...prev.items];
@@ -630,6 +639,9 @@ const SalesInvoice = ({
         discountAmount: "",
         discountPercentage: "",
         totalBuyingCost: qty * buyingCost,
+        supplier,
+        category,
+        store_location,
       };
 
       newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
@@ -819,6 +831,9 @@ const SalesInvoice = ({
           specialDiscount: parseFloat(item.specialDiscount) || 0,
           total: parseFloat(item.total) || 0,
           totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
+          supplier: item.supplier || null,
+          category: item.category || null,
+          store_location: item.store_location || null,
         })),
         purchaseDetails: {
           method: formData.purchaseDetails.method,
@@ -890,46 +905,6 @@ const SalesInvoice = ({
     },
     [formData, isEditMode, onGenerateInvoice, onUpdateInvoice, products]
   );
-
-const handleProductSelect = async (selectedOption, index) => {
-    const productId = selectedOption ? selectedOption.value : null;
-    let product = products.find((p) => p.product_id === productId);
-  // Fetch additional product details
-  let supplier = "", category = "", store_location = "";
-  if (productId) {
-    try {
-      const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
-      const productData = response.data.data;
-      supplier = productData.supplier || "N/A";
-      category = productData.category || "N/A";
-      store_location = productData.store_location || "N/A";
-    } catch (error) {
-      console.error("Error fetching product details:", error);
-      toast.error("Failed to fetch product details.");
-    }
-  }
-  setFormData((prev) => {
-    const newItems = [...prev.items];
-    const qty = parseFloat(newItems[index].qty) || 1;
-    const mrp = product ? parseFloat(product.mrp) || 0 : 0;
-    const salesPrice = product ? parseFloat(product.sales_price) || mrp : 0;
-    const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
-
-    newItems[index] = {
-      ...newItems[index],
-      productId: product ? product.product_id : null,
-      categoryId: product ? product.category_id : null,
-      description: product ? product.product_name : "",
-      unitPrice: "",
-      mrp,
-      salesPrice,
-      buyingCost,
-      discountAmount: "",
-      discountPercentage: "",
-      totalBuyingCost: qty * buyingCost,
-      supplier,
-      category,
-      store_location,
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1033,100 +1008,6 @@ const handleProductSelect = async (selectedOption, index) => {
       addItem();
       return;
     }
-
-    setLoading(true);
-    const payload = {
-      invoice: formData.invoice,
-      customer: {
-        id: formData.customer.id || null,
-        name: formData.customer.name,
-        address: formData.customer.address || null,
-        phone: formData.customer.phone || null,
-        email: formData.customer.email || null,
-      },
-      items: formData.items.map((item) => ({
-        id: isEditMode && item.id ? item.id : undefined,
-        product_id: item.productId || null,
-        description: item.description || "Item",
-        qty: parseFloat(item.qty) || 0,
-        unitPrice: parseFloat(item.unitPrice) || 0,
-        salesPrice: parseFloat(item.unitPrice) || 0,
-        discountAmount: parseFloat(item.discountAmount) || 0,
-        discountPercentage: parseFloat(item.discountPercentage) || 0,
-        specialDiscount: parseFloat(item.specialDiscount) || 0,
-        total: parseFloat(item.total) || 0,
-        totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
-        supplier: item.supplier || null,
-        category: item.category || null,
-        store_location: item.store_location || null,
-      })),
-      purchaseDetails: {
-        method: formData.purchaseDetails.method,
-        amount: parseFloat(formData.purchaseDetails.amount) || 0,
-        taxPercentage: parseFloat(formData.purchaseDetails.taxPercentage) || 0,
-      },
-      status: formData.status,
-    };
-
-    try {
-      if (isEditMode) {
-        await onUpdateInvoice(payload, formData.id);
-        toast.success("Invoice updated!");
-      } else {
-        await onGenerateInvoice(payload);
-        toast.success("Invoice created!");
-        localStorage.removeItem(draftKey);
-        setFormData({
-          invoice: {
-            no: "",
-            date: new Date().toISOString().split("T")[0],
-            time: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            }),
-          },
-          customer: { id: null, name: "", address: "", phone: "", email: "" },
-          items: [
-            {
-              id: Date.now(),
-              description: "",
-              qty: 1,
-              unitPrice: "",
-              salesPrice: 0,
-              discountAmount: "",
-              discountPercentage: "",
-              specialDiscount: 0,
-              total: 0,
-              totalBuyingCost: 0,
-              productId: null,
-              buyingCost: 0,
-              categoryId: null,
-              mrp: 0,
-            },
-          ],
-          purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
-          status: "pending",
-          id: null,
-        });
-        setErrors({});
-        invoiceNoRef.current?.focus();
-      }
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to save invoice.";
-      const details = error.response?.data?.errors
-        ? Object.entries(error.response.data.errors)
-            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-            .join("\n")
-        : "No detailed errors provided.";
-      console.error("API Error Details:", {
-        message,
-        details,
-        response: error.response?.data,
-      });
-      toast.error(`${message}\n${details}`);
-    } finally {
-      setLoading(false);
 
     if (currentField.ref === purchaseAmountRef) {
       document.getElementById("invoiceForm")?.requestSubmit();
@@ -1242,7 +1123,7 @@ const handleProductSelect = async (selectedOption, index) => {
   return (
     <ErrorBoundary>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm">
-        <div className="relative w-full h-full bg-white dark:bg-gray-800 overflow-y-auto flex flex-col">
+        <div className="relative flex flex-col w-full h-full overflow-y-auto bg-white dark:bg-gray-800">
           <h3 className="p-6 text-2xl font-bold text-blue-600 border-b border-gray-200">
             {isEditMode ? "Edit Invoice" : "Create New Invoice"}
           </h3>
@@ -1619,7 +1500,7 @@ const handleProductSelect = async (selectedOption, index) => {
                 </div>
 
                 {/* Add Button */}
-                <div className="md:col-span-1 flex items-end">
+                <div className="flex items-end md:col-span-1">
                   <button
                     type="button"
                     onClick={addItem}
@@ -1662,37 +1543,37 @@ const handleProductSelect = async (selectedOption, index) => {
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
                       >
                         Product
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Qty
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Unit Price
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Discount
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Total
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Actions
                       </th>
@@ -1708,7 +1589,7 @@ const handleProductSelect = async (selectedOption, index) => {
                                 {item.description || "No description"}
                               </div>
                               {item.discountScheme && (
-                                <div className="text-xs text-green-600 mt-1">
+                                <div className="mt-1 text-xs text-green-600">
                                   {item.discountSchemeType === "product"
                                     ? `Product Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`
                                     : `Category Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`}
@@ -1717,13 +1598,13 @@ const handleProductSelect = async (selectedOption, index) => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
                           {item.qty}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
                           {formatCurrency(item.unitPrice)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
                           {item.discountAmount > 0 ? (
                             <span className="text-red-600">
                               -{formatCurrency(item.discountAmount)}
@@ -1732,14 +1613,14 @@ const handleProductSelect = async (selectedOption, index) => {
                             "-"
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
                           {formatCurrency(item.total)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md p-1"
+                            className="p-1 text-red-600 rounded-md hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                           >
                             Remove
                           </button>
@@ -1751,11 +1632,11 @@ const handleProductSelect = async (selectedOption, index) => {
                     <tr>
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
+                        className="px-6 py-4 text-sm font-medium text-right text-gray-500 uppercase"
                       >
                         Subtotal
                       </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900">
                         {formatCurrency(subtotal)}
                       </td>
                       <td></td>
@@ -1763,11 +1644,11 @@ const handleProductSelect = async (selectedOption, index) => {
                     <tr>
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
+                        className="px-6 py-4 text-sm font-medium text-right text-gray-500 uppercase"
                       >
                         Tax ({formData.purchaseDetails.taxPercentage}%)
                       </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900">
                         {formatCurrency(tax)}
                       </td>
                       <td></td>
@@ -1775,11 +1656,11 @@ const handleProductSelect = async (selectedOption, index) => {
                     <tr className="bg-gray-100">
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-bold text-gray-700 uppercase"
+                        className="px-6 py-4 text-sm font-bold text-right text-gray-700 uppercase"
                       >
                         Total
                       </td>
-                      <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                      <td className="px-6 py-4 text-sm font-bold text-right text-gray-900">
                         {formatCurrency(total)}
                       </td>
                       <td></td>
