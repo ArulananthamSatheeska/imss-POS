@@ -20,6 +20,17 @@ class Product extends Model
         'extra_fields'
     ];
 
+    protected $casts = [
+        'buying_cost' => 'float',
+        'sales_price' => 'float',
+        'minimum_price' => 'float',
+        'wholesale_price' => 'float',
+        'mrp' => 'float',
+        'minimum_stock_quantity' => 'float',
+        'opening_stock_quantity' => 'float',
+        'opening_stock_value' => 'float',
+    ];
+
     // Method to update stock quantity
     public function updateStock($quantity, $action = 'subtract')
     {

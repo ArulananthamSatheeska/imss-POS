@@ -322,8 +322,8 @@ if ($storeLocationName) {
             'wholesale_price' => 'nullable|numeric|min:0',
             'barcode' => 'nullable|string|unique:products,barcode',
             'mrp' => 'required|numeric|min:0',
-            'minimum_stock_quantity' => 'nullable|integer|min:0',
-            'opening_stock_quantity' => 'nullable|integer|min:0',
+            'minimum_stock_quantity' => 'nullable|numeric|min:0',
+            'opening_stock_quantity' => 'nullable|numeric|min:0',
             'opening_stock_value' => 'nullable|numeric|min:0',
             'category' => 'nullable|string',
             'supplier' => 'nullable|string',
@@ -340,6 +340,7 @@ if ($storeLocationName) {
         return array_merge($this->storeRules(), [
             'item_code' => ['nullable', 'string', Rule::unique('products', 'item_code')->ignore($id, 'product_id')],
             'barcode' => ['nullable', 'string', Rule::unique('products', 'barcode')->ignore($id, 'product_id')],
+            'points' => 'nullable|numeric|min:0',
         ]);
     }
 
