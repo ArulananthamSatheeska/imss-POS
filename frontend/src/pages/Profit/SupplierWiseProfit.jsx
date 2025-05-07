@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import Select from 'react-select';
 import ReportTable from '../../components/reports/ReportTable';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -8,7 +9,9 @@ import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 export const SupplierWiseProfit = () => {
     const [suppliers, setSuppliers] = useState([]);
-    const [selectedSupplier, setSelectedSupplier] = useState('');
+    const [selectedSupplier, setSelectedSupplier] = useState(null); // Changed to null for react-select
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [reportData, setReportData] = useState([]);
     const [itemDetails, setItemDetails] = useState([]);
     const [summary, setSummary] = useState({});
@@ -20,20 +23,42 @@ export const SupplierWiseProfit = () => {
     const fetchSuppliers = async () => {
         try {
             const response = await axios.get('http://127.0.0.1:8000/api/suppliers');
-            setSuppliers(response.data);
+            // Transform suppliers for react-select
+            const supplierOptions = response.data.map(supplier => ({
+                value: supplier.supplier_name,
+                label: supplier.supplier_name,
+            }));
+            setSuppliers(supplierOptions);
         } catch (error) {
             console.error('Error fetching suppliers:', error);
             setError('Failed to load suppliers. Please try again.');
         }
     };
 
-    // Fetch report data from the backend based on selected supplier
+    // Fetch report data from the backend based on selected supplier and date range
     const fetchReportData = async () => {
+        if (!selectedSupplier) {
+            setReportData([]);
+            setItemDetails([]);
+            setSummary({});
+            setError('Please select a supplier.');
+            return;
+        }
+
+        if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
+            setError('From date cannot be later than To date.');
+            return;
+        }
+
         try {
             setLoading(true);
             setError('');
             const response = await axios.get('http://127.0.0.1:8000/api/sales/supplier-wise-profit-report', {
-                params: { supplierName: selectedSupplier },
+                params: {
+                    supplierName: selectedSupplier.value, // Use value from react-select
+                    fromDate: fromDate || undefined,
+                    toDate: toDate || undefined,
+                },
             });
 
             if (response.data?.reportData) {
@@ -56,13 +81,13 @@ export const SupplierWiseProfit = () => {
                 });
 
                 if (processedData.length === 0) {
-                    setError(`No data found for supplier "${selectedSupplier}".`);
+                    setError(`No data found for supplier "${selectedSupplier.label}"${fromDate && toDate ? ` between ${fromDate} and ${toDate}` : ''}.`);
                 }
             } else {
                 setReportData([]);
                 setItemDetails([]);
                 setSummary({});
-                setError(`No data found for supplier "${selectedSupplier}".`);
+                setError(`No data found for supplier "${selectedSupplier.label}"${fromDate && toDate ? ` between ${fromDate} and ${toDate}` : ''}.`);
             }
         } catch (error) {
             console.error('Error fetching report data:', error);
@@ -72,7 +97,7 @@ export const SupplierWiseProfit = () => {
             setItemDetails([]);
             setSummary({});
         } finally {
-            setLoading(false);
+            setLoading( false);
         }
     };
 
@@ -81,10 +106,10 @@ export const SupplierWiseProfit = () => {
         fetchSuppliers();
     }, []);
 
-    // Fetch report data when the selected supplier changes
+    // Fetch report data when the selected supplier or date range changes
     useEffect(() => {
-        if (selectedSupplier) fetchReportData();
-    }, [selectedSupplier]);
+        fetchReportData();
+    }, [selectedSupplier, fromDate, toDate]);
 
     // Toggle row expansion
     const toggleRow = (index) => {
@@ -94,17 +119,29 @@ export const SupplierWiseProfit = () => {
     // Export to Excel
     const exportToExcel = () => {
         const wb = XLSX.utils.book_new();
-        const summaryWs = XLSX.utils.json_to_sheet(reportData);
+        const summaryData = reportData.map(row => ({
+            Supplier: row.supplierName,
+            'Total Quantity': row.totalQuantity,
+            'Total Cost': row.totalCostPrice,
+            'Total Sales': row.totalSellingPrice,
+            'Total Profit': row.totalProfit,
+            'Profit %': row.profit_percentage,
+        }));
+        const summaryWs = XLSX.utils.json_to_sheet([
+            { 'Report': `Supplier Wise Profit Report${fromDate && toDate ? ` (${fromDate} to ${toDate})` : ''}` },
+            {},
+            ...summaryData,
+        ]);
         XLSX.utils.book_append_sheet(wb, summaryWs, 'Supplier Summary');
         const itemsWs = XLSX.utils.json_to_sheet(itemDetails);
         XLSX.utils.book_append_sheet(wb, itemsWs, 'Item Details');
-        XLSX.writeFile(wb, 'Supplier_Wise_Profit_Report.xlsx');
+        XLSX.writeFile(wb, `Supplier_Wise_Profit_Report${fromDate && toDate ? `_${fromDate}_to_${toDate}` : ''}.xlsx`);
     };
 
     // Export to PDF
     const exportToPDF = () => {
         const doc = new jsPDF();
-        doc.text('Supplier Wise Profit Report', 10, 10);
+        doc.text(`Supplier Wise Profit Report${fromDate && toDate ? ` (${fromDate} to ${toDate})` : ''}`, 10, 10);
         doc.autoTable({
             head: [['Supplier', 'Total Quantity', 'Total Cost', 'Total Sales', 'Total Profit', 'Profit %']],
             body: reportData.map(row => [
@@ -130,7 +167,7 @@ export const SupplierWiseProfit = () => {
             ]),
             startY: doc.lastAutoTable.finalY + 20,
         });
-        doc.save('Supplier_Wise_Profit_Report.pdf');
+        doc.save(`Supplier_Wise_Profit_Report${fromDate && toDate ? `_${fromDate}_to_${toDate}` : ''}.pdf`);
     };
 
     return (
@@ -141,22 +178,71 @@ export const SupplierWiseProfit = () => {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                {/* Supplier Dropdown */}
+                {/* Supplier Dropdown with react-select */}
                 <div className="flex-1 min-w-[200px]">
                     <label className="flex flex-col">
                         <span className="mb-1 font-medium">Select Supplier:</span>
-                        <select
+                        <Select
+                            options={suppliers}
                             value={selectedSupplier}
-                            onChange={(e) => setSelectedSupplier(e.target.value)}
+                            onChange={setSelectedSupplier}
+                            placeholder="Type to search suppliers..."
+                            isClearable
+                            className="text-sm"
+                            classNamePrefix="react-select"
+                            styles={{
+                                control: (base) => ({
+                                    ...base,
+                                    borderColor: '#d1d5db',
+                                    borderRadius: '0.375rem',
+                                    padding: '0.25rem',
+                                    boxShadow: 'none',
+                                    '&:hover': {
+                                        borderColor: '#3b82f6',
+                                    },
+                                }),
+                                menu: (base) => ({
+                                    ...base,
+                                    zIndex: 9999,
+                                    borderRadius: '0.375rem',
+                                    marginTop: '0.25rem',
+                                }),
+                                option: (base, { isFocused, isSelected }) => ({
+                                    ...base,
+                                    backgroundColor: isSelected
+                                        ? '#3b82f6'
+                                        : isFocused
+                                        ? '#e5e7eb'
+                                        : 'white',
+                                    color: isSelected ? 'white' : '#1f2937',
+                                    padding: '0.5rem 1rem',
+                                }),
+                            }}
+                        />
+                    </label>
+                </div>
+
+                {/* Date Range Inputs */}
+                <div className="flex-1 min-w-[200px]">
+                    <label className="flex flex-col">
+                        <span className="mb-1 font-medium">From Date:</span>
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
                             className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Select a Supplier</option>
-                            {suppliers.map((supplier) => (
-                                <option key={supplier.id} value={supplier.supplier_name}>
-                                    {supplier.supplier_name}
-                                </option>
-                            ))}
-                        </select>
+                        />
+                    </label>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                    <label className="flex flex-col">
+                        <span className="mb-1 font-medium">To Date:</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
                     </label>
                 </div>
 
