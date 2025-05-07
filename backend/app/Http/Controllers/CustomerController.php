@@ -24,49 +24,61 @@ class CustomerController extends Controller
 
     public function store(Request $request)
     {
-        // Validation removed as per request
-        $validator = Validator::make($request->all(), [
-            // 'customer_name' => 'required|string|max:255',
-            // 'email' => 'nullable|email|unique:customers,email',
-            // 'phone' => 'required|string|max:20|unique:customers,phone',
-            // 'address' => 'nullable|string|max:255',
-            // 'nic_number' => 'required|string|max:12|unique:customers,nic_number',
-            // 'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
+        try {
+            // Validation removed as per request
+            $validator = Validator::make($request->all(), [
+                // 'customer_name' => 'required|string|max:255',
+                // 'email' => 'nullable|email|unique:customers,email',
+                // 'phone' => 'required|string|max:20|unique:customers,phone',
+                // 'address' => 'nullable|string|max:255',
+                // 'nic_number' => 'required|string|max:12|unique:customers,nic_number',
+                // 'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            ]);
 
-        if ($validator->fails()) {
-            Log::error("Validation failed for store customer", [
-                'errors' => $validator->errors()->toArray(),
+            if ($validator->fails()) {
+                Log::error("Validation failed for store customer", [
+                    'errors' => $validator->errors()->toArray(),
+                    'request' => $request->except('photo'),
+                ]);
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()->toArray(),
+                ], 422);
+            }
+
+            $data = $request->only(['customer_name', 'email', 'phone', 'address', 'nic_number']);
+
+            $photoPath = null;
+            if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+                $photoPath = $request->file('photo')->storeAs(
+                    'public/customers',
+                    time() . '_' . $request->file('photo')->getClientOriginalName()
+                );
+                $data['photo'] = str_replace('public/', '', $photoPath);
+                Log::info("Photo stored", [
+                    'path' => $data['photo'],
+                    'url' => url(Storage::url($data['photo'])),
+                    'file_exists' => Storage::exists($photoPath),
+                ]);
+            }
+
+            $customer = Customer::create($data);
+            if ($customer->photo) {
+                $customer->photo_url = url(Storage::url($customer->photo));
+            }
+
+            return response()->json(['data' => $customer], 201);
+        } catch (\Exception $e) {
+            Log::error("Exception in store customer", [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'request' => $request->except('photo'),
             ]);
             return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()->toArray(),
-            ], 422);
+                'message' => 'Server error, please try again later',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $data = $request->only(['customer_name', 'email', 'phone', 'address', 'nic_number']);
-
-        $photoPath = null;
-        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
-            $photoPath = $request->file('photo')->storeAs(
-                'public/customers',
-                time() . '_' . $request->file('photo')->getClientOriginalName()
-            );
-            $data['photo'] = str_replace('public/', '', $photoPath);
-            Log::info("Photo stored", [
-                'path' => $data['photo'],
-                'url' => url(Storage::url($data['photo'])),
-                'file_exists' => Storage::exists($photoPath),
-            ]);
-        }
-
-        $customer = Customer::create($data);
-        if ($customer->photo) {
-            $customer->photo_url = url(Storage::url($customer->photo));
-        }
-
-        return response()->json(['data' => $customer], 201);
     }
 
     public function update(Request $request, $id)

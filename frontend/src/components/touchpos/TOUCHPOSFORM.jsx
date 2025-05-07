@@ -489,23 +489,10 @@ const TOUCHPOSFORM = () => {
           scheme.applies_to === "category" &&
           categoryName &&
           target === categoryName?.trim().toLowerCase();
-        if (productMatch) {
-          console.log(
-            `Product discount match for ${product.product_name}: Target=${target}, Value=${scheme.value} ${scheme.type}`
-          );
-        }
-        if (categoryMatch) {
-          console.log(
-            `Category discount match for ${product.product_name} (Category: ${categoryName}): Target=${target}, Value=${scheme.value} ${scheme.type}`
-          );
-        }
         return productMatch || categoryMatch;
       });
 
       if (!applicableScheme) {
-        console.log(
-          `No discount scheme found for ${product.product_name} (Category: ${categoryName})`
-        );
         return 0;
       }
 
@@ -516,9 +503,6 @@ const TOUCHPOSFORM = () => {
         discount = parseFloat(applicableScheme.value) * qty;
       }
 
-      console.log(
-        `Applied ${applicableScheme.applies_to} discount for ${product.product_name}: Target=${applicableScheme.target}, Discount=${discount.toFixed(2)}`
-      );
       return discount >= 0 ? discount : 0;
     },
     [items, activeSchemes]
@@ -681,41 +665,69 @@ const TOUCHPOSFORM = () => {
     const mrp = parseFloat(item.mrp || 0);
     const discountPerUnit = Math.max(0, mrp - salesPrice);
     const { schemeName } = applyDiscountScheme(item, saleType, activeSchemes);
-    const productWithQty = { ...item, qty: newTotalQty };
-    const specialDiscount =
-      existingProductIndex >= 0
-        ? calculateSpecialDiscount(
-            productWithQty,
-            saleType,
-            new Date().toISOString().split("T")[0]
-          )
-        : calculateSpecialDiscount(
-            { ...item, qty: qtyToAdd },
-            saleType,
-            new Date().toISOString().split("T")[0]
-          );
+
+    // Calculate special discount once (not per unit)
+    const productWithQty = { ...item, qty: 1 }; // Use qty=1 to get discount for one unit
+    const specialDiscount = calculateSpecialDiscount(
+      productWithQty,
+      saleType,
+      new Date().toISOString().split("T")[0]
+    );
 
     let updatedProducts = [...products];
+
+    const specialDiscountPerUnit = specialDiscount / (qtyToAdd || 1);
 
     if (existingProductIndex >= 0) {
       updatedProducts[existingProductIndex] = {
         ...updatedProducts[existingProductIndex],
         qty: newTotalQty,
         price: salesPrice,
-        discount: discountPerUnit,
+        discountPerUnit: discountPerUnit,
+        discount: discountPerUnit * newTotalQty,
+        specialDiscount: specialDiscount, // Fixed amount, not multiplied by qty
+        total: newTotalQty * (salesPrice - discountPerUnit) - specialDiscount,
         schemeName: schemeName,
-        specialDiscount: specialDiscount,
-        total: salesPrice * newTotalQty - specialDiscount,
       };
     } else {
       const newProduct = {
         ...item,
         qty: qtyToAdd,
         price: salesPrice,
-        discount: discountPerUnit,
+        discountPerUnit: discountPerUnit,
+        discount: discountPerUnit * qtyToAdd,
+        specialDiscount: specialDiscount, // Fixed amount, not multiplied by qty
+        total: qtyToAdd * (salesPrice - discountPerUnit) - specialDiscount,
+        serialNumber: products.length + 1,
+      };
+      updatedProducts = [...products, newProduct];
+    }
+
+    if (existingProductIndex >= 0) {
+      updatedProducts[existingProductIndex] = {
+        ...updatedProducts[existingProductIndex],
+        qty: newTotalQty,
+        price: salesPrice,
+        discountPerUnit: discountPerUnit,
+        specialDiscountPerUnit: specialDiscountPerUnit,
+        discount: discountPerUnit * newTotalQty,
+        specialDiscount: specialDiscountPerUnit * newTotalQty,
         schemeName: schemeName,
-        specialDiscount: specialDiscount,
-        total: salesPrice * qtyToAdd - specialDiscount,
+        total:
+          newTotalQty *
+          ((mrp || 0) - (discountPerUnit + specialDiscountPerUnit)),
+      };
+    } else {
+      const newProduct = {
+        ...item,
+        qty: qtyToAdd,
+        price: salesPrice,
+        discountPerUnit: discountPerUnit,
+        specialDiscountPerUnit: specialDiscountPerUnit,
+        discount: discountPerUnit * qtyToAdd,
+        specialDiscount: specialDiscountPerUnit * qtyToAdd,
+        total:
+          qtyToAdd * ((mrp || 0) - (discountPerUnit + specialDiscountPerUnit)),
         serialNumber: products.length + 1,
       };
       updatedProducts = [...products, newProduct];
@@ -771,8 +783,14 @@ const TOUCHPOSFORM = () => {
 
     const stockDifference = parsedQty - (product.qty || 0);
 
-    const { standardDiscount, specialDiscount, totalPrice } =
-      calculateProductDiscounts(product, parsedQty);
+    // Keep specialDiscount constant (not multiplied by quantity)
+    const specialDiscount = product.specialDiscount || 0;
+    const discountPerUnit = product.discountPerUnit || 0;
+
+    const totalDiscount = discountPerUnit * parsedQty;
+
+    const newTotal =
+      parsedQty * ((product.mrp || 0) - discountPerUnit) - specialDiscount;
 
     setProducts((prevProducts) =>
       prevProducts.map((p, i) =>
@@ -780,10 +798,11 @@ const TOUCHPOSFORM = () => {
           ? {
               ...p,
               qty: parsedQty,
-              price: parseFloat(product.price || 0),
-              discount: standardDiscount,
-              specialDiscount: specialDiscount,
-              total: totalPrice,
+              price: product.price,
+              discountPerUnit: discountPerUnit,
+              discount: totalDiscount,
+              specialDiscount: specialDiscount, // Keep original special discount amount
+              total: newTotal >= 0 ? newTotal : 0,
             }
           : p
       )
@@ -860,15 +879,16 @@ const TOUCHPOSFORM = () => {
       const qty = p.qty || 0;
       const mrp = parseFloat(p.mrp || 0);
       const unitPrice = p.price || 0;
-      const unitDiscount = p.discount || 0;
       const specialDiscount = p.specialDiscount || 0;
 
       totalQty += qty;
       subTotalMRP += mrp * qty;
-      totalItemDiscounts += unitDiscount * qty;
+      totalItemDiscounts += (mrp - unitPrice) * qty;
       totalSpecialDiscounts += specialDiscount;
       grandTotalBeforeAdjustments += unitPrice * qty;
     });
+
+    totalItemDiscounts += totalSpecialDiscounts;
 
     const currentTaxRate = parseFloat(tax || 0);
     const currentBillDiscount = parseFloat(billDiscount || 0);
@@ -884,9 +904,7 @@ const TOUCHPOSFORM = () => {
     return {
       totalQty,
       subTotalMRP: isNaN(subTotalMRP) ? 0 : subTotalMRP,
-      totalItemDiscounts: isNaN(totalItemDiscounts + totalSpecialDiscounts)
-        ? 0
-        : totalItemDiscounts + totalSpecialDiscounts,
+      totalItemDiscounts: isNaN(totalItemDiscounts) ? 0 : totalItemDiscounts,
       totalSpecialDiscounts: isNaN(totalSpecialDiscounts)
         ? 0
         : totalSpecialDiscounts,
@@ -1288,76 +1306,47 @@ const TOUCHPOSFORM = () => {
                             className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                             value={formatNumberWithCommas(
                               parseFloat(
-                                (product.specialDiscount
-                                  ? product.discount + product.specialDiscount
-                                  : product.discount) || 0
+                                (product.discountPerUnit || 0) +
+                                  (product.specialDiscount || 0) / product.qty
                               ).toFixed(2)
                             )}
                             onChange={(e) => {
-                              const newDiscountValue = parseFloat(
+                              const newTotalDiscountValue = parseFloat(
                                 e.target.value
                               );
                               if (
-                                isNaN(newDiscountValue) ||
-                                newDiscountValue < 0
+                                isNaN(newTotalDiscountValue) ||
+                                newTotalDiscountValue < 0
                               )
                                 return;
 
                               setProducts((prevProducts) =>
-                                prevProducts.map((product, i) => {
+                                prevProducts.map((p, i) => {
                                   if (i === index) {
-                                    const baseDiscount = product.specialDiscount
-                                      ? newDiscountValue -
-                                        product.specialDiscount
-                                      : newDiscountValue;
-
-                                    const validatedBaseDiscount = Math.max(
+                                    // Calculate new discount per unit (excluding special discount)
+                                    const newDiscountPerUnit = Math.max(
                                       0,
-                                      baseDiscount
+                                      (newTotalDiscountValue -
+                                        (p.specialDiscount || 0)) /
+                                        (p.qty || 1)
                                     );
 
-                                    const updatedProductWithQty = {
-                                      ...product,
-                                      qty: product.qty || 1,
-                                    };
-
-                                    const newSpecialDiscount =
-                                      product.specialDiscount
-                                        ? calculateSpecialDiscount(
-                                            updatedProductWithQty,
-                                            saleType,
-                                            new Date()
-                                              .toISOString()
-                                              .split("T")[0]
-                                          )
-                                        : 0;
-
                                     const newPrice =
-                                      (product.mrp || 0) -
-                                      validatedBaseDiscount;
-                                    const totalDiscount =
-                                      validatedBaseDiscount +
-                                      newSpecialDiscount;
-
+                                      (p.mrp || 0) - newDiscountPerUnit;
                                     const newTotal =
-                                      product.qty *
-                                      ((product.mrp || 0) - totalDiscount);
+                                      (p.qty || 1) * newPrice -
+                                      (p.specialDiscount || 0);
 
                                     return {
-                                      ...product,
-                                      discount: validatedBaseDiscount,
-                                      discount_percentage:
-                                        product.mrp > 0
-                                          ? (validatedBaseDiscount /
-                                              product.mrp) *
-                                            100
-                                          : 0,
+                                      ...p,
+                                      discountPerUnit: newDiscountPerUnit,
+                                      discount:
+                                        newDiscountPerUnit * (p.qty || 1),
                                       price: newPrice >= 0 ? newPrice : 0,
-                                      specialDiscount: newSpecialDiscount,
                                       total: newTotal >= 0 ? newTotal : 0,
                                     };
                                   }
-                                  return product;
+                                  return p;
                                 })
                               );
                             }}

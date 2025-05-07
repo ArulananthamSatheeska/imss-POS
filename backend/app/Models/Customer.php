@@ -11,11 +11,21 @@ class Customer extends Model
 
     protected $fillable = ['customer_name', 'email', 'phone', 'address', 'nic_number', 'photo'];
 
+    protected $appends = ['photo_url'];
+
     /**
      * Get the photo URL.
      */
+    public function getPhotoUrlAttribute()
+    {
+        return $this->photo ? asset('storage/' . $this->photo) : null;
+    }
+
+    /**
+     * Get the photo attribute.
+     */
     public function getPhotoAttribute($value)
     {
-        return $value ? asset('storage/' . $value) : null;
+        return $value;
     }
 }
