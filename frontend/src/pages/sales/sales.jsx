@@ -112,14 +112,14 @@ const SalesReport = () => {
         customer_email: sale.customer_email || "",
         items: Array.isArray(sale.items)
           ? sale.items.map((item) => ({
-            ...item,
-            product_name: item.product_name || "Unknown Product",
-            quantity: item.quantity || 0,
-            unit_price: parseFloat(item.unit_price) || 0,
-            discount: parseFloat(item.discount) || 0,
-            total: parseFloat(item.total) || 0,
-            mrp: parseFloat(item.mrp) || 0,
-          }))
+              ...item,
+              product_name: item.product_name || "Unknown Product",
+              quantity: item.quantity || 0,
+              unit_price: parseFloat(item.unit_price) || 0,
+              discount: parseFloat(item.discount) || 0,
+              total: parseFloat(item.total) || 0,
+              mrp: parseFloat(item.mrp) || 0,
+            }))
           : [],
         total_amount: parseFloat(sale.total) || 0,
         subtotal: parseFloat(sale.subtotal) || 0,
@@ -177,8 +177,8 @@ const SalesReport = () => {
         error.response?.data?.message || `Failed to create ${type}.`;
       const errorDetails = error.response?.data?.errors
         ? Object.entries(error.response.data.errors)
-          .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-          .join("\n")
+            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+            .join("\n")
         : error.message;
       alert(`Error: ${errorMessage}\nDetails: ${errorDetails}`);
       throw error;
@@ -194,8 +194,7 @@ const SalesReport = () => {
       alert(`Cannot update ${type}: ID is missing.`);
       return;
     }
-    const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"
-      }/${id}`;
+    const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"}/${id}`;
     try {
       const response = await axios.put(url, updatedInvoiceData, {
         headers: {
@@ -216,8 +215,8 @@ const SalesReport = () => {
         error.response?.data?.message || `Failed to update ${type}.`;
       const errorDetails = error.response?.data?.errors
         ? Object.entries(error.response.data.errors)
-          .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-          .join("\n")
+            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+            .join("\n")
         : error.message;
       alert(`Error: ${errorMessage}\nDetails: ${errorDetails}`);
       throw error;
@@ -231,21 +230,18 @@ const SalesReport = () => {
       )
     ) {
       setLoading(true);
-      const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"
-        }/${id}`;
+      const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"}/${id}`;
       try {
         await axios.delete(url, {
           headers: { Accept: "application/json" },
         });
         alert(
-          `${type === "invoice" ? "Invoice" : "Sale"
-          } ID: ${id} deleted successfully.`
+          `${type === "invoice" ? "Invoice" : "Sale"} ID: ${id} deleted successfully.`
         );
         fetchReportData();
       } catch (error) {
         alert(
-          `Failed to delete ${type} ${id}. ${error.response?.data?.message || error.message
-          }`
+          `Failed to delete ${type} ${id}. ${error.response?.data?.message || error.message}`
         );
       } finally {
         setLoading(false);
@@ -295,6 +291,19 @@ const SalesReport = () => {
     setExpandedRow(expandedRow === index ? null : index);
   };
 
+  const formatCurrency = (amount) => {
+    const numericAmount = Number(amount);
+    if (isNaN(numericAmount)) {
+      return "LKR 0.00";
+    }
+    return new Intl.NumberFormat("en-LK", {
+      style: "currency",
+      currency: "LKR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numericAmount);
+  };
+
   const handleViewInvoice = (row) => {
     if (!row.customer_name) {
       row.customer_name =
@@ -321,22 +330,23 @@ const SalesReport = () => {
           discount: parseFloat(item.discount) || 0,
           total:
             parseFloat(item.total) ||
-            (parseFloat(item.unit_price) || 0) *
-            (parseFloat(item.quantity) || 1),
+            (parseFloat(item.unit_price) || 0) * (parseFloat(item.quantity) || 1),
           serialNumber: index + 1,
+          specialDiscount: 0, // Assuming no special discount for simplicity
         })
       );
 
       const totals = {
         totalQty: products.reduce((sum, p) => sum + (p.qty || 0), 0),
-        subTotalMRP: products.reduce(
-          (sum, p) => sum + (p.mrp || 0) * (p.qty || 0),
+        subTotal: products.reduce(
+          (sum, p) => sum + (p.price || 0) * (p.qty || 0),
           0
         ),
         totalItemDiscounts: products.reduce(
           (sum, p) => sum + (p.discount || 0) * (p.qty || 0),
           0
         ),
+        totalSpecialDiscounts: 0,
         totalBillDiscount: parseFloat(row.discount) || 0,
         finalTotalDiscount:
           products.reduce(
@@ -344,7 +354,7 @@ const SalesReport = () => {
             0
           ) + (parseFloat(row.discount) || 0),
         taxAmount: parseFloat(row.tax_amount) || 0,
-        grandTotalBeforeAdjustments: parseFloat(row.subtotal) || 0,
+        grandTotal: parseFloat(row.subtotal) || 0,
         finalTotal: parseFloat(row.total_amount) || 0,
       };
 
@@ -355,15 +365,246 @@ const SalesReport = () => {
         userId: "U-1",
       };
 
-      setBillPrintData({
-        initialProducts: products,
-        initialBillDiscount: parseFloat(row.discount) || 0,
-        initialTax: parseFloat(row.tax_amount) || 0,
-        initialShipping: 0,
-        initialTotals: totals,
-        initialCustomerInfo: customerInfo,
-      });
-      setShowBillPrintModal(true);
+      const companyDetails = {
+        company_name: "MUNSI TEX",
+        business_address: "MOSQUE BUILDING, POLICE ROAD",
+        contact_number: "0769859513",
+      };
+
+      const paymentType = row.payment_method || "Cash";
+      const receivedAmount = parseFloat(row.purchase_amount) || 0;
+      const balanceAmount = parseFloat(row.balance) || 0;
+
+      // Generate print content
+      const printContent = `
+        <div class="print-container">
+          <!-- Header -->
+          <div class="text-center bill-header">
+            <div class="text-xl font-bold uppercase shop-name">${companyDetails.company_name}</div>
+            <div class="text-sm shop-address">${companyDetails.business_address}</div>
+            <div class="text-sm shop-contact">Mob: ${companyDetails.contact_number}</div>
+            <hr class="my-1 border-t border-black" />
+          </div>
+
+          <!-- Bill Info -->
+          <div class="grid grid-cols-2 gap-2 mt-2 text-xs bill-info">
+            <div><strong>Bill No:</strong> ${customerInfo.bill_number}</div>
+            <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
+            <div><strong>Customer:</strong> ${customerInfo.name}</div>
+            <div><strong>Cashier:</strong> Admin</div>
+            <div><strong>Payment:</strong> ${paymentType}</div>
+            <div><strong>Time:</strong> ${new Date().toLocaleTimeString("en-IN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: true,
+            })}</div>
+          </div>
+
+          <!-- Items Table -->
+          <table class="w-full mt-2 border-collapse bill-table">
+            <thead>
+              <tr class="bg-gray-100">
+                <th class="px-2 py-1 text-left border border-black">S.No</th>
+                <th class="px-2 py-1 text-left border border-black">Name</th>
+                <th class="px-2 py-1 text-center border border-black">Qty</th>
+                <th class="px-2 py-1 text-right border border-black">MRP</th>
+                <th class="px-2 py-1 text-right border border-black">U.Price</th>
+                <th class="px-2 py-1 text-right border border-black">U.Dis</th>
+                <th class="px-2 py-1 text-right border border-black">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${products
+                .map(
+                  (product, index) => `
+                    <!-- Item Name Row -->
+                    <tr class="tr-name">
+                      <td class="px-2 py-1 text-left border border-black">${index + 1}</td>
+                      <td class="px-2 py-1 font-bold text-left border border-black" colSpan="6">${product.product_name}</td>
+                    </tr>
+                    <!-- Item Details Row -->
+                    <tr class="tr-details">
+                      <td class="px-2 py-1 text-left border border-black"></td>
+                      <td class="px-2 py-1 text-left border border-black"></td>
+                      <td class="px-2 py-1 text-center border border-black">${product.qty}</td>
+                      <td class="px-2 py-1 text-right border border-black">${formatCurrency(product.mrp)}</td>
+                      <td class="px-2 py-1 text-right border border-black">${formatCurrency(product.price)}</td>
+                      <td class="px-2 py-1 text-right border border-black">${formatCurrency(product.discount)}</td>
+                      <td class="px-2 py-1 font-bold text-right border border-black">${formatCurrency(product.total)}</td>
+                    </tr>
+                  `
+                )
+                .join("")}
+            </tbody>
+          </table>
+
+          <!-- Summary Section -->
+          <div class="mt-2 text-sm text-right bill-summary">
+            <p><strong>Subtotal:</strong> ${formatCurrency(totals.subTotal)}</p>
+            <p><strong>Discount:</strong> ${formatCurrency(totals.finalTotalDiscount)}</p>
+            <p><strong>Tax:</strong> ${formatCurrency(totals.taxAmount)}</p>
+            <p><strong>Grand Total:</strong> ${formatCurrency(totals.finalTotal)}</p>
+            <p><strong>Received:</strong> ${formatCurrency(receivedAmount)}</p>
+            <p><strong>Balance:</strong> ${formatCurrency(balanceAmount)}</p>
+          </div>
+
+          <!-- Terms & Conditions -->
+          <div class="mt-2 text-xs text-left terms-conditions">
+            <h4 class="font-bold text-center">Terms and Conditions</h4>
+            <p>
+              - Goods once sold cannot be returned. <br />
+              - Please keep the bill for future reference. <br />
+              - Exchange is allowed within 7 days with original bill. <br />
+              - No refunds, only exchange for unused items. <br />
+            </p>
+          </div>
+
+          <!-- Thank You Message -->
+          <p class="mt-2 font-semibold text-center thanks">Thank You! Visit Again.</p>
+
+          <!-- Branding -->
+          <p class="systemby">System by IMSS</p>
+          <p class="systemby-web">visit🔗: www.imss.lk</p>
+        </div>
+      `;
+
+      // Create iframe for printing
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "absolute";
+      iframe.style.width = "0px";
+      iframe.style.height = "0px";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentWindow.document;
+      iframeDoc.open();
+      iframeDoc.write(`
+        <html>
+          <head>
+            <style>
+              body {
+                font-family: "Arial", sans-serif;
+                font-size: 12px;
+                text-align: center;
+                margin: 1px;
+                padding: 0;
+                background-color: #fff;
+              }
+              .bill-header {
+                margin-bottom: 10px;
+              }
+              .shop-name {
+                font-size: 22px;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #222;
+                margin-bottom: 0;
+              }
+              .shop-address, .shop-contact {
+                font-size: 14px;
+                font-weight: normal;
+                color: #555;
+                margin-bottom: 2px;
+              }
+              .bill-info {
+                font-size: 10px;
+                color: #000;
+                margin-top: 0;
+                padding-top: 0;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+              }
+              .bill-info div {
+                text-align: left;
+              }
+              .bill-info div:nth-child(odd) {
+                margin-left: 10px;
+              }
+              .bill-table {
+                padding: 2px;
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+              }
+              .bill-table th, .bill-table td {
+                font-size: 12px;
+                border-bottom: 1px dashed #000;
+                padding: 4px;
+                text-align: right;
+              }
+              .bill-table th {
+                background-color: #f5f5f5;
+                color: #000;
+                font-weight: bold;
+                text-align: center;
+                border-bottom: 1px dashed #000;
+                border-top: 1px solid #000;
+              }
+              .bill-table td:nth-child(2) {
+                text-align: left;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              .bill-summary {
+                text-align: right;
+                margin-top: 10px;
+                font-size: 14px;
+                padding-top: 6px;
+                border-top: 1px solid #000;
+              }
+              .bill-summary p {
+                margin: 6px 0;
+                font-weight: bold;
+              }
+              .terms-conditions {
+                font-size: 11px;
+                text-align: left;
+                margin-top: 12px;
+                border-top: 1px solid #000;
+                padding-top: 2px;
+              }
+              .terms-conditions h4 {
+                font-weight: bold;
+                text-align: center;
+              }
+              .thanks {
+                font-size: 13px;
+                font-weight: bold;
+                margin: 0;
+                color: #000;
+              }
+              .systemby {
+                font-size: 8px;
+                font-weight: bold;
+                margin: 0px;
+                color: #444;
+                padding: 0;
+              }
+              .systemby-web {
+                font-size: 10px;
+                font-style: italic;
+                color: #777;
+                padding: 0;
+                margin: 0;
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent}
+          </body>
+        </html>
+      `);
+      iframeDoc.close();
+
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 500);
     } else {
       setInvoiceDataForPreview({
         customer: {
@@ -431,6 +672,7 @@ const SalesReport = () => {
   const closeBillPrintModal = () => {
     setShowBillPrintModal(false);
     setBillPrintData(null);
+    fetchReportData();
   };
 
   const handlePrintInvoice = () => {
@@ -443,7 +685,6 @@ const SalesReport = () => {
         <head>
           <title>Print Invoice</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <!-- Include Tailwind CSS for consistent styling -->
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @page {
@@ -475,7 +716,6 @@ const SalesReport = () => {
               .no-print {
                 display: none !important;
               }
-              /* Ensure Tailwind classes are preserved */
               .bg-blue-600 { background-color: #2563eb !important; }
               .text-blue-600 { color: #2563eb !important; }
               .border-blue-600 { border-color: #2563eb !important; }
@@ -493,7 +733,6 @@ const SalesReport = () => {
     `);
     printWindow.document.close();
     printWindow.focus();
-    // Delay print to ensure styles are applied
     setTimeout(() => {
       printWindow.print();
       printWindow.close();
@@ -521,15 +760,14 @@ const SalesReport = () => {
           discount: parseFloat(item.discount) || 0,
           total:
             parseFloat(item.total) ||
-            (parseFloat(item.unit_price) || 0) *
-            (parseFloat(item.quantity) || 1),
+            (parseFloat(item.unit_price) || 0) * (parseFloat(item.quantity) || 1),
           serialNumber: index + 1,
         })
       );
 
       const totals = {
         totalQty: products.reduce((sum, p) => sum + (p.qty || 0), 0),
-        subTotalMRP: products.reduce(
+        subTotal: products.reduce(
           (sum, p) => sum + (p.mrp || 0) * (p.qty || 0),
           0
         ),
@@ -670,19 +908,6 @@ const SalesReport = () => {
     setShowInvoiceModal(false);
   };
 
-  const formatCurrency = (amount) => {
-    const numericAmount = Number(amount);
-    if (isNaN(numericAmount)) {
-      return "LKR 0.00";
-    }
-    return new Intl.NumberFormat("en-LK", {
-      style: "currency",
-      currency: "LKR",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(numericAmount);
-  };
-
   return (
     <div className="flex flex-col min-h-screen p-4 bg-transparent">
       <div className="py-3 mb-6 text-center text-white rounded-lg shadow-md bg-gradient-to-r from-blue-500 to-blue-800 dark:bg-gradient-to-r dark:from-blue-900 dark:to-slate-800">
@@ -723,8 +948,9 @@ const SalesReport = () => {
             onClick={fetchReportData}
             disabled={loading}
             title="Refresh Data"
-            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${loading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+              loading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             <FiRefreshCw className={`${loading ? "animate-spin" : ""}`} />{" "}
             Refresh
@@ -733,10 +959,11 @@ const SalesReport = () => {
             onClick={exportToExcel}
             disabled={filteredData.length === 0 || loading}
             title="Export to Excel"
-            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${filteredData.length === 0 || loading
+            className={`flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+              filteredData.length === 0 || loading
                 ? "opacity-50 cursor-not-allowed"
                 : ""
-              }`}
+            }`}
           >
             <FaFileExcel /> Export
           </button>
@@ -822,8 +1049,9 @@ const SalesReport = () => {
               <button
                 onClick={fetchReportData}
                 disabled={loading}
-                className={`w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${loading ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                className={`w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
                 {loading ? "Applying..." : "Apply Filters"}
               </button>
@@ -861,11 +1089,11 @@ const SalesReport = () => {
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {filteredData.length > 0
               ? formatCurrency(
-                filteredData.reduce(
-                  (sum, row) => sum + (parseFloat(row.total_amount) || 0),
-                  0
-                ) / filteredData.length
-              )
+                  filteredData.reduce(
+                    (sum, row) => sum + (parseFloat(row.total_amount) || 0),
+                    0
+                  ) / filteredData.length
+                )
               : formatCurrency(0)}
           </p>
         </div>
@@ -931,10 +1159,9 @@ const SalesReport = () => {
                   filteredData.map((row, index) => (
                     <React.Fragment key={`${row.type}-${row.id}`}>
                       <tr
-                        className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${expandedRow === index
-                            ? "bg-blue-50 dark:bg-slate-700"
-                            : ""
-                          }`}
+                        className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${
+                          expandedRow === index ? "bg-blue-50 dark:bg-slate-700" : ""
+                        }`}
                       >
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
                           {row.type === "invoice" ? "Invoice" : "Sale"}
@@ -975,25 +1202,18 @@ const SalesReport = () => {
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-1 inline-flex text-xs font-semibold leading-tight rounded-full
-                            ${row.payment_method.toLowerCase() === "cash"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
-                                : row.payment_method
-                                  .toLowerCase()
-                                  .includes("card")
+                              ${
+                                row.payment_method.toLowerCase() === "cash"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
+                                  : row.payment_method.toLowerCase().includes("card")
                                   ? "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300"
-                                  : row.payment_method
-                                    .toLowerCase()
-                                    .includes("online")
-                                    ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
-                                    : row.payment_method
-                                      .toLowerCase()
-                                      .includes("cheque")
-                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300"
-                                      : row.payment_method
-                                        .toLowerCase()
-                                        .includes("credit")
-                                        ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
-                                        : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200"
+                                  : row.payment_method.toLowerCase().includes("online")
+                                  ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
+                                  : row.payment_method.toLowerCase().includes("cheque")
+                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300"
+                                  : row.payment_method.toLowerCase().includes("credit")
+                                  ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
+                                  : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200"
                               }`}
                           >
                             {row.payment_method}
@@ -1016,8 +1236,7 @@ const SalesReport = () => {
                                 e.stopPropagation();
                                 handleEditSale(row);
                               }}
-                              title={`Edit ${row.type === "invoice" ? "Invoice" : "Sale"
-                                }`}
+                              title={`Edit ${row.type === "invoice" ? "Invoice" : "Sale"}`}
                               className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 focus:outline-none"
                             >
                               <FiEdit size={16} />
@@ -1027,8 +1246,7 @@ const SalesReport = () => {
                                 e.stopPropagation();
                                 handleDeleteSale(row.id, row.type);
                               }}
-                              title={`Delete ${row.type === "invoice" ? "Invoice" : "Sale"
-                                }`}
+                              title={`Delete ${row.type === "invoice" ? "Invoice" : "Sale"}`}
                               className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 focus:outline-none"
                             >
                               <FiTrash2 size={16} />
@@ -1081,19 +1299,14 @@ const SalesReport = () => {
                                     Discount:
                                   </div>
                                   <div className="font-medium text-right text-red-600 dark:text-red-400">
-                                    -
-                                    {formatCurrency(
+                                    -{formatCurrency(
                                       row.items.reduce(
                                         (sum, item) =>
                                           sum +
                                           (parseFloat(
-                                            item.discount ||
-                                            item.discount_amount ||
-                                            0
+                                            item.discount || item.discount_amount || 0
                                           ) +
-                                            parseFloat(
-                                              item.special_discount || 0
-                                            )),
+                                            parseFloat(item.special_discount || 0)),
                                         0
                                       )
                                     )}
@@ -1115,10 +1328,11 @@ const SalesReport = () => {
                                     Balance:
                                   </div>
                                   <div
-                                    className={`font-medium text-right ${parseFloat(row.balance) < 0
+                                    className={`font-medium text-right ${
+                                      parseFloat(row.balance) < 0
                                         ? "text-red-600 dark:text-red-400"
                                         : "text-blue-600 dark:text-blue-400"
-                                      }`}
+                                    }`}
                                   >
                                     {formatCurrency(row.balance)}
                                   </div>
@@ -1161,8 +1375,7 @@ const SalesReport = () => {
                                 <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-400">
                                   Items Purchased ({row.items?.length || 0})
                                 </h4>
-                                {Array.isArray(row.items) &&
-                                  row.items.length > 0 ? (
+                                {Array.isArray(row.items) && row.items.length > 0 ? (
                                   <div className="overflow-x-auto max-h-60">
                                     <table className="min-w-full text-xs divide-y divide-gray-200 dark:divide-slate-600">
                                       <thead className="sticky top-0 text-gray-700 bg-gray-100 dark:bg-slate-700 dark:text-gray-300">
@@ -1192,8 +1405,7 @@ const SalesReport = () => {
                                           <tr key={item.id || i}>
                                             <td className="px-2 py-1 font-medium text-gray-900 dark:text-white">
                                               {row.type === "sale"
-                                                ? item.product_name ||
-                                                "Unknown Product"
+                                                ? item.product_name || "Unknown Product"
                                                 : item.description || "N/A"}
                                             </td>
                                             <td className="px-2 py-1 text-center text-gray-600 dark:text-gray-300">
@@ -1201,22 +1413,16 @@ const SalesReport = () => {
                                             </td>
                                             <td className="px-2 py-1 text-right text-gray-600 dark:text-gray-300">
                                               {formatCurrency(
-                                                item.unit_price ||
-                                                item.sales_price ||
-                                                0
+                                                item.unit_price || item.sales_price || 0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
                                               {formatCurrency(
-                                                item.discount ||
-                                                item.discount_amount ||
-                                                0
+                                                item.discount || item.discount_amount || 0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
-                                              {formatCurrency(
-                                                item.special_discount || 0
-                                              )}
+                                              {formatCurrency(item.special_discount || 0)}
                                             </td>
                                             <td className="px-2 py-1 font-semibold text-right text-gray-900 dark:text-white">
                                               {formatCurrency(item.total || 0)}
@@ -1299,7 +1505,11 @@ const SalesReport = () => {
           initialShipping={billPrintData.initialShipping}
           initialTotals={billPrintData.initialTotals}
           initialCustomerInfo={billPrintData.initialCustomerInfo}
-          onClose={closeBillPrintModal}
+          onClose={(saved) => {
+            setShowBillPrintModal(false);
+            setBillPrintData(null);
+            if (saved) fetchReportData();
+          }}
         />
       )}
     </div>

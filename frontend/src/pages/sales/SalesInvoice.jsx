@@ -111,6 +111,9 @@ const SalesInvoice = ({
           buyingCost: 0,
           categoryId: null,
           mrp: 0,
+          supplier: "",
+          category: "",
+          store_location: "",
           stock: 0,
         },
       ],
@@ -168,6 +171,9 @@ const SalesInvoice = ({
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
             ),
+            supplier: item.supplier || "",
+            category: item.category || "",
+            store_location: item.store_location || "",
           };
         }),
         purchaseDetails: {
@@ -215,9 +221,16 @@ const SalesInvoice = ({
             stock,
             discountAmount: "",
             discountPercentage: "",
-            specialDiscount: 0,
-            total: 0,
-            totalBuyingCost: 0,
+            specialDiscount: parseFloat(item.specialDiscount || 0),
+            total: parseFloat(
+              item.total || qty * unitPrice - (item.specialDiscount || 0)
+            ),
+            totalBuyingCost: parseFloat(
+              item.totalBuyingCost || qty * buyingCost
+            ),
+            supplier: item.supplier || "",
+            category: item.category || "",
+            store_location: item.store_location || "",
           };
         }),
         purchaseDetails: {
@@ -878,6 +891,46 @@ const SalesInvoice = ({
     [formData, isEditMode, onGenerateInvoice, onUpdateInvoice, products]
   );
 
+const handleProductSelect = async (selectedOption, index) => {
+    const productId = selectedOption ? selectedOption.value : null;
+    let product = products.find((p) => p.product_id === productId);
+  // Fetch additional product details
+  let supplier = "", category = "", store_location = "";
+  if (productId) {
+    try {
+      const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
+      const productData = response.data.data;
+      supplier = productData.supplier || "N/A";
+      category = productData.category || "N/A";
+      store_location = productData.store_location || "N/A";
+    } catch (error) {
+      console.error("Error fetching product details:", error);
+      toast.error("Failed to fetch product details.");
+    }
+  }
+  setFormData((prev) => {
+    const newItems = [...prev.items];
+    const qty = parseFloat(newItems[index].qty) || 1;
+    const mrp = product ? parseFloat(product.mrp) || 0 : 0;
+    const salesPrice = product ? parseFloat(product.sales_price) || mrp : 0;
+    const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
+
+    newItems[index] = {
+      ...newItems[index],
+      productId: product ? product.product_id : null,
+      categoryId: product ? product.category_id : null,
+      description: product ? product.product_name : "",
+      unitPrice: "",
+      mrp,
+      salesPrice,
+      buyingCost,
+      discountAmount: "",
+      discountPercentage: "",
+      totalBuyingCost: qty * buyingCost,
+      supplier,
+      category,
+      store_location,
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -980,6 +1033,100 @@ const SalesInvoice = ({
       addItem();
       return;
     }
+
+    setLoading(true);
+    const payload = {
+      invoice: formData.invoice,
+      customer: {
+        id: formData.customer.id || null,
+        name: formData.customer.name,
+        address: formData.customer.address || null,
+        phone: formData.customer.phone || null,
+        email: formData.customer.email || null,
+      },
+      items: formData.items.map((item) => ({
+        id: isEditMode && item.id ? item.id : undefined,
+        product_id: item.productId || null,
+        description: item.description || "Item",
+        qty: parseFloat(item.qty) || 0,
+        unitPrice: parseFloat(item.unitPrice) || 0,
+        salesPrice: parseFloat(item.unitPrice) || 0,
+        discountAmount: parseFloat(item.discountAmount) || 0,
+        discountPercentage: parseFloat(item.discountPercentage) || 0,
+        specialDiscount: parseFloat(item.specialDiscount) || 0,
+        total: parseFloat(item.total) || 0,
+        totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
+        supplier: item.supplier || null,
+        category: item.category || null,
+        store_location: item.store_location || null,
+      })),
+      purchaseDetails: {
+        method: formData.purchaseDetails.method,
+        amount: parseFloat(formData.purchaseDetails.amount) || 0,
+        taxPercentage: parseFloat(formData.purchaseDetails.taxPercentage) || 0,
+      },
+      status: formData.status,
+    };
+
+    try {
+      if (isEditMode) {
+        await onUpdateInvoice(payload, formData.id);
+        toast.success("Invoice updated!");
+      } else {
+        await onGenerateInvoice(payload);
+        toast.success("Invoice created!");
+        localStorage.removeItem(draftKey);
+        setFormData({
+          invoice: {
+            no: "",
+            date: new Date().toISOString().split("T")[0],
+            time: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }),
+          },
+          customer: { id: null, name: "", address: "", phone: "", email: "" },
+          items: [
+            {
+              id: Date.now(),
+              description: "",
+              qty: 1,
+              unitPrice: "",
+              salesPrice: 0,
+              discountAmount: "",
+              discountPercentage: "",
+              specialDiscount: 0,
+              total: 0,
+              totalBuyingCost: 0,
+              productId: null,
+              buyingCost: 0,
+              categoryId: null,
+              mrp: 0,
+            },
+          ],
+          purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
+          status: "pending",
+          id: null,
+        });
+        setErrors({});
+        invoiceNoRef.current?.focus();
+      }
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to save invoice.";
+      const details = error.response?.data?.errors
+        ? Object.entries(error.response.data.errors)
+            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+            .join("\n")
+        : "No detailed errors provided.";
+      console.error("API Error Details:", {
+        message,
+        details,
+        response: error.response?.data,
+      });
+      toast.error(`${message}\n${details}`);
+    } finally {
+      setLoading(false);
 
     if (currentField.ref === purchaseAmountRef) {
       document.getElementById("invoiceForm")?.requestSubmit();
