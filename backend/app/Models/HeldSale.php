@@ -27,16 +27,27 @@ class HeldSale extends Model
     public static function boot()
     {
         parent::boot();
-
+    
         static::creating(function ($model) {
-            $model->hold_id = 'HLD-' . strtoupper(uniqid());
-            $expiryHours = config('pos.hold_expiry_hours');
-            if (!$expiryHours) {
-                $expiryHours = 72;
+            // Get the latest numeric hold_id
+            $latest = self::whereRaw("hold_id REGEXP '^HLD-[0-9]+$'")
+                ->orderByRaw("CAST(SUBSTRING(hold_id, 5) AS UNSIGNED) DESC")
+                ->first();
+    
+            // Determine the next number
+            if ($latest && preg_match('/HLD-(\d+)/', $latest->hold_id, $matches)) {
+                $nextNumber = (int) $matches[1] + 1;
+            } else {
+                $nextNumber = 1;
             }
-            $model->expires_at = now()->addHours($expiryHours);
+    
+            // Assign the new hold_id with leading zeros
+            $model->hold_id = 'HLD-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    
+            
         });
     }
+    
 
     public function scopeActive($query)
     {

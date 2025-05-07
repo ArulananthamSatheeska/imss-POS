@@ -561,14 +561,21 @@ const POSForm = ({
         new Date().toISOString().split("T")[0]
       );
 
+      const perUnitDiscount = Math.max(
+        0,
+        (existingProduct.mrp || 0) - (existingProduct.price || 0)
+      );
+      const totalDiscount = perUnitDiscount * newQuantity;
+
       updatedProducts[existingProductIndex] = {
         ...existingProduct,
         qty: newQuantity,
         price: existingProduct.price || 0,
-        discount: existingProduct.discount || 0,
+        discount: totalDiscount,
         discount_percentage: existingProduct.discount_percentage || 0,
         schemeName: schemeName,
         specialDiscount: newSpecialDiscount,
+
         total: (existingProduct.price || 0) * newQuantity - ((existingProduct.discount || 0) + newSpecialDiscount),
         supplier: selectedProduct.supplier,
         category: selectedProduct.category,
@@ -585,28 +592,26 @@ const POSForm = ({
         setStockWarning("");
       }
 
+      const perUnitDiscount = Math.max(
+        0,
+        (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
+      );
+      const totalDiscount = perUnitDiscount * currentQuantity;
+
       const newProduct = {
         ...selectedProduct,
         qty: currentQuantity,
-        price: selectedProduct.sales_price || 0,
-        discount: Math.max(
-          0,
-          (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
-        ),
+        price: (selectedProduct.mrp || 0) - totalDiscount / currentQuantity,
+        discount: totalDiscount,
         discount_percentage:
           selectedProduct.mrp && selectedProduct.sales_price
-            ? (Math.max(
-                0,
-                (selectedProduct.mrp || 0) - (selectedProduct.sales_price || 0)
-              ) /
-                selectedProduct.mrp) *
-              100
+            ? (perUnitDiscount / selectedProduct.mrp) * 100
             : 0,
         schemeName: schemeName,
         specialDiscount: specialDiscount,
         total:
-          (selectedProduct.sales_price || 0) * currentQuantity -
-          specialDiscount,
+          ((selectedProduct.mrp || 0) - totalDiscount / currentQuantity) *
+          currentQuantity,
         serialNumber: products.length + 1,
         supplier: selectedProduct.supplier,
         category: selectedProduct.category,
@@ -652,19 +657,21 @@ const POSForm = ({
         saleType,
         new Date().toISOString().split("T")[0]
       );
-      const newDiscount = Math.max(
+      const perUnitDiscount = Math.max(
         0,
         (productToUpdate.mrp || 0) - (productToUpdate.price || 0)
       );
+      const totalDiscount = perUnitDiscount * newQty;
 
       return prevProducts.map((product, i) => {
         if (i === index) {
           const newTotal =
-            product.price * newQty - (newDiscount + newSpecialDiscount);
+            newQty * ((product.mrp || 0) - perUnitDiscount) -
+            newSpecialDiscount;
           return {
             ...product,
             qty: newQty,
-            discount: newDiscount,
+            discount: totalDiscount,
             specialDiscount: newSpecialDiscount,
             total: newTotal >= 0 ? newTotal : 0,
           };
@@ -694,7 +701,8 @@ const POSForm = ({
           const newDiscountPercentage =
             newPrice > 0 ? (newDiscount / newPrice) * 100 : 0;
           const newTotal =
-            newPrice * product.qty - (newDiscount + newSpecialDiscount);
+            product.qty *
+            ((product.mrp || 0) - (newDiscount + newSpecialDiscount));
           return {
             ...product,
             price: newPrice,
@@ -729,7 +737,8 @@ const POSForm = ({
           const newDiscountPercentage =
             product.price > 0 ? (newDiscount / product.price) * 100 : 0;
           const newTotal =
-            product.price * product.qty - (newDiscount + newSpecialDiscount);
+            product.qty *
+            ((product.mrp || 0) - (newDiscount + newSpecialDiscount));
           return {
             ...product,
             discount: newDiscount,
@@ -762,7 +771,8 @@ const POSForm = ({
           // Calculate discount amount from percentage
           const newDiscount = (product.price * newPercentage) / 100;
           const newTotal =
-            product.price * product.qty - (newDiscount + newSpecialDiscount);
+            product.qty *
+            ((product.mrp || 0) - (newDiscount + newSpecialDiscount));
           return {
             ...product,
             discount: newDiscount,
@@ -820,7 +830,7 @@ const POSForm = ({
 
       totalQty += qty;
       subTotalMRP += mrp * qty;
-      totalItemDiscounts += unitDiscount * qty;
+      totalItemDiscounts += unitDiscount; // discount is total for quantity, so no multiplication by qty
       totalSpecialDiscounts += specialDiscount;
       grandTotalBeforeAdjustments += p.total;
     });
@@ -1452,7 +1462,7 @@ const POSForm = ({
                     scope="col"
                     className="px-3 py-3 border-r dark:border-gray-600"
                   >
-                    S.No
+                    No
                   </th>
                   <th
                     scope="col"
@@ -1468,31 +1478,25 @@ const POSForm = ({
                   </th>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[100px]"
+                    className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]"
                   >
-                    U.Price
+                    MRP
                   </th>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                    className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[80px]"
                   >
-                    U.Disc
+                    Disc
                   </th>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                    className="px-3 py-3 text-center border-r dark:border-gray-600 min-w-[100px]"
                   >
-                    Disc %
+                    Price
                   </th>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
-                  >
-                    Sp.Disc
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]"
+                    className="px-4 py-3 text-center border-r dark:border-gray-600 min-w-[110px]"
                   >
                     Total
                   </th>
@@ -1534,8 +1538,6 @@ const POSForm = ({
                       <td className="px-1 py-1 text-center border-r dark:border-gray-700">
                         <input
                           type="number"
-                          step="1"
-                          min="0"
                           className="w-16 py-1 text-sm text-center bg-transparent border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:text-white"
                           value={product.qty}
                           onChange={(e) =>
@@ -1548,8 +1550,6 @@ const POSForm = ({
                         <div className="flex flex-col items-end">
                           <input
                             type="number"
-                            step="0.01"
-                            min="0"
                             className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                             value={formatNumberWithCommas(
                               parseFloat(product.mrp || 0).toFixed(2)
@@ -1559,22 +1559,9 @@ const POSForm = ({
                             }
                             onFocus={(e) => e.target.select()}
                           />
-                          {/* <div className="flex flex-col items-end mt-1 text-xs text-red-600 dark:text-red-400">
-                            <span>
-                              MRP:{" "}
-                              {formatNumberWithCommas(
-                                parseFloat(product.mrp || 0).toFixed(2)
-                              )}
-                            </span>
-                            <span>
-                              Sales:{" "}
-                              {formatNumberWithCommas(
-                                parseFloat(product.sales_price || 0).toFixed(2)
-                              )}
-                            </span>
-                          </div> */}
                         </div>
                       </td>
+
                       <td className="px-3 py-2 text-right border-r dark:border-gray-700">
                         <input
                           type="number"
@@ -1583,41 +1570,83 @@ const POSForm = ({
                           className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                           value={formatNumberWithCommas(
                             parseFloat(
-                              product.mrp - product.sales_price
+                              product.discount + product.specialDiscount || 0
                             ).toFixed(2)
                           )}
-                          onChange={(e) =>
-                            updateProductDiscount(index, e.target.value)
-                          }
+                          onChange={(e) => {
+                            const newDiscountValue = parseFloat(e.target.value);
+                            if (isNaN(newDiscountValue) || newDiscountValue < 0)
+                              return;
+
+                            setProducts((prevProducts) =>
+                              prevProducts.map((product, i) => {
+                                if (i === index) {
+                                  // Calculate the base discount (without special discount)
+                                  const baseDiscount = product.specialDiscount
+                                    ? newDiscountValue - product.specialDiscount
+                                    : newDiscountValue;
+
+                                  // Ensure base discount doesn't go negative
+                                  const validatedBaseDiscount = Math.max(
+                                    0,
+                                    baseDiscount
+                                  );
+
+                                  const updatedProductWithQty = {
+                                    ...product,
+                                    qty: product.qty || 1,
+                                  };
+
+                                  const newPrice =
+                                    (product.mrp || 0) - validatedBaseDiscount;
+                                  const totalDiscount =
+                                    validatedBaseDiscount + newSpecialDiscount;
+
+                                  const newTotal =
+                                    product.qty *
+                                    ((product.mrp || 0) - totalDiscount);
+
+                                  return {
+                                    ...product,
+                                    discount: validatedBaseDiscount,
+                                    discount_percentage:
+                                      product.mrp > 0
+                                        ? (validatedBaseDiscount /
+                                            product.mrp) *
+                                          100
+                                        : 0,
+                                    price: newPrice >= 0 ? newPrice : 0,
+                                    specialDiscount: newSpecialDiscount,
+                                    total: newTotal >= 0 ? newTotal : 0,
+                                  };
+                                }
+                                return product;
+                              })
+                            );
+                          }}
                           onFocus={(e) => e.target.select()}
                         />
                       </td>
+                      {/* <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
+                        {formatNumberWithCommas(
+                          product.specialDiscount?.toFixed(2) ?? 0.0
+                        )}
+                      </td> */}
                       <td className="px-3 py-2 text-right border-r dark:border-gray-700">
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                          value={product.discount_percentage}
-                          onChange={(e) =>
-                            updateProductDiscountPercentage(
-                              index,
-                              e.target.value
-                            )
-                          }
-                          onFocus={(e) => e.target.select()}
+                          value={product.price.toFixed(2)}
                         />
-                      </td>
-                      <td className="px-3 py-2 text-right text-red-600 border-r dark:text-red-400 dark:border-gray-700">
-                        {formatNumberWithCommas(
-                          product.specialDiscount?.toFixed(2) ?? 0.0
-                        )}
                       </td>
                       <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">
                         {formatNumberWithCommas(
-                          product.total?.toFixed(2) ?? 0.0
+                          (product.price * product.qty).toFixed(2) || "0.00"
                         )}
                       </td>
+
                       <td className="px-3 py-2 text-center">
                         <button
                           onClick={() => handleDeleteClick(index)}

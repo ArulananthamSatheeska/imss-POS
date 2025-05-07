@@ -234,19 +234,19 @@ if ($storeLocationName) {
                     // Remove commas
                     $value = str_replace(',', '', $productData[$field]);
                     // Convert to float or int depending on field
-                    if (in_array($field, ['minimum_stock_quantity', 'opening_stock_quantity'])) {
-                        $value = (int) $value;
-                        // Set negative values to zero
-                        if ($value < 0) {
-                            $value = 0;
-                        }
-                    } else {
-                        $value = (float) $value;
-                        // Set negative values to zero
-                        if ($value < 0) {
-                            $value = 0.0;
-                        }
-                    }
+            if (in_array($field, ['minimum_stock_quantity', 'opening_stock_quantity'])) {
+                $value = (float) $value;
+                // Set negative values to zero
+                if ($value < 0) {
+                    $value = 0.0;
+                }
+            } else {
+                $value = (float) $value;
+                // Set negative values to zero
+                if ($value < 0) {
+                    $value = 0.0;
+                }
+            }
                     $productData[$field] = $value;
                 }
             }
@@ -322,8 +322,8 @@ if ($storeLocationName) {
             'wholesale_price' => 'nullable|numeric|min:0',
             'barcode' => 'nullable|string|unique:products,barcode',
             'mrp' => 'required|numeric|min:0',
-            'minimum_stock_quantity' => 'nullable|integer|min:0',
-            'opening_stock_quantity' => 'nullable|integer|min:0',
+            'minimum_stock_quantity' => 'nullable|numeric|min:0',
+            'opening_stock_quantity' => 'nullable|numeric|min:0',
             'opening_stock_value' => 'nullable|numeric|min:0',
             'category' => 'nullable|string',
             'supplier' => 'nullable|string',
