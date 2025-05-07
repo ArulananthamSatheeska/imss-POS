@@ -7,9 +7,9 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
-export const SupplierWiseProfit = () => {
-    const [suppliers, setSuppliers] = useState([]);
-    const [selectedSupplier, setSelectedSupplier] = useState(null); // Changed to null for react-select
+export const CategoryWiseProfit = () => {
+    const [categories, setCategories] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState(null);
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [reportData, setReportData] = useState([]);
@@ -19,29 +19,28 @@ export const SupplierWiseProfit = () => {
     const [error, setError] = useState('');
     const [expandedRow, setExpandedRow] = useState(null);
 
-    // Fetch suppliers from the backend
-    const fetchSuppliers = async () => {
+    // Fetch categories from the backend
+    const fetchCategories = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:8000/api/suppliers');
-            // Transform suppliers for react-select
-            const supplierOptions = response.data.map(supplier => ({
-                value: supplier.supplier_name,
-                label: supplier.supplier_name,
+            const response = await axios.get('http://127.0.0.1:8000/api/categories');
+            const categoryOptions = response.data.map(category => ({
+                value: category.name,
+                label: category.name,
             }));
-            setSuppliers(supplierOptions);
+            setCategories(categoryOptions);
         } catch (error) {
-            console.error('Error fetching suppliers:', error);
-            setError('Failed to load suppliers. Please try again.');
+            console.error('Error fetching categories:', error);
+            setError('Failed to load categories. Please try again.');
         }
     };
 
-    // Fetch report data from the backend based on selected supplier and date range
+    // Fetch report data and items based on selected category and date range
     const fetchReportData = async () => {
-        if (!selectedSupplier) {
+        if (!selectedCategory) {
             setReportData([]);
             setItemDetails([]);
             setSummary({});
-            setError('Please select a supplier.');
+            setError('Please select a category.');
             return;
         }
 
@@ -53,23 +52,21 @@ export const SupplierWiseProfit = () => {
         try {
             setLoading(true);
             setError('');
-            const response = await axios.get('http://127.0.0.1:8000/api/sales/supplier-wise-profit-report', {
+            const response = await axios.get('http://127.0.0.1:8000/api/sales/category-wise-profit-report', {
                 params: {
-                    supplierName: selectedSupplier.value, // Use value from react-select
+                    categoryName: selectedCategory.value,
                     fromDate: fromDate || undefined,
                     toDate: toDate || undefined,
                 },
             });
 
             if (response.data?.reportData) {
-                // Process data for profit percentages and quantity
                 const processedData = response.data.reportData.map(item => ({
                     ...item,
-                    profit_percentage: item.profitPercentage, // Already formatted as 'X.XX%'
+                    profit_percentage: item.profitPercentage,
                     totalQuantity: item.totalQuantity,
                 }));
 
-                // Extract item details
                 const items = response.data.reportData.flatMap(item => item.items || []);
 
                 setReportData(processedData);
@@ -81,13 +78,13 @@ export const SupplierWiseProfit = () => {
                 });
 
                 if (processedData.length === 0) {
-                    setError(`No data found for supplier "${selectedSupplier.label}"${fromDate && toDate ? ` between ${fromDate} and ${toDate}` : ''}.`);
+                    setError(`No data found for category "${selectedCategory.label}"${fromDate && toDate ? ` between ${fromDate} and ${toDate}` : ''}.`);
                 }
             } else {
                 setReportData([]);
                 setItemDetails([]);
                 setSummary({});
-                setError(`No data found for supplier "${selectedSupplier.label}"${fromDate && toDate ? ` between ${fromDate} and ${toDate}` : ''}.`);
+                setError(`No data found for category "${selectedCategory.label}"${fromDate && toDate ? ` between ${fromDate} and ${toDate}` : ''}.`);
             }
         } catch (error) {
             console.error('Error fetching report data:', error);
@@ -97,19 +94,21 @@ export const SupplierWiseProfit = () => {
             setItemDetails([]);
             setSummary({});
         } finally {
-            setLoading( false);
+            setLoading(false);
         }
     };
 
-    // Fetch suppliers on component mount
+    // Fetch categories on component mount
     useEffect(() => {
-        fetchSuppliers();
+        fetchCategories();
     }, []);
 
-    // Fetch report data when the selected supplier or date range changes
+    // Fetch report data when the selected category or date range changes
     useEffect(() => {
-        fetchReportData();
-    }, [selectedSupplier, fromDate, toDate]);
+        if (selectedCategory) {
+            fetchReportData();
+        }
+    }, [selectedCategory, fromDate, toDate]);
 
     // Toggle row expansion
     const toggleRow = (index) => {
@@ -120,7 +119,7 @@ export const SupplierWiseProfit = () => {
     const exportToExcel = () => {
         const wb = XLSX.utils.book_new();
         const summaryData = reportData.map(row => ({
-            Supplier: row.supplierName,
+            Category: row.categoryName,
             'Total Quantity': row.totalQuantity,
             'Total Cost': row.totalCostPrice,
             'Total Sales': row.totalSellingPrice,
@@ -128,24 +127,24 @@ export const SupplierWiseProfit = () => {
             'Profit %': row.profit_percentage,
         }));
         const summaryWs = XLSX.utils.json_to_sheet([
-            { 'Report': `Supplier Wise Profit Report${fromDate && toDate ? ` (${fromDate} to ${toDate})` : ''}` },
+            { 'Report': `Category Wise Profit Report${fromDate && toDate ? ` (${fromDate} to ${toDate})` : ''}` },
             {},
             ...summaryData,
         ]);
-        XLSX.utils.book_append_sheet(wb, summaryWs, 'Supplier Summary');
+        XLSX.utils.book_append_sheet(wb, summaryWs, 'Category Summary');
         const itemsWs = XLSX.utils.json_to_sheet(itemDetails);
         XLSX.utils.book_append_sheet(wb, itemsWs, 'Item Details');
-        XLSX.writeFile(wb, `Supplier_Wise_Profit_Report${fromDate && toDate ? `_${fromDate}_to_${toDate}` : ''}.xlsx`);
+        XLSX.writeFile(wb, `Category_Wise_Profit_Report${fromDate && toDate ? `_${fromDate}_to_${toDate}` : ''}.xlsx`);
     };
 
     // Export to PDF
     const exportToPDF = () => {
         const doc = new jsPDF();
-        doc.text(`Supplier Wise Profit Report${fromDate && toDate ? ` (${fromDate} to ${toDate})` : ''}`, 10, 10);
+        doc.text(`Category Wise Profit Report${fromDate && toDate ? ` (${fromDate} to ${toDate})` : ''}`, 10, 10);
         doc.autoTable({
-            head: [['Supplier', 'Total Quantity', 'Total Cost', 'Total Sales', 'Total Profit', 'Profit %']],
+            head: [['Category', 'Total Quantity', 'Total Cost', 'Total Sales', 'Total Profit', 'Profit %']],
             body: reportData.map(row => [
-                row.supplierName,
+                row.categoryName,
                 row.totalQuantity,
                 row.totalCostPrice,
                 row.totalSellingPrice,
@@ -167,26 +166,26 @@ export const SupplierWiseProfit = () => {
             ]),
             startY: doc.lastAutoTable.finalY + 20,
         });
-        doc.save(`Supplier_Wise_Profit_Report${fromDate && toDate ? `_${fromDate}_to_${toDate}` : ''}.pdf`);
+        doc.save(`Category_Wise_Profit_Report${fromDate && toDate ? `_${fromDate}_to_${toDate}` : ''}.pdf`);
     };
 
     return (
         <div className="flex flex-col min-h-screen p-4 bg-transparent">
             {/* Header */}
             <div className="p-2 text-center text-white bg-blue-600 rounded-t-lg">
-                <h1 className="text-2xl font-bold">Supplier Wise Profit Report</h1>
+                <h1 className="text-2xl font-bold">Category Wise Profit Report</h1>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                {/* Supplier Dropdown with react-select */}
+                {/* Category Dropdown with react-select */}
                 <div className="flex-1 min-w-[200px]">
                     <label className="flex flex-col">
-                        <span className="mb-1 font-medium">Select Supplier:</span>
+                        <span className="mb-1 font-medium">Select Category:</span>
                         <Select
-                            options={suppliers}
-                            value={selectedSupplier}
-                            onChange={setSelectedSupplier}
-                            placeholder="Type to search suppliers..."
+                            options={categories}
+                            value={selectedCategory}
+                            onChange={(option) => setSelectedCategory(option)}
+                            placeholder="Type to search categories..."
                             isClearable
                             className="text-sm"
                             classNamePrefix="react-select"
@@ -285,7 +284,7 @@ export const SupplierWiseProfit = () => {
                         <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-slate-600">
                             <thead className="text-xs tracking-wider text-gray-700 uppercase bg-gray-100 dark:bg-slate-700 dark:text-gray-300">
                                 <tr>
-                                    <th className="px-4 py-3 font-semibold text-left whitespace-nowrap">Supplier Name</th>
+                                    <th className="px-4 py-3 font-semibold text-left whitespace-nowrap">Category Name</th>
                                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Quantity</th>
                                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Cost</th>
                                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Sales</th>
@@ -296,7 +295,7 @@ export const SupplierWiseProfit = () => {
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-800 dark:divide-slate-600">
                                 {reportData.map((row, index) => (
-                                    <React.Fragment key={row.supplierName}>
+                                    <React.Fragment key={row.categoryName}>
                                         <tr
                                             className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${
                                                 expandedRow === index ? 'bg-blue-50 dark:bg-slate-700' : ''
@@ -307,7 +306,7 @@ export const SupplierWiseProfit = () => {
                                                     onClick={() => toggleRow(index)}
                                                     className="hover:underline focus:outline-none"
                                                 >
-                                                    {row.supplierName}
+                                                    {row.categoryName}
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300 whitespace-nowrap">
@@ -408,4 +407,4 @@ export const SupplierWiseProfit = () => {
     );
 };
 
-export default SupplierWiseProfit;
+export default CategoryWiseProfit;

@@ -112,6 +112,9 @@ const SalesInvoice = ({
           categoryId: null,
           mrp: 0,
           stock: 0,
+          supplier: "",
+          category: "",
+          store_location: "",
         },
       ],
       purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
@@ -168,6 +171,9 @@ const SalesInvoice = ({
             totalBuyingCost: parseFloat(
               item.totalBuyingCost || qty * buyingCost
             ),
+            supplier: item.supplier || "",
+            category: item.category || "",
+            store_location: item.store_location || "",
           };
         }),
         purchaseDetails: {
@@ -218,6 +224,9 @@ const SalesInvoice = ({
             specialDiscount: 0,
             total: 0,
             totalBuyingCost: 0,
+            supplier: item.supplier || "",
+            category: item.category || "",
+            store_location: item.store_location || "",
           };
         }),
         purchaseDetails: {
@@ -585,10 +594,23 @@ const SalesInvoice = ({
     setTimeout(() => customerAddressRef.current?.focus(), 0);
   };
 
-  const handleProductSelect = (selectedOption, index) => {
-    const product = selectedOption
-      ? products.find((p) => p.product_id === selectedOption.value)
-      : null;
+  const handleProductSelect = async (selectedOption, index) => {
+    const productId = selectedOption ? selectedOption.value : null;
+    let product = products.find((p) => p.product_id === productId);
+    // Fetch additional product details
+    let supplier = "", category = "", store_location = "";
+    if (productId) {
+      try {
+        const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
+        const productData = response.data.data;
+        supplier = productData.supplier || "N/A";
+        category = productData.category || "N/A";
+        store_location = productData.store_location || "N/A";
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+        toast.error("Failed to fetch product details.");
+      }
+    }
 
     setFormData((prev) => {
       const newItems = [...prev.items];
@@ -617,6 +639,9 @@ const SalesInvoice = ({
         discountAmount: "",
         discountPercentage: "",
         totalBuyingCost: qty * buyingCost,
+        supplier,
+        category,
+        store_location,
       };
 
       newItems[index] = updateItemTotal(newItems[index], prev.invoice.date);
@@ -806,6 +831,9 @@ const SalesInvoice = ({
           specialDiscount: parseFloat(item.specialDiscount) || 0,
           total: parseFloat(item.total) || 0,
           totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
+          supplier: item.supplier || null,
+          category: item.category || null,
+          store_location: item.store_location || null,
         })),
         purchaseDetails: {
           method: formData.purchaseDetails.method,
@@ -1095,7 +1123,7 @@ const SalesInvoice = ({
   return (
     <ErrorBoundary>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm">
-        <div className="relative w-full h-full bg-white dark:bg-gray-800 overflow-y-auto flex flex-col">
+        <div className="relative flex flex-col w-full h-full overflow-y-auto bg-white dark:bg-gray-800">
           <h3 className="p-6 text-2xl font-bold text-blue-600 border-b border-gray-200">
             {isEditMode ? "Edit Invoice" : "Create New Invoice"}
           </h3>
@@ -1472,7 +1500,7 @@ const SalesInvoice = ({
                 </div>
 
                 {/* Add Button */}
-                <div className="md:col-span-1 flex items-end">
+                <div className="flex items-end md:col-span-1">
                   <button
                     type="button"
                     onClick={addItem}
@@ -1515,37 +1543,37 @@ const SalesInvoice = ({
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
                       >
                         Product
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Qty
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Unit Price
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Discount
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Total
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
                       >
                         Actions
                       </th>
@@ -1561,7 +1589,7 @@ const SalesInvoice = ({
                                 {item.description || "No description"}
                               </div>
                               {item.discountScheme && (
-                                <div className="text-xs text-green-600 mt-1">
+                                <div className="mt-1 text-xs text-green-600">
                                   {item.discountSchemeType === "product"
                                     ? `Product Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`
                                     : `Category Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`}
@@ -1570,13 +1598,13 @@ const SalesInvoice = ({
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
                           {item.qty}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
                           {formatCurrency(item.unitPrice)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
                           {item.discountAmount > 0 ? (
                             <span className="text-red-600">
                               -{formatCurrency(item.discountAmount)}
@@ -1585,14 +1613,14 @@ const SalesInvoice = ({
                             "-"
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
                           {formatCurrency(item.total)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md p-1"
+                            className="p-1 text-red-600 rounded-md hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                           >
                             Remove
                           </button>
@@ -1604,11 +1632,11 @@ const SalesInvoice = ({
                     <tr>
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
+                        className="px-6 py-4 text-sm font-medium text-right text-gray-500 uppercase"
                       >
                         Subtotal
                       </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900">
                         {formatCurrency(subtotal)}
                       </td>
                       <td></td>
@@ -1616,11 +1644,11 @@ const SalesInvoice = ({
                     <tr>
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
+                        className="px-6 py-4 text-sm font-medium text-right text-gray-500 uppercase"
                       >
                         Tax ({formData.purchaseDetails.taxPercentage}%)
                       </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900">
                         {formatCurrency(tax)}
                       </td>
                       <td></td>
@@ -1628,11 +1656,11 @@ const SalesInvoice = ({
                     <tr className="bg-gray-100">
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-bold text-gray-700 uppercase"
+                        className="px-6 py-4 text-sm font-bold text-right text-gray-700 uppercase"
                       >
                         Total
                       </td>
-                      <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                      <td className="px-6 py-4 text-sm font-bold text-right text-gray-900">
                         {formatCurrency(total)}
                       </td>
                       <td></td>

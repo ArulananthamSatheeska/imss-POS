@@ -1234,7 +1234,8 @@ const TOUCHPOSFORM = () => {
                       (itemDiscount || 0) + (specialDiscount || 0);
                     const price = product.price || 0;
                     const totalDiscountPerUnit = totalDiscount / (qty || 1);
-                    const total = qty * price;
+
+                    const total = qty * (mrp - totalDiscountPerUnit);
 
                     return (
                       <tr
@@ -1260,7 +1261,8 @@ const TOUCHPOSFORM = () => {
                               type="number"
                               step="0.01"
                               min="0"
-                              className="w-16 p-1 text-center text-sm border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+
+                              className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
                               value={qty}
                               onChange={(e) =>
                                 updateProductQuantity(index, e.target.value)
@@ -1280,8 +1282,9 @@ const TOUCHPOSFORM = () => {
                           {formatNumberWithCommas(mrp.toFixed(2))}
                         </td>
 
-                        <td className="px-3  text-right border-r dark:border-gray-700">
-                          <input
+
+                        <td className="px-3 text-right border-r dark:border-gray-700">
+                      <input
                             type="number"
                             step="0.01"
                             min="0"
@@ -1306,11 +1309,11 @@ const TOUCHPOSFORM = () => {
                               setProducts((prevProducts) =>
                                 prevProducts.map((product, i) => {
                                   if (i === index) {
-                                    const qty = product.qty || 1;
+
                                     const baseDiscount = product.specialDiscount
-                                      ? newDiscountValue / qty -
+                                      ? newDiscountValue -
                                         product.specialDiscount
-                                      : newDiscountValue / qty;
+                                      : newDiscountValue;
 
                                     const validatedBaseDiscount = Math.max(
                                       0,
@@ -1319,7 +1322,8 @@ const TOUCHPOSFORM = () => {
 
                                     const updatedProductWithQty = {
                                       ...product,
-                                      qty,
+
+                                      qty: product.qty || 1,
                                     };
 
                                     const newSpecialDiscount =
@@ -1341,7 +1345,8 @@ const TOUCHPOSFORM = () => {
                                       newSpecialDiscount;
 
                                     const newTotal =
-                                      qty *
+
+                                      product.qty *
                                       ((product.mrp || 0) - totalDiscount);
 
                                     return {
@@ -1390,7 +1395,7 @@ const TOUCHPOSFORM = () => {
           {/* Totals Section */}
           <div className="flex flex-col gap-4 mt-2 sm:mt-4 dark:bg-slate-800 sm:flex-row sm:gap-6">
             <div className="flex-1">
-              <div className="flex items-center gap-2 text-sm font-semibold sm:text-lg mt-1">
+              <div className="flex items-center gap-2 mt-1 text-sm font-semibold sm:text-lg">
                 <span>Selected Item Quantity:</span>
                 <span>
                   {formatNumberWithCommas(

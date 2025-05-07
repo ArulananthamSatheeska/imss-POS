@@ -25,7 +25,6 @@ import Categories from "./pages/items/Categories.jsx";
 import StoreLocations from "./pages/items/StoreLocations.jsx";
 import Notification from "./components/notification/Notification.jsx";
 import ItemWiseReport from "./pages/Report/ItemWiseStockReport.jsx";
-import DailyProfitReport from "./pages/Profit/DailyProfit.jsx";
 import BillWiseProfitReport from "./pages/Profit/BillWiseProfit.jsx";
 import ReportTable from "./components/reports/ReportTable.jsx";
 import Reports from "./pages/Report/StockReport.jsx";
@@ -69,7 +68,7 @@ import Approvels from "./pages/Approvels/Approvels.jsx";
 import StockTransfer from "./pages/StockTransfer/StockTransfer.jsx";
 import DiscountScheam from "./pages/Discount/DiscountScheam.jsx";
 import CompanyWiseProfit from "./pages/Profit/CompanyWiseProfit.jsx";
-import SupplierWiseProfit from "./pages/Profit/SupplierWiseProfit.jsx";
+// import SupplierWiseProfit from "./pages/Profit/SupplierWise.jsx";
 import HomePage from "./pages/TaskManager/HomePage.jsx";
 import ProjectsPage from "./pages/TaskManager/ProjectsPage.jsx";
 import ReportPage from "./pages/TaskManager/ReportPage.jsx";
@@ -81,6 +80,11 @@ import ProjectForm from "./components/TaskManager/ProjectForm.jsx";
 import Home from "./components/TaskManager/Home.jsx";
 import { BarcodePage } from "./pages/items/BarcodePage.jsx";
 import Expiry from "./pages/Expiry/Expiry.jsx";
+import { CustomerWiseProfit } from "./pages/Profit/CustomerWiseProfit.jsx";
+import { StoreAndLocationWiseProfit } from "./pages/Profit/StoreAndLocationWiseProfit.jsx";
+import DailyProfitReport from "./pages/Profit/DailyProfit.jsx";
+import { SupplierWiseProfit } from "./pages/Profit/SupplierWiseProfit.jsx";
+import { CategoryWiseProfit } from "./pages/Profit/CategoryWiseProfit.jsx";
 
 // === App Component ===
 function App() {
@@ -175,18 +179,30 @@ function App() {
                     path="ItemWiseStockReport"
                     element={<ItemWiseReport />}
                   />
-                  <Route path="DailyProfit" element={<DailyProfitReport />} />
+                  <Route path="ItemWiseProfit" element={<DailyProfitReport/>} />
                   <Route
                     path="BillWiseProfit"
                     element={<BillWiseProfitReport />}
                   />
-                  <Route
+                  {/* <Route
                     path="CompanyWiseProfit"
                     element={<CompanyWiseProfit />}
-                  />
+                  /> */}
                   <Route
                     path="SupplierWiseProfit"
                     element={<SupplierWiseProfit />}
+                  />
+                  <Route
+                    path="CustomerWiseProfit"
+                    element={<CustomerWiseProfit />}
+                  />
+                  <Route
+                    path="StoreAndLocationWiseProfit"
+                    element={<StoreAndLocationWiseProfit />}
+                  />
+                  <Route
+                    path="CategoryWiseProfit"
+                    element={<CategoryWiseProfit />}
                   />
                   <Route path="ReportTable" element={<ReportTable />} />
                   <Route path="StockRecheck" element={<StockRecheck />} />
