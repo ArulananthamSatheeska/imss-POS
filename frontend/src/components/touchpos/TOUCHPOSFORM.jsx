@@ -1234,6 +1234,7 @@ const TOUCHPOSFORM = () => {
                       (itemDiscount || 0) + (specialDiscount || 0);
                     const price = product.price || 0;
                     const totalDiscountPerUnit = totalDiscount / (qty || 1);
+
                     const total = qty * (mrp - totalDiscountPerUnit);
 
                     return (
@@ -1260,6 +1261,7 @@ const TOUCHPOSFORM = () => {
                               type="number"
                               step="0.01"
                               min="0"
+
                               className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
                               value={qty}
                               onChange={(e) =>
@@ -1280,8 +1282,9 @@ const TOUCHPOSFORM = () => {
                           {formatNumberWithCommas(mrp.toFixed(2))}
                         </td>
 
+
                         <td className="px-3 text-right border-r dark:border-gray-700">
-                          <input
+                      <input
                             type="number"
                             step="0.01"
                             min="0"
@@ -1306,6 +1309,7 @@ const TOUCHPOSFORM = () => {
                               setProducts((prevProducts) =>
                                 prevProducts.map((product, i) => {
                                   if (i === index) {
+
                                     const baseDiscount = product.specialDiscount
                                       ? newDiscountValue -
                                         product.specialDiscount
@@ -1318,6 +1322,7 @@ const TOUCHPOSFORM = () => {
 
                                     const updatedProductWithQty = {
                                       ...product,
+
                                       qty: product.qty || 1,
                                     };
 
@@ -1340,6 +1345,7 @@ const TOUCHPOSFORM = () => {
                                       newSpecialDiscount;
 
                                     const newTotal =
+
                                       product.qty *
                                       ((product.mrp || 0) - totalDiscount);
 
