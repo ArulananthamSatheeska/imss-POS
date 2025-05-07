@@ -83,7 +83,7 @@ import Expiry from "./pages/Expiry/Expiry.jsx";
 import { CustomerWiseProfit } from "./pages/Profit/CustomerWiseProfit.jsx";
 import { StoreAndLocationWiseProfit } from "./pages/Profit/StoreAndLocationWiseProfit.jsx";
 import DailyProfitReport from "./pages/Profit/DailyProfit.jsx";
-import SupplierWiseProfit from "./pages/Profit/SupplierWiseProfit.jsx";
+import { SupplierWiseProfit } from "./pages/Profit/SupplierWiseProfit.jsx";
 
 // === App Component ===
 function App() {
