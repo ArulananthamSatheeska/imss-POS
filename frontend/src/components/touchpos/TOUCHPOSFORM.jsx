@@ -190,6 +190,7 @@ const TOUCHPOSFORM = () => {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedBrand, setSelectedBrand] = useState("All Brands");
   const [lowStockWarning, setLowStockWarning] = useState(null);
+
   useEffect(() => {
     if (auth && auth.user) {
       setUser(auth.user);
@@ -459,10 +460,7 @@ const TOUCHPOSFORM = () => {
         );
       }
 
-      const basePrice =
-        saleType === "Wholesale"
-          ? parseFloat(product.wholesale_price || product.sales_price || 0)
-          : parseFloat(product.sales_price || 0);
+      const basePrice = parseFloat(item.price || product.sales_price || 0);
       const qty = parseFloat(item.qty) || 1;
       const totalAmount = basePrice * qty;
 
@@ -546,6 +544,66 @@ const TOUCHPOSFORM = () => {
     debouncedSearch(query, selectedCategory, selectedBrand);
   };
 
+  // Update Product Price
+  const updateProductPrice = (index, newPrice) => {
+    const parsedPrice = parseFloat(newPrice) || 0;
+    if (parsedPrice < 0) {
+      return;
+    }
+
+    const product = products[index];
+    const qty = parseFloat(product.qty || 1);
+    const productWithQty = { ...product, qty, price: parsedPrice };
+    const newSpecialDiscount = calculateSpecialDiscount(
+      productWithQty,
+      saleType,
+      new Date().toISOString().split("T")[0]
+    );
+
+    setProducts((prevProducts) =>
+      prevProducts.map((p, i) =>
+        i === index
+          ? {
+              ...p,
+              price: parsedPrice,
+              specialDiscount: newSpecialDiscount,
+              total: parsedPrice * qty - newSpecialDiscount,
+            }
+          : p
+      )
+    );
+  };
+
+  // Update Product Discount
+  const updateProductDiscount = (index, newDiscount) => {
+    const parsedDiscount = parseFloat(newDiscount) || 0;
+    if (parsedDiscount < 0) {
+      return;
+    }
+
+    const product = products[index];
+    const qty = parseFloat(product.qty || 1);
+    const productWithQty = { ...product, qty, discount: parsedDiscount };
+    const newSpecialDiscount = calculateSpecialDiscount(
+      productWithQty,
+      saleType,
+      new Date().toISOString().split("T")[0]
+    );
+
+    setProducts((prevProducts) =>
+      prevProducts.map((p, i) =>
+        i === index
+          ? {
+              ...p,
+              discount: parsedDiscount,
+              specialDiscount: newSpecialDiscount,
+              total: p.price * qty - newSpecialDiscount - parsedDiscount * qty,
+            }
+          : p
+      )
+    );
+  };
+
   // Recalculate prices and discounts
   useEffect(() => {
     if (activeSchemes.length > 0 || !loadingSchemes) {
@@ -557,16 +615,16 @@ const TOUCHPOSFORM = () => {
             activeSchemes
           );
           const mrp = parseFloat(product.mrp || 0);
-          const salesPrice = parseFloat(product.sales_price || 0);
-          const discountPerUnit = Math.max(0, mrp - salesPrice);
-          const productWithQty = { ...product, qty: product.qty || 1 };
+          const salesPrice = parseFloat(product.price || product.sales_price || 0);
+          const discountPerUnit = parseFloat(product.discount || 0);
+          const productWithQty = { ...product, qty: product.qty || 1, price: salesPrice };
           const specialDiscount = calculateSpecialDiscount(
             productWithQty,
             saleType,
             new Date().toISOString().split("T")[0]
           );
           const total =
-            salesPrice * (product.qty || 0) - (specialDiscount || 0);
+            salesPrice * (product.qty || 0) - (specialDiscount || 0) - (discountPerUnit * (product.qty || 0));
 
           return {
             ...product,
@@ -655,7 +713,7 @@ const TOUCHPOSFORM = () => {
 
     const salesPrice = parseFloat(item.sales_price || 0);
     const mrp = parseFloat(item.mrp || 0);
-    const discountPerUnit = Math.max(0, mrp - salesPrice);
+    const discountPerUnit = 0; // Initialize discount as 0, editable later
     const { schemeName } = applyDiscountScheme(item, saleType, activeSchemes);
     const productWithQty = { ...item, qty: newTotalQty };
     const specialDiscount =
@@ -681,7 +739,7 @@ const TOUCHPOSFORM = () => {
         discount: discountPerUnit,
         schemeName: schemeName,
         specialDiscount: specialDiscount,
-        total: salesPrice * newTotalQty - specialDiscount,
+        total: salesPrice * newTotalQty - specialDiscount - discountPerUnit * newTotalQty,
       };
     } else {
       const newProduct = {
@@ -691,7 +749,7 @@ const TOUCHPOSFORM = () => {
         discount: discountPerUnit,
         schemeName: schemeName,
         specialDiscount: specialDiscount,
-        total: salesPrice * qtyToAdd - specialDiscount,
+        total: salesPrice * qtyToAdd - specialDiscount - discountPerUnit * qtyToAdd,
         serialNumber: products.length + 1,
       };
       updatedProducts = [...products, newProduct];
@@ -708,6 +766,7 @@ const TOUCHPOSFORM = () => {
 
     setSearchQuery("");
   };
+
   // Update Product Quantity
   const updateProductQuantity = (index, newQty) => {
     const parsedQty = parseFloat(newQty) || 0;
@@ -740,7 +799,7 @@ const TOUCHPOSFORM = () => {
               ...p,
               qty: parsedQty,
               specialDiscount: newSpecialDiscount,
-              total: p.price * parsedQty - newSpecialDiscount,
+              total: p.price * parsedQty - newSpecialDiscount - (p.discount || 0) * parsedQty,
             }
           : p
       )
@@ -815,27 +874,24 @@ const TOUCHPOSFORM = () => {
     products.forEach((p) => {
       const qty = p.qty || 0;
       const mrp = parseFloat(p.mrp || 0);
-      const unitDiscount = p.discount || 0;
+      const unitPrice = parseFloat(p.price || 0);
+      const unitDiscount = parseFloat(p.discount || 0);
       const specialDiscount = p.specialDiscount || 0;
 
       totalQty += qty;
       subTotalMRP += mrp * qty;
       totalItemDiscounts += unitDiscount; // discount is total discount for product, not per unit
       totalSpecialDiscounts += specialDiscount;
-      grandTotalBeforeAdjustments += p.total;
+      grandTotalBeforeAdjustments += unitPrice * qty - specialDiscount - unitDiscount * qty;
     });
 
     const currentTaxRate = parseFloat(tax || 0);
     const currentBillDiscount = parseFloat(billDiscount || 0);
-    const currentShipping = parseFloat(shipping || 0);
     const taxAmount = grandTotalBeforeAdjustments * (currentTaxRate / 100);
     const finalTotalDiscount =
       totalItemDiscounts + totalSpecialDiscounts + currentBillDiscount;
     const finalTotal =
-      grandTotalBeforeAdjustments +
-      taxAmount -
-      currentBillDiscount +
-      currentShipping;
+      grandTotalBeforeAdjustments + taxAmount - currentBillDiscount;
 
     return {
       totalQty,
@@ -852,7 +908,7 @@ const TOUCHPOSFORM = () => {
         : grandTotalBeforeAdjustments,
       finalTotal: isNaN(finalTotal) ? 0 : finalTotal,
     };
-  }, [products, tax, billDiscount, shipping]);
+  }, [products, tax, billDiscount]);
 
   const calculateClosingDetails = () => {
     const totals = calculateTotals();
@@ -1228,6 +1284,19 @@ const TOUCHPOSFORM = () => {
                             type="number"
                             step="0.01"
                             min="0"
+
+                            className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                            value={product.qty}
+                            onChange={(e) =>
+                              updateProductQuantity(index, e.target.value)
+                            }
+                            onBlur={(e) => {
+                              if (
+                                e.target.value === "" ||
+                                parseFloat(e.target.value) < 0
+                              ) {
+                                updateProductQuantity(index, 0);
+
                             max={(product.price * (product.qty || 0)).toFixed(
                               2
                             )}
@@ -1277,10 +1346,69 @@ const TOUCHPOSFORM = () => {
                           >
                             <Trash2 size={16} className="sm:w-5 sm:h-5" />
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })
+
+                        </div>
+                      </td>
+                      <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="w-20 p-1 text-sm text-right border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                          value={product.price}
+                          onChange={(e) =>
+                            updateProductPrice(index, e.target.value)
+                          }
+                          onBlur={(e) => {
+                            if (
+                              e.target.value === "" ||
+                              parseFloat(e.target.value) < 0
+                            ) {
+                              updateProductPrice(index, 0);
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="w-20 p-1 text-sm text-right border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
+                          value={product.discount}
+                          onChange={(e) =>
+                            updateProductDiscount(index, e.target.value)
+                          }
+                          onBlur={(e) => {
+                            if (
+                              e.target.value === "" ||
+                              parseFloat(e.target.value) < 0
+                            ) {
+                              updateProductDiscount(index, 0);
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
+                        {formatNumberWithCommas(
+                          product.specialDiscount?.toFixed(2) ?? 0.0
+                        )}
+                      </td>
+                      <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                        {formatNumberWithCommas(
+                          product.total?.toFixed(2) ?? 0.0
+                        )}
+                      </td>
+                      <td className="p-1 text-center sm:p-2">
+                        <button
+                          onClick={() => handleDeleteClick(index)}
+                          className="p-1 text-white bg-red-500 rounded-lg sm:p-2 dark:text-slate-900"
+                        >
+                          <Trash2 size={16} className="sm:w-5 sm:h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -1293,6 +1421,7 @@ const TOUCHPOSFORM = () => {
                 <span>Selected Item Quantity:</span>
                 <span>
                   {formatNumberWithCommas(
+                    totals.totalQty.toFixed(1)
                     (
                       products.find((p) => p.id === selectedProductId)?.qty || 0
                     ).toFixed(1)
@@ -1534,7 +1663,7 @@ const TOUCHPOSFORM = () => {
             </button>
           </div>
 
-          {/* Category Filter - Modified */}
+          {/* Category Filter */}
           <div className="mb-2 sm:mb-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-medium dark:text-white">
@@ -1585,7 +1714,7 @@ const TOUCHPOSFORM = () => {
             )}
           </div>
 
-          {/* Brand Filter - Modified */}
+          {/* Brand Filter */}
           <div className="mb-2 sm:mb-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-medium dark:text-white">
@@ -1672,8 +1801,7 @@ const TOUCHPOSFORM = () => {
                     <div className="flex flex-col">
                       <div className="text-xs font-semibold text-green-700 sm:text-sm">
                         {formatNumberWithCommas(
-                          applyDiscountScheme(item, saleType, activeSchemes)
-                            .price
+                          parseFloat(item.mrp || 0).toFixed(2)
                         )}{" "}
                         Rs.
                       </div>
@@ -1788,7 +1916,6 @@ const TOUCHPOSFORM = () => {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
-                  // Find the product again in case it changed
                   const item = items.find(
                     (i) => i.id === lowStockWarning.productId
                   );
@@ -1805,7 +1932,7 @@ const TOUCHPOSFORM = () => {
 
                     const salesPrice = parseFloat(item.sales_price || 0);
                     const mrp = parseFloat(item.mrp || 0);
-                    const discountPerUnit = Math.max(0, mrp - salesPrice);
+                    const discountPerUnit = 0;
                     const { schemeName } = applyDiscountScheme(
                       item,
                       saleType,
@@ -1835,7 +1962,7 @@ const TOUCHPOSFORM = () => {
                         discount: discountPerUnit,
                         schemeName: schemeName,
                         specialDiscount: specialDiscount,
-                        total: salesPrice * newTotalQty - specialDiscount,
+                        total: salesPrice * newTotalQty - specialDiscount - discountPerUnit * newTotalQty,
                       };
                     } else {
                       const newProduct = {
@@ -1845,7 +1972,7 @@ const TOUCHPOSFORM = () => {
                         discount: discountPerUnit,
                         schemeName: schemeName,
                         specialDiscount: specialDiscount,
-                        total: salesPrice * qtyToAdd - specialDiscount,
+                        total: salesPrice * qtyToAdd - specialDiscount - discountPerUnit * qtyToAdd,
                         serialNumber: products.length + 1,
                       };
                       updatedProducts = [...products, newProduct];

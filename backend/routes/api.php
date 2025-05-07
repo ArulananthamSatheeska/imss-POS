@@ -134,6 +134,7 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::get('/sales/bill-wise-profit-report', [SaleController::class, 'getCombinedBillWiseProfitReport']);
     Route::get('/sales/company-wise-profit-report', [SaleController::class, 'getCompanyWiseProfitReport']);
     Route::get('/sales/supplier-wise-profit-report', [SaleController::class, 'getSupplierWiseProfitReport']);
+    Route::get('/sales/category-wise-profit-report', [SaleController::class, 'getCategoryWiseProfitReport']);
     Route::apiResource('sales', SaleController::class);
 
     // Stock reports

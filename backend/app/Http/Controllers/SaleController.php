@@ -871,4 +871,205 @@ class SaleController extends Controller
             ], 500);
         }
     }
+
+    public function getCategoryWiseProfitReport(Request $request)
+    {
+        try {
+            $categoryName = trim($request->input('categoryName'));
+            if (empty($categoryName)) {
+                Log::warning('No category name provided in getCategoryWiseProfitReport');
+                return response()->json([
+                    'reportData' => [],
+                    'summary' => [
+                        'totalCostPriceAll' => '0.00',
+                        'totalSellingPriceAll' => '0.00',
+                        'totalProfitAll' => '0.00',
+                        'totalQuantityAll' => '0.00',
+                        'averageProfitPercentageAll' => '0.00%',
+                    ],
+                ], 200);
+            }
+
+            $salesQuery = Sale::with(['items.product'])
+                ->select('id', 'created_at', 'customer_name', 'payment_type')
+                ->whereHas('items', function ($q) use ($categoryName) {
+                    $q->whereRaw('LOWER(category) = ?', [strtolower($categoryName)]);
+                });
+
+            $invoicesQuery = Invoice::with('items')
+                ->select('id', 'invoice_date', 'customer_name', 'payment_method')
+                ->whereHas('items', function ($q) use ($categoryName) {
+                    $q->whereRaw('LOWER(category) = ?', [strtolower($categoryName)]);
+                });
+
+            if ($request->has('fromDate') && $request->has('toDate')) {
+                $fromDate = $request->input('fromDate');
+                $toDate = $request->input('toDate');
+                if ($fromDate && $toDate) {
+                    $salesQuery->whereBetween('created_at', [
+                        $fromDate . ' 00:00:00',
+                        $toDate . ' 23:59:59'
+                    ]);
+                    $invoicesQuery->whereBetween('invoice_date', [
+                        $fromDate . ' 00:00:00',
+                        $toDate . ' 23:59:59'
+                    ]);
+                }
+            }
+
+            if ($request->has('paymentMethod') && $request->input('paymentMethod') !== '' && $request->input('paymentMethod') !== 'all') {
+                $paymentMethod = trim(strtolower($request->input('paymentMethod')));
+                $salesQuery->whereRaw('LOWER(payment_type) = ?', [$paymentMethod]);
+                $invoicesQuery->whereRaw('LOWER(payment_method) = ?', [$paymentMethod]);
+            }
+
+            $sales = $salesQuery->get();
+            $invoices = $invoicesQuery->get();
+
+            $reportData = [];
+            $totalCostPriceAll = 0;
+            $totalSellingPriceAll = 0;
+            $totalProfitAll = 0;
+            $totalQuantityAll = 0;
+
+            // Process sales
+            foreach ($sales as $sale) {
+                foreach ($sale->items as $item) {
+                    $currentCategoryName = $item->category ? trim($item->category) : 'Unknown Category';
+                    if (strtolower($currentCategoryName) !== strtolower($categoryName)) {
+                        continue;
+                    }
+
+                    $product = $item->product;
+                    $buyingCost = $product ? floatval($product->buying_cost ?? 0) : 0;
+                    $quantity = floatval($item->quantity ?? 0);
+                    $unitPrice = floatval($item->unit_price ?? 0);
+                    $discount = floatval($item->discount ?? 0);
+                    $specialDiscount = floatval($item->special_discount ?? 0);
+
+                    $itemCostPrice = $buyingCost * $quantity;
+                    $itemSellingPrice = ($unitPrice * $quantity) - ($discount + $specialDiscount);
+                    $itemProfit = $itemSellingPrice - $itemCostPrice;
+
+                    if (!isset($reportData[$currentCategoryName])) {
+                        $reportData[$currentCategoryName] = [
+                            'categoryName' => $currentCategoryName,
+                            'totalCostPrice' => 0,
+                            'totalSellingPrice' => 0,
+                            'totalProfit' => 0,
+                            'totalQuantity' => 0,
+                            'items' => [],
+                        ];
+                    }
+
+                    $reportData[$currentCategoryName]['totalCostPrice'] += $itemCostPrice;
+                    $reportData[$currentCategoryName]['totalSellingPrice'] += $itemSellingPrice;
+                    $reportData[$currentCategoryName]['totalProfit'] += $itemProfit;
+                    $reportData[$currentCategoryName]['totalQuantity'] += $quantity;
+
+                    $reportData[$currentCategoryName]['items'][] = [
+                        'product_name' => $item->product_name ?? 'Unknown Product',
+                        'quantity' => number_format($quantity, 2),
+                        'unit_price' => number_format($unitPrice, 2),
+                        'total_cost' => number_format($itemCostPrice, 2),
+                        'total_sales' => number_format($itemSellingPrice, 2),
+                        'profit' => number_format($itemProfit, 2),
+                    ];
+
+                    $totalCostPriceAll += $itemCostPrice;
+                    $totalSellingPriceAll += $itemSellingPrice;
+                    $totalProfitAll += $itemProfit;
+                    $totalQuantityAll += $quantity;
+                }
+            }
+
+            // Process invoices
+            foreach ($invoices as $invoice) {
+                foreach ($invoice->items as $item) {
+                    $currentCategoryName = $item->category ? trim($item->category) : 'Unknown Category';
+                    if (strtolower($currentCategoryName) !== strtolower($categoryName)) {
+                        continue;
+                    }
+
+                    $costPrice = floatval($item->total_buying_cost ?? 0);
+                    $quantity = floatval($item->quantity ?? 0);
+                    $unitPrice = floatval($item->sales_price ?? $item->unit_price ?? 0);
+                    $discount = floatval($item->discount_amount ?? 0);
+                    $specialDiscount = floatval($item->special_discount ?? 0);
+
+                    $itemCostPrice = $costPrice;
+                    $itemSellingPrice = ($unitPrice * $quantity) - ($discount + $specialDiscount);
+                    $itemProfit = $itemSellingPrice - $itemCostPrice;
+
+                    if (!isset($reportData[$currentCategoryName])) {
+                        $reportData[$currentCategoryName] = [
+                            'categoryName' => $currentCategoryName,
+                            'totalCostPrice' => 0,
+                            'totalSellingPrice' => 0,
+                            'totalProfit' => 0,
+                            'totalQuantity' => 0,
+                            'items' => [],
+                        ];
+                    }
+
+                    $reportData[$currentCategoryName]['totalCostPrice'] += $itemCostPrice;
+                    $reportData[$currentCategoryName]['totalSellingPrice'] += $itemSellingPrice;
+                    $reportData[$currentCategoryName]['totalProfit'] += $itemProfit;
+                    $reportData[$currentCategoryName]['totalQuantity'] += $quantity;
+
+                    $reportData[$currentCategoryName]['items'][] = [
+                        'product_name' => $item->description ?? 'Unknown Product',
+                        'quantity' => number_format($quantity, 2),
+                        'unit_price' => number_format($unitPrice, 2),
+                        'total_cost' => number_format($itemCostPrice, 2),
+                        'total_sales' => number_format($itemSellingPrice, 2),
+                        'profit' => number_format($itemProfit, 2),
+                    ];
+
+                    $totalCostPriceAll += $itemCostPrice;
+                    $totalSellingPriceAll += $itemSellingPrice;
+                    $totalProfitAll += $itemProfit;
+                    $totalQuantityAll += $quantity;
+                }
+            }
+
+            $reportData = array_map(function ($item) {
+                $profitPercentage = ($item['totalCostPrice'] > 0) ? ($item['totalProfit'] / $item['totalCostPrice']) * 100 : 0;
+                return [
+                    'categoryName' => $item['categoryName'],
+                    'totalCostPrice' => number_format($item['totalCostPrice'], 2),
+                    'totalSellingPrice' => number_format($item['totalSellingPrice'], 2),
+                    'totalProfit' => number_format($item['totalProfit'], 2),
+                    'totalQuantity' => number_format($item['totalQuantity'], 2),
+                    'profitPercentage' => number_format($profitPercentage, 2) . '%',
+                    'items' => $item['items'],
+                ];
+            }, array_values($reportData));
+
+            $summary = [
+                'totalCostPriceAll' => number_format($totalCostPriceAll, 2),
+                'totalSellingPriceAll' => number_format($totalSellingPriceAll, 2),
+                'totalProfitAll' => number_format($totalProfitAll, 2),
+                'totalQuantityAll' => number_format($totalQuantityAll, 2),
+                'averageProfitPercentageAll' => ($totalCostPriceAll > 0) ? number_format(($totalProfitAll / $totalCostPriceAll) * 100, 2) . '%' : '0.00%',
+            ];
+
+            return response()->json([
+                'reportData' => $reportData,
+                'summary' => $summary,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error in getCategoryWiseProfitReport: ' . $e->getMessage(), [
+                'exception' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'stack_trace' => $e->getTraceAsString(),
+                'request' => $request->all(),
+            ]);
+            return response()->json([
+                'error' => 'Failed to fetch category report. Please try again later.',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
