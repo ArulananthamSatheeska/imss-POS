@@ -34,6 +34,15 @@ class PurchaseController extends Controller
 
             DB::beginTransaction();
 
+            // Calculate total excluding free items
+            $total = 0;
+            foreach ($validatedData['items'] as $item) {
+                $subtotal = $item['quantity'] * $item['buying_cost'];
+                $discountAmount = $item['discount_amount'] ?? 0;
+                $total += $subtotal - $discountAmount;
+            }
+            $validatedData['total'] = $total;
+
             $purchase = Purchase::create([
                 'bill_number' => $validatedData['bill_number'],
                 'invoice_number' => $validatedData['invoice_number'],
@@ -58,6 +67,13 @@ class PurchaseController extends Controller
                     'discount_percentage' => $item['discount_percentage'] ?? 0,
                     'discount_amount' => $item['discount_amount'] ?? 0,
                 ]);
+
+                // Update stock quantity
+                $product = Product::find($item['product_id']);
+                if ($product) {
+                    $product->opening_stock_quantity += $item['quantity'] + ($item['free_items'] ?? 0);
+                    $product->save();
+                }
             }
 
             DB::commit();
@@ -87,6 +103,15 @@ class PurchaseController extends Controller
 
             DB::beginTransaction();
 
+            // Calculate total excluding free items
+            $total = 0;
+            foreach ($validatedData['items'] as $item) {
+                $subtotal = $item['quantity'] * $item['buying_cost'];
+                $discountAmount = $item['discount_amount'] ?? 0;
+                $total += $subtotal - $discountAmount;
+            }
+            $validatedData['total'] = $total;
+
             $purchase = Purchase::findOrFail($id);
 
             $purchase->update([
@@ -115,6 +140,13 @@ class PurchaseController extends Controller
                     'discount_percentage' => $item['discount_percentage'] ?? 0,
                     'discount_amount' => $item['discount_amount'] ?? 0,
                 ]);
+
+                // Update stock quantity
+                $product = Product::find($item['product_id']);
+                if ($product) {
+                    $product->opening_stock_quantity += $item['quantity'] + ($item['free_items'] ?? 0);
+                    $product->save();
+                }
             }
 
             DB::commit();
