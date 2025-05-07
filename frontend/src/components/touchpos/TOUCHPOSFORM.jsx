@@ -42,7 +42,7 @@ const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
   }
 };
 
-// Helper Function to Apply Discount Schemes
+// Function to apply discount schemes for products or categories
 const applyDiscountScheme = (product, saleType, schemes) => {
   if (!product || !product.id || !Array.isArray(schemes)) {
     const fallbackPrice =
@@ -106,13 +106,19 @@ const applyDiscountScheme = (product, saleType, schemes) => {
   };
 
   const productSchemes = schemes.filter(
-    (s) => s.applies_to === "product" && s.target === product.product_name
+    (s) =>
+      s.applies_to === "product" &&
+      s.target?.trim().toLowerCase() ===
+        (product.product_name?.trim().toLowerCase() || "")
   );
   findBestScheme(productSchemes);
 
-  if (!bestScheme || maxDiscountValue <= 0) {
+  if ((!bestScheme || maxDiscountValue <= 0) && product.category_name) {
     const categorySchemes = schemes.filter(
-      (s) => s.applies_to === "category" && s.target === product.category_name
+      (s) =>
+        s.applies_to === "category" &&
+        s.target?.trim().toLowerCase() ===
+          product.category_name?.trim().toLowerCase()
     );
     findBestScheme(categorySchemes);
   }
@@ -438,7 +444,7 @@ const TOUCHPOSFORM = () => {
       });
   }, []);
 
-  // Calculate Special Discount
+  // Calculate Special Discounts// Replace the existing calculateSpecialDiscount function with this one:
   const calculateSpecialDiscount = useCallback(
     (item, saleType, billDate) => {
       if (!item || !item.id) {
@@ -476,15 +482,30 @@ const TOUCHPOSFORM = () => {
         const target = scheme.target?.trim().toLowerCase();
         const productMatch =
           scheme.applies_to === "product" &&
-          target === product.product_name?.trim().toLowerCase();
+          target ===
+            (product.product_name?.trim().toLowerCase() ||
+              product.description?.trim().toLowerCase());
         const categoryMatch =
           scheme.applies_to === "category" &&
           categoryName &&
           target === categoryName?.trim().toLowerCase();
+        if (productMatch) {
+          console.log(
+            `Product discount match for ${product.product_name}: Target=${target}, Value=${scheme.value} ${scheme.type}`
+          );
+        }
+        if (categoryMatch) {
+          console.log(
+            `Category discount match for ${product.product_name} (Category: ${categoryName}): Target=${target}, Value=${scheme.value} ${scheme.type}`
+          );
+        }
         return productMatch || categoryMatch;
       });
 
       if (!applicableScheme) {
+        console.log(
+          `No discount scheme found for ${product.product_name} (Category: ${categoryName})`
+        );
         return 0;
       }
 
@@ -495,6 +516,9 @@ const TOUCHPOSFORM = () => {
         discount = parseFloat(applicableScheme.value) * qty;
       }
 
+      console.log(
+        `Applied ${applicableScheme.applies_to} discount for ${product.product_name}: Target=${applicableScheme.target}, Discount=${discount.toFixed(2)}`
+      );
       return discount >= 0 ? discount : 0;
     },
     [items, activeSchemes]
@@ -708,10 +732,30 @@ const TOUCHPOSFORM = () => {
 
     setSearchQuery("");
   };
+  // Helper to calculate product discounts and total price
+  const calculateProductDiscounts = (product, qty) => {
+    const mrp = parseFloat(product.mrp || 0);
+    const salesPrice = parseFloat(product.price || 0);
+    const standardDiscountPerUnit = Math.max(0, mrp - salesPrice);
+
+    const productWithQty = { ...product, qty };
+    const specialDiscountTotal = calculateSpecialDiscount(
+      productWithQty,
+      saleType,
+      new Date().toISOString().split("T")[0]
+    );
+
+    return {
+      standardDiscount: standardDiscountPerUnit * qty,
+      specialDiscount: specialDiscountTotal,
+      totalPrice: salesPrice * qty - specialDiscountTotal,
+    };
+  };
+
   // Update Product Quantity
   const updateProductQuantity = (index, newQty) => {
-    const parsedQty = parseFloat(newQty) || 0;
-    if (parsedQty < 0) {
+    const parsedQty = parseFloat(newQty);
+    if (isNaN(parsedQty) || parsedQty < 0) {
       return;
     }
 
@@ -726,12 +770,9 @@ const TOUCHPOSFORM = () => {
     }
 
     const stockDifference = parsedQty - (product.qty || 0);
-    const productWithQty = { ...product, qty: parsedQty };
-    const newSpecialDiscount = calculateSpecialDiscount(
-      productWithQty,
-      saleType,
-      new Date().toISOString().split("T")[0]
-    );
+
+    const { standardDiscount, specialDiscount, totalPrice } =
+      calculateProductDiscounts(product, parsedQty);
 
     setProducts((prevProducts) =>
       prevProducts.map((p, i) =>
@@ -739,8 +780,10 @@ const TOUCHPOSFORM = () => {
           ? {
               ...p,
               qty: parsedQty,
-              specialDiscount: newSpecialDiscount,
-              total: p.price * parsedQty - newSpecialDiscount,
+              price: parseFloat(product.price || 0),
+              discount: standardDiscount,
+              specialDiscount: specialDiscount,
+              total: totalPrice,
             }
           : p
       )
@@ -805,6 +848,7 @@ const TOUCHPOSFORM = () => {
   };
 
   // Calculate Totals
+  // Replace the existing calculateTotals function with this one:
   const calculateTotals = useCallback(() => {
     let totalQty = 0;
     let subTotalMRP = 0;
@@ -815,22 +859,22 @@ const TOUCHPOSFORM = () => {
     products.forEach((p) => {
       const qty = p.qty || 0;
       const mrp = parseFloat(p.mrp || 0);
+      const unitPrice = p.price || 0;
       const unitDiscount = p.discount || 0;
       const specialDiscount = p.specialDiscount || 0;
 
       totalQty += qty;
       subTotalMRP += mrp * qty;
-      totalItemDiscounts += unitDiscount; // discount is total discount for product, not per unit
+      totalItemDiscounts += unitDiscount * qty;
       totalSpecialDiscounts += specialDiscount;
-      grandTotalBeforeAdjustments += p.total;
+      grandTotalBeforeAdjustments += unitPrice * qty;
     });
 
     const currentTaxRate = parseFloat(tax || 0);
     const currentBillDiscount = parseFloat(billDiscount || 0);
     const currentShipping = parseFloat(shipping || 0);
     const taxAmount = grandTotalBeforeAdjustments * (currentTaxRate / 100);
-    const finalTotalDiscount =
-      totalItemDiscounts + totalSpecialDiscounts + currentBillDiscount;
+    const finalTotalDiscount = currentBillDiscount;
     const finalTotal =
       grandTotalBeforeAdjustments +
       taxAmount -
@@ -840,7 +884,9 @@ const TOUCHPOSFORM = () => {
     return {
       totalQty,
       subTotalMRP: isNaN(subTotalMRP) ? 0 : subTotalMRP,
-      totalItemDiscounts: isNaN(totalItemDiscounts) ? 0 : totalItemDiscounts,
+      totalItemDiscounts: isNaN(totalItemDiscounts + totalSpecialDiscounts)
+        ? 0
+        : totalItemDiscounts + totalSpecialDiscounts,
       totalSpecialDiscounts: isNaN(totalSpecialDiscounts)
         ? 0
         : totalSpecialDiscounts,
@@ -1140,22 +1186,22 @@ const TOUCHPOSFORM = () => {
               <thead className="bg-gray-200 dark:bg-slate-700">
                 <tr>
                   <th className="p-1 text-xs text-left sm:p-2 sm:text-sm">
-                    S.No
+                    No
                   </th>
                   <th className="p-1 text-xs text-left sm:p-2 sm:text-sm">
-                    Product
+                    Item
                   </th>
                   <th className="p-1 text-xs text-center sm:p-2 sm:text-sm">
                     Qty
                   </th>
                   <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                    MRP
+                  </th>
+                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                    Discount
+                  </th>
+                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
                     Price
-                  </th>
-                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
-                    Disc
-                  </th>
-                  <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
-                    Sp.Disc
                   </th>
                   <th className="p-1 text-xs text-right sm:p-2 sm:text-sm">
                     Total
@@ -1179,6 +1225,16 @@ const TOUCHPOSFORM = () => {
                       product.serialNumber !== undefined
                         ? product.serialNumber
                         : index + 1;
+
+                    const qty = product.qty || 0;
+                    const mrp = parseFloat(product.mrp || 0);
+                    const itemDiscount = product.discount || 0;
+                    const specialDiscount = product.specialDiscount || 0;
+                    const totalDiscount =
+                      (itemDiscount || 0) + (specialDiscount || 0);
+                    const price = product.price || 0;
+                    const totalDiscountPerUnit = totalDiscount / (qty || 1);
+                    const total = qty * price;
 
                     return (
                       <tr
@@ -1205,7 +1261,7 @@ const TOUCHPOSFORM = () => {
                               step="0.01"
                               min="0"
                               className="w-16 p-1 text-center text-sm border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
-                              value={product.qty}
+                              value={qty}
                               onChange={(e) =>
                                 updateProductQuantity(index, e.target.value)
                               }
@@ -1221,56 +1277,101 @@ const TOUCHPOSFORM = () => {
                           </div>
                         </td>
                         <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
-                          {formatNumberWithCommas(product.price.toFixed(2))}
+                          {formatNumberWithCommas(mrp.toFixed(2))}
                         </td>
-                        <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
+
+                        <td className="px-3  text-right border-r dark:border-gray-700">
                           <input
                             type="number"
                             step="0.01"
                             min="0"
-                            max={(product.price * (product.qty || 0)).toFixed(
-                              2
+                            className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            value={formatNumberWithCommas(
+                              parseFloat(
+                                (product.specialDiscount
+                                  ? product.discount + product.specialDiscount
+                                  : product.discount) || 0
+                              ).toFixed(2)
                             )}
-                            value={product.discount?.toFixed(2) ?? "0.00"}
                             onChange={(e) => {
-                              let value = parseFloat(e.target.value);
-                              if (isNaN(value) || value < 0) {
-                                value = 0;
-                              }
-                              const maxDiscount =
-                                product.price * (product.qty || 0);
-                              if (value > maxDiscount) {
-                                value = maxDiscount;
-                              }
+                              const newDiscountValue = parseFloat(
+                                e.target.value
+                              );
+                              if (
+                                isNaN(newDiscountValue) ||
+                                newDiscountValue < 0
+                              )
+                                return;
+
                               setProducts((prevProducts) =>
-                                prevProducts.map((p) =>
-                                  p.id === product.id
-                                    ? {
-                                        ...p,
-                                        discount: value,
-                                        total:
-                                          p.price * (p.qty || 0) -
-                                          (p.specialDiscount || 0) -
-                                          value,
-                                      }
-                                    : p
-                                )
+                                prevProducts.map((product, i) => {
+                                  if (i === index) {
+                                    const qty = product.qty || 1;
+                                    const baseDiscount = product.specialDiscount
+                                      ? newDiscountValue / qty -
+                                        product.specialDiscount
+                                      : newDiscountValue / qty;
+
+                                    const validatedBaseDiscount = Math.max(
+                                      0,
+                                      baseDiscount
+                                    );
+
+                                    const updatedProductWithQty = {
+                                      ...product,
+                                      qty,
+                                    };
+
+                                    const newSpecialDiscount =
+                                      product.specialDiscount
+                                        ? calculateSpecialDiscount(
+                                            updatedProductWithQty,
+                                            saleType,
+                                            new Date()
+                                              .toISOString()
+                                              .split("T")[0]
+                                          )
+                                        : 0;
+
+                                    const newPrice =
+                                      (product.mrp || 0) -
+                                      validatedBaseDiscount;
+                                    const totalDiscount =
+                                      validatedBaseDiscount +
+                                      newSpecialDiscount;
+
+                                    const newTotal =
+                                      qty *
+                                      ((product.mrp || 0) - totalDiscount);
+
+                                    return {
+                                      ...product,
+                                      discount: validatedBaseDiscount,
+                                      discount_percentage:
+                                        product.mrp > 0
+                                          ? (validatedBaseDiscount /
+                                              product.mrp) *
+                                            100
+                                          : 0,
+                                      price: newPrice >= 0 ? newPrice : 0,
+                                      specialDiscount: newSpecialDiscount,
+                                      total: newTotal >= 0 ? newTotal : 0,
+                                    };
+                                  }
+                                  return product;
+                                })
                               );
                             }}
-                            className="w-full p-1 text-xs text-right border rounded dark:bg-slate-700 dark:text-white sm:text-sm"
+                            onFocus={(e) => e.target.select()}
                           />
                         </td>
-                        <td className="p-1 text-xs text-right text-red-600 sm:p-2 sm:text-sm">
-                          {formatNumberWithCommas(
-                            product.specialDiscount?.toFixed(2) ?? 0.0
-                          )}
+                        <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
+                          {formatNumberWithCommas(price.toFixed(2))}
                         </td>
                         <td className="p-1 text-xs text-right sm:p-2 sm:text-sm">
-                          {formatNumberWithCommas(
-                            product.total?.toFixed(2) ?? 0.0
-                          )}
+                          {formatNumberWithCommas(total.toFixed(2))}
                         </td>
-                        <td className="p-1 text-center sm:p-2">
+                        <td className="p-1 text-xs text-center sm:p-2">
                           <button
                             onClick={() => handleDeleteClick(index)}
                             className="p-1 text-white bg-red-500 rounded-lg sm:p-2 dark:text-slate-900"
@@ -1379,7 +1480,9 @@ const TOUCHPOSFORM = () => {
                     <span>Sub Total (MRP):</span>
                     <span>
                       Rs.{" "}
-                      {formatNumberWithCommas(totals.subTotalMRP.toFixed(2))}
+                      {formatNumberWithCommas(
+                        (totals.subTotalMRP ?? 0).toFixed(2)
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-red-600 sm:text-sm">
@@ -1387,16 +1490,7 @@ const TOUCHPOSFORM = () => {
                     <span>
                       Rs.{" "}
                       {formatNumberWithCommas(
-                        totals.totalItemDiscounts.toFixed(2)
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs text-red-600 sm:text-sm">
-                    <span>(-) Special Discounts:</span>
-                    <span>
-                      Rs.{" "}
-                      {formatNumberWithCommas(
-                        totals.totalSpecialDiscounts.toFixed(2)
+                        (totals.totalItemDiscounts ?? 0).toFixed(2)
                       )}
                     </span>
                   </div>
@@ -1405,7 +1499,7 @@ const TOUCHPOSFORM = () => {
                     <span>
                       Rs.{" "}
                       {formatNumberWithCommas(
-                        totals.grandTotalBeforeAdjustments.toFixed(2)
+                        (totals.grandTotalBeforeAdjustments ?? 0).toFixed(2)
                       )}
                     </span>
                   </div>
