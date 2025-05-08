@@ -192,11 +192,6 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
   const handleChange = (e) => {
     let { name, value } = e.target;
 
-    // Remove any 'o' characters from input value
-    if (typeof value === "string") {
-      value = value.replace(/o/gi, "");
-    }
-
     // Helper to parse float or zero
     const parseOrZero = (val) => {
       const parsed = parseFloat(val);

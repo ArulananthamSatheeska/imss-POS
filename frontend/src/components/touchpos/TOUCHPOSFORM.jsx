@@ -1367,13 +1367,9 @@ const TOUCHPOSFORM = () => {
           <div className="flex flex-col gap-4 mt-2 sm:mt-4 dark:bg-slate-800 sm:flex-row sm:gap-6">
             <div className="flex-1">
               <div className="flex items-center gap-2 mt-1 text-sm font-semibold sm:text-lg">
-                <span>Selected Item Quantity:</span>
+                <span>Total Item Quantity:</span>
                 <span>
-                  {formatNumberWithCommas(
-                    (
-                      products.find((p) => p.id === selectedProductId)?.qty || 0
-                    ).toFixed(1)
-                  )}
+                  {formatNumberWithCommas((totals.totalQty || 0).toFixed(2))}
                 </span>
               </div>
             </div>
@@ -1752,14 +1748,14 @@ const TOUCHPOSFORM = () => {
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
-                      <div className="text-xs font-semibold text-blue-700 sm:text-sm">
-                        Qty: {item.stock}
+                      {/* <div className="text-xs font-semibold text-blue-700 sm:text-sm">
+                        Qty: {item.closingStock}
                       </div>
-                      {item.stock < 10 && (
+                      {item.closingStock < 10 && (
                         <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full mt-0.5">
                           Low Stock
                         </span>
-                      )}
+                      )} */}
                     </div>
                   </div>
                   <div className="flex flex-col items-center">
@@ -1864,7 +1860,7 @@ const TOUCHPOSFORM = () => {
                     (i) => i.id === lowStockWarning.productId
                   );
                   if (item) {
-                    const availableStock = parseFloat(item.stock || 0);
+                    const availableStock = parseFloat(item.closingStock || 0);
                     const qtyToAdd = 1;
                     const existingProductIndex = products.findIndex(
                       (p) => p.id === item.id

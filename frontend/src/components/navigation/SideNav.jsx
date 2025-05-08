@@ -153,12 +153,12 @@ const SideNav = ({ isPosOpen }) => {
           roles: ["admin", "manager"],
         },
         // { path: "/PurchaseInvoice", label: "Purchasing Invoice", icon: ClipboardPenLine, roles: ['admin', 'manager'] },
-        {
-          path: "/PurchaseOrder",
-          label: "Purchase Order",
-          icon: FileText,
-          roles: ["admin", "manager"],
-        },
+        // {
+        //   path: "/PurchaseOrder",
+        //   label: "Purchase Order",
+        //   icon: FileText,
+        //   roles: ["admin", "manager"],
+        // },
         {
           path: "/PurchaseReturn",
           label: "Purchase Return",
