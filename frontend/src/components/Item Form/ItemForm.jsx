@@ -56,7 +56,7 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
     }
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/categories",
+        "https://sharvakshafoodcity.com.lk/backend/public/api/categories",
         {
           name: newCategory.trim(),
         }
@@ -80,7 +80,7 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
     }
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/store-locations",
+        "https://sharvakshafoodcity.com.lk/backend/public/api/store-locations",
         {
           store_name: newStore.trim(),
           phone_number: formData.phone_number || "",
@@ -110,7 +110,7 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       return;
     }
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/suppliers", {
+      const response = await axios.post("https://sharvakshafoodcity.com.lk/backend/public/api/suppliers", {
         supplier_name: newSupplier.trim(),
         contact: formData.contact || "",
         address: formData.address || "",
@@ -138,7 +138,7 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       return;
     }
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/units", {
+      const response = await axios.post("https://sharvakshafoodcity.com.lk/backend/public/api/units", {
         unit_name: newUnitType.trim(),
       });
       setUnitTypes((prev) => [...prev, response.data]);
@@ -170,10 +170,10 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       try {
         const [categoriesRes, unitTypesRes, suppliersRes, storesRes] =
           await Promise.all([
-            axios.get("http://127.0.0.1:8000/api/categories"),
-            axios.get("http://127.0.0.1:8000/api/units"),
-            axios.get("http://127.0.0.1:8000/api/suppliers"),
-            axios.get("http://127.0.0.1:8000/api/store-locations"),
+            axios.get("https://sharvakshafoodcity.com.lk/backend/public/api/categories"),
+            axios.get("https://sharvakshafoodcity.com.lk/backend/public/api/units"),
+            axios.get("https://sharvakshafoodcity.com.lk/backend/public/api/suppliers"),
+            axios.get("https://sharvakshafoodcity.com.lk/backend/public/api/store-locations"),
           ]);
 
         setCategories(categoriesRes.data);
