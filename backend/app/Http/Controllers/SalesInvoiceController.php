@@ -407,4 +407,75 @@ class SalesInvoiceController extends Controller
             return response()->json(['error' => 'Failed to fetch invoice report.'], 500);
         }
     }
+
+    public function getDailyProfitReport(Request $request)
+    {
+        try {
+            $date = $request->input('date', now()->format('Y-m-d'));
+            $invoices = Invoice::with('items.product')
+                ->whereDate('invoice_date', $date)
+                ->get();
+
+            $reportData = [];
+            $totalCost = 0;
+            $totalSales = 0;
+            $totalProfit = 0;
+
+            foreach ($invoices as $invoice) {
+                foreach ($invoice->items as $item) {
+                    $product = $item->product;
+                    $productName = $product ? $product->product_name : ($item->description ?? 'Unknown Product');
+                    $costPrice = $product ? $product->buying_cost * $item->quantity : 0;
+                    $sellingPrice = $item->sales_price * $item->quantity;
+                    $profit = $sellingPrice - $costPrice;
+
+                    if (!isset($reportData[$productName])) {
+                        $reportData[$productName] = [
+                            'product_name' => $productName,
+                            'total_quantity_sold' => 0,
+                            'total_sales_amount' => 0,
+                            'total_cost' => 0,
+                            'total_profit' => 0,
+                        ];
+                    }
+
+                    $reportData[$productName]['total_quantity_sold'] += $item->quantity;
+                    $reportData[$productName]['total_sales_amount'] += $sellingPrice;
+                    $reportData[$productName]['total_cost'] += $costPrice;
+                    $reportData[$productName]['total_profit'] += $profit;
+
+                    $totalCost += $costPrice;
+                    $totalSales += $sellingPrice;
+                    $totalProfit += $profit;
+                }
+            }
+
+            $reportData = array_map(function ($item) {
+                $profitPercentage = ($item['total_cost'] > 0) ? ($item['total_profit'] / $item['total_cost']) * 100 : 0;
+                return [
+                    'product_name' => $item['product_name'],
+                    'total_quantity_sold' => number_format($item['total_quantity_sold'], 2),
+                    'total_sales_amount' => number_format($item['total_sales_amount'], 2),
+                    'total_cost' => number_format($item['total_cost'], 2),
+                    'total_profit' => number_format($item['total_profit'], 2),
+                    'profit_percentage' => number_format($profitPercentage, 2) . '%',
+                ];
+            }, array_values($reportData));
+
+            $summary = [
+                'totalCostPriceAll' => number_format($totalCost, 2),
+                'totalSellingPriceAll' => number_format($totalSales, 2),
+                'totalProfitAll' => number_format($totalProfit, 2),
+                'averageProfitPercentageAll' => ($totalCost > 0) ? number_format(($totalProfit / $totalCost) * 100, 2) . '%' : '0.00%',
+            ];
+
+            return response()->json([
+                'reportData' => $reportData,
+                'summary' => $summary,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in getDailyProfitReport (Invoice): ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch report.'], 500);
+        }
+    }
 }

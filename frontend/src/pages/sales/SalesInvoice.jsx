@@ -6,6 +6,43 @@ import React, {
   useMemo,
 } from "react";
 import Select from "react-select";
+
+const customSelectStyles = {
+  control: (provided, state) => ({
+    ...provided,
+    borderColor: state.isFocused ? "#2563eb" : "#d1d5db",
+    boxShadow: state.isFocused ? "0 0 0 1px #2563eb" : "none",
+    minHeight: "42px",
+    borderRadius: "0.375rem",
+    "&:hover": {
+      borderColor: "#2563eb",
+    },
+    fontSize: "0.875rem",
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+    fontSize: "0.875rem",
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected
+      ? "#2563eb"
+      : state.isFocused
+        ? "#e0e7ff"
+        : "white",
+    color: state.isSelected ? "white" : "black",
+    cursor: "pointer",
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: "#6b7280",
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    color: "#111827",
+  }),
+};
 import axios from "axios";
 import { toast } from "react-toastify";
 import { format } from "date-fns";
@@ -86,9 +123,9 @@ const SalesInvoice = ({
   const taxPercentageRef = useRef(null);
   const itemRefs = useRef([]);
 
-  // State
-  const [formData, setFormData] = useState(() => {
-    const defaultState = {
+  // Helper to get default form state
+  const getDefaultFormState = () => {
+    return {
       invoice: {
         no: "",
         date: format(new Date(), "yyyy-MM-dd"),
@@ -100,6 +137,11 @@ const SalesInvoice = ({
       status: "pending",
       id: null,
     };
+  };
+
+  // State
+  const [formData, setFormData] = useState(() => {
+    const defaultState = getDefaultFormState();
 
     if (isEditMode && initialData) {
       return {
@@ -227,9 +269,30 @@ const SalesInvoice = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [discountSchemes, setDiscountSchemes] = useState([]);
 
+  // Clear form to default state
+  const clearForm = () => {
+    setFormData(getDefaultFormState());
+    setErrors({});
+    setNewItem({
+      productId: null,
+      qty: 1,
+      unitPrice: 0,
+      discountAmount: 0,
+    });
+  };
+
+  // Override onCancel to clear form
+  const handleCancel = () => {
+    clearForm();
+    if (onCancel) {
+      onCancel();
+    }
+  };
+
   const newItemQtyRef = useRef(null);
   const newItemUnitPriceRef = useRef(null);
   const newItemDiscountAmountRef = useRef(null);
+  const newItemProductSelectRef = useRef(null);
 
   const [newItem, setNewItem] = useState({
     productId: null,
@@ -241,13 +304,162 @@ const SalesInvoice = ({
   const handleNewItemProductSelect = (selectedOption) => {
     const productId = selectedOption ? selectedOption.value : null;
     const product = products.find((p) => p.product_id === productId);
+    let discountAmount = 0;
+    if (product) {
+      const { discount: specialDiscount } = calculateSpecialDiscount(
+        {
+          productId: product.product_id,
+          qty: 1,
+          unitPrice: parseFloat(product.mrp) || 0,
+        },
+        formData.invoice.date
+      );
+      discountAmount = specialDiscount || 0;
+    }
     setNewItem((prev) => ({
       ...prev,
       productId,
       unitPrice: product ? parseFloat(product.mrp) || 0 : 0,
+      discountAmount,
     }));
     setErrors((prev) => ({ ...prev, newItemDescription: undefined }));
   };
+
+  // Update handleSubmit to clear form after save
+  // const handleSubmit = useCallback(
+  //   async (e) => {
+  //     e.preventDefault();
+  //     if (!validateForm()) {
+  //       toast.warn("Please fix validation errors.");
+  //       return;
+  //     }
+
+  //     // Generate invoice number if empty
+  //     let invoiceNo = formData.invoice.no;
+  //     if (!invoiceNo || invoiceNo.trim() === "") {
+  //       // Use localStorage to keep track of last invoice number index
+  //       const lastIndexStr = localStorage.getItem("lastInvoiceIndex");
+  //       let lastIndex = lastIndexStr ? parseInt(lastIndexStr, 10) : 0;
+  //       lastIndex += 1;
+  //       localStorage.setItem("lastInvoiceIndex", lastIndex.toString());
+  //       // Format invoice number as INV-001, INV-002, etc.
+  //       invoiceNo = `INV-${lastIndex.toString().padStart(3, "0")}`;
+  //       setFormData((prev) => ({
+  //         ...prev,
+  //         invoice: {
+  //           ...prev.invoice,
+  //           no: invoiceNo,
+  //         },
+  //       }));
+  //       console.log("Generated invoice number:", invoiceNo);
+  //     } else {
+  //       console.log("Using existing invoice number:", invoiceNo);
+  //     }
+
+  //     // Additional validation for payload fields before sending
+  //     if (!invoiceNo) {
+  //       toast.error("Invoice number is required.");
+  //       return;
+  //     }
+  //     if (!formData.invoice.date) {
+  //       toast.error("Invoice date is required.");
+  //       return;
+  //     }
+  //     if (!formData.invoice.time) {
+  //       toast.error("Invoice time is required.");
+  //       return;
+  //     }
+  //     if (!formData.items || formData.items.length === 0) {
+  //       toast.error("At least one invoice item is required.");
+  //       return;
+  //     }
+  //     for (const item of formData.items) {
+  //       if (!item.productId) {
+  //         toast.error("All items must have a valid product selected.");
+  //         return;
+  //       }
+  //       if (item.qty <= 0) {
+  //         toast.error("Item quantity must be greater than zero.");
+  //         return;
+  //       }
+  //       if (item.unitPrice < 0) {
+  //         toast.error("Item unit price cannot be negative.");
+  //         return;
+  //       }
+  //     }
+
+  //     setLoading(true);
+  //     const payload = {
+  //       invoice: {
+  //         no: invoiceNo,
+  //         date: formData.invoice.date,
+  //         time: formData.invoice.time,
+  //       },
+  //       customer: {
+  //         id: formData.customer.id || null,
+  //         name: formData.customer.name,
+  //         address: formData.customer.address || null,
+  //         phone: formData.customer.phone || null,
+  //         email: formData.customer.email || null,
+  //       },
+  //       items: formData.items.map((item) => ({
+  //         id: isEditMode && item.id ? item.id : undefined,
+  //         product_id: item.productId || null,
+  //         description: item.description || "Item",
+  //         qty: parseFloat(item.qty) || 0,
+  //         unit_price: parseFloat(item.unitPrice) || 0,
+  //         sales_price: parseFloat(item.salesPrice) || 0,
+  //         discount_amount: parseFloat(item.discountAmount) || 0,
+  //         discount_percentage: parseFloat(item.discountPercentage) || 0,
+  //         special_discount: parseFloat(item.specialDiscount) || 0,
+  //         total: parseFloat(item.total) || 0,
+  //         total_buying_cost: parseFloat(item.totalBuyingCost) || 0,
+  //         supplier: item.supplier || null,
+  //         category: item.category || null,
+  //         store_location: item.store_location || null,
+  //         mrp: parseFloat(item.mrp) || 0,
+  //       })),
+  //       purchaseDetails: {
+  //         method: formData.purchaseDetails.method,
+  //         amount: parseFloat(formData.purchaseDetails.amount) || 0,
+  //         tax_percentage:
+  //           parseFloat(formData.purchaseDetails.taxPercentage) || 0,
+  //       },
+  //       status: formData.status,
+  //     };
+
+  //     try {
+  //       if (isEditMode) {
+  //         await onUpdateInvoice(payload, formData.id);
+  //         toast.success("Invoice updated successfully!");
+  //       } else {
+  //         await onGenerateInvoice(payload);
+  //         toast.success("Invoice created successfully!");
+  //         localStorage.removeItem(draftKey);
+  //         clearForm();
+  //         invoiceNoRef.current?.focus();
+  //       }
+  //     } catch (error) {
+  //       const message =
+  //         error.response?.data?.message || "Failed to save invoice.";
+  //       const details = error.response?.data?.errors
+  //         ? Object.entries(error.response.data.errors)
+  //             .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+  //             .join("\n")
+  //         : "No detailed errors provided.";
+  //       console.error("API Error Details:", {
+  //         message,
+  //         details,
+  //         response: error.response?.data,
+  //         fullError: error,
+  //       });
+  //       toast.error(`${message}\n${details}`);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   },
+  //   [formData, isEditMode, onGenerateInvoice, onUpdateInvoice, products]
+  // );
 
   const handleNewItemInputChange = (e, field) => {
     const value = e.target.value;
@@ -333,6 +545,7 @@ const SalesInvoice = ({
       newItemUnitPrice: undefined,
       newItemDiscountAmount: undefined,
     }));
+    newItemProductSelectRef.current?.focus();
   };
   useEffect(() => {
     const fetchData = async () => {
@@ -782,10 +995,6 @@ const SalesInvoice = ({
   };
 
   const removeItem = (index) => {
-    if (formData.items.length <= 1) {
-      toast.warn("Cannot remove the only item.");
-      return;
-    }
     setFormData((prev) => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index),
@@ -796,6 +1005,14 @@ const SalesInvoice = ({
     return formData.items.reduce((sum, item) => {
       const total = parseFloat(item.total) || 0;
       return sum + total;
+    }, 0);
+  }, [formData.items]);
+
+  const calculateTotalDiscount = useCallback(() => {
+    return formData.items.reduce((sum, item) => {
+      const discountAmount = parseFloat(item.discountAmount) || 0;
+      const specialDiscount = parseFloat(item.specialDiscount) || 0;
+      return sum + discountAmount + specialDiscount;
     }, 0);
   }, [formData.items]);
 
@@ -1446,7 +1663,7 @@ const SalesInvoice = ({
                     type="email"
                     value={formData.customer.email}
                     onChange={(e) => handleInputChange(e, "customer", "email")}
-                    onKeyDown={(e) => handleEnterKey(e, customerEmailRef)}
+                    onKeyDown={(e) => handleEnterKey(e, filteredProductOptions)}
                     className={`w-full p-2.5 border rounded-md focus:outline-none ${
                       errors.customerEmail
                         ? "border-red-500"
@@ -1474,32 +1691,36 @@ const SalesInvoice = ({
                     Product <span className="text-red-500">*</span>
                   </label>
                   <Select
+                    ref={newItemProductSelectRef}
                     options={filteredProductOptions}
                     value={
-                      filteredProductOptions.find(
-                        (option) =>
-                          option.value ===
-                          formData.items[formData.items.length - 1]?.productId
-                      ) || null
+                      newItem.productId
+                        ? filteredProductOptions.find(
+                            (option) => option.value === newItem.productId
+                          ) || null
+                        : null
                     }
                     placeholder="Search or select product"
                     isClearable
                     isSearchable
-                    onChange={(option) =>
-                      handleProductSelect(option, formData.items.length - 1)
-                    }
+                    onChange={handleNewItemProductSelect}
                     onInputChange={(value) => setSearchTerm(value)}
-                    styles={getSelectStyles(
-                      !!errors[`itemDescription${formData.items.length - 1}`]
-                    )}
+                    styles={customSelectStyles}
                     className="basic-multi-select"
                     classNamePrefix="select"
                     noOptionsMessage={() => "No products found"}
                     loadingMessage={() => "Loading..."}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newItem.productId) {
+                        e.preventDefault();
+                        newItemQtyRef.current?.focus();
+                        newItemQtyRef.current?.select();
+                      }
+                    }}
                   />
-                  {errors[`itemDescription${formData.items.length - 1}`] && (
+                  {errors.newItemDescription && (
                     <p className="mt-1 text-xs text-red-600">
-                      {errors[`itemDescription${formData.items.length - 1}`]}
+                      {errors.newItemDescription}
                     </p>
                   )}
                 </div>
@@ -1513,33 +1734,23 @@ const SalesInvoice = ({
                     type="number"
                     min="1"
                     step="1"
+                    ref={newItemQtyRef}
                     className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
-                      errors[`itemQty${formData.items.length - 1}`]
-                        ? "border-red-500"
-                        : "border-gray-300"
+                      errors.newItemQty ? "border-red-500" : "border-gray-300"
                     }`}
-                    value={formData.items[formData.items.length - 1]?.qty || 1}
-                    onChange={(e) =>
-                      handleInputChange(
-                        e,
-                        "items",
-                        "qty",
-                        formData.items.length - 1
-                      )
-                    }
-                    onKeyDown={(e) =>
-                      handleEnterKey(
-                        e,
-                        itemRefs.current[formData.items.length - 1]?.qty
-                      )
-                    }
-                    ref={(el) =>
-                      assignRef(formData.items.length - 1, "qty", el)
-                    }
+                    value={newItem.qty}
+                    onChange={(e) => handleNewItemInputChange(e, "qty")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        newItemUnitPriceRef.current?.focus();
+                        newItemUnitPriceRef.current?.select();
+                      }
+                    }}
                   />
-                  {errors[`itemQty${formData.items.length - 1}`] && (
+                  {errors.newItemQty && (
                     <p className="mt-1 text-xs text-red-600">
-                      {errors[`itemQty${formData.items.length - 1}`]}
+                      {errors.newItemQty}
                     </p>
                   )}
                 </div>
@@ -1547,41 +1758,31 @@ const SalesInvoice = ({
                 {/* Unit Price */}
                 <div className="md:col-span-2">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
-                    Unit Price <span className="text-red-500">*</span>
+                    MRP <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
+                    ref={newItemUnitPriceRef}
                     className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
-                      errors[`itemUnitPrice${formData.items.length - 1}`]
+                      errors.newItemUnitPrice
                         ? "border-red-500"
                         : "border-gray-300"
                     }`}
-                    value={
-                      formData.items[formData.items.length - 1]?.unitPrice || ""
-                    }
-                    onChange={(e) =>
-                      handleInputChange(
-                        e,
-                        "items",
-                        "unitPrice",
-                        formData.items.length - 1
-                      )
-                    }
-                    onKeyDown={(e) =>
-                      handleEnterKey(
-                        e,
-                        itemRefs.current[formData.items.length - 1]?.unitPrice
-                      )
-                    }
-                    ref={(el) =>
-                      assignRef(formData.items.length - 1, "unitPrice", el)
-                    }
+                    value={newItem.unitPrice}
+                    onChange={(e) => handleNewItemInputChange(e, "unitPrice")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        newItemDiscountAmountRef.current?.focus();
+                        newItemDiscountAmountRef.current?.select();
+                      }
+                    }}
                   />
-                  {errors[`itemUnitPrice${formData.items.length - 1}`] && (
+                  {errors.newItemUnitPrice && (
                     <p className="mt-1 text-xs text-red-600">
-                      {errors[`itemUnitPrice${formData.items.length - 1}`]}
+                      {errors.newItemUnitPrice}
                     </p>
                   )}
                 </div>
@@ -1596,46 +1797,31 @@ const SalesInvoice = ({
                       type="number"
                       min="0"
                       step="0.01"
+                      ref={newItemDiscountAmountRef}
                       className={`w-full p-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500 ${
-                        errors[`itemDiscountAmount${formData.items.length - 1}`]
+                        errors.newItemDiscountAmount
                           ? "border-red-500"
                           : "border-gray-300"
                       }`}
                       placeholder="Amount"
-                      value={
-                        formData.items[formData.items.length - 1]
-                          ?.discountAmount || ""
-                      }
+                      value={newItem.discountAmount}
                       onChange={(e) =>
-                        handleInputChange(
-                          e,
-                          "items",
-                          "discountAmount",
-                          formData.items.length - 1
-                        )
+                        handleNewItemInputChange(e, "discountAmount")
                       }
-                      onKeyDown={(e) =>
-                        handleEnterKey(
-                          e,
-                          itemRefs.current[formData.items.length - 1]
-                            ?.discountAmount
-                        )
-                      }
-                      ref={(el) =>
-                        assignRef(
-                          formData.items.length - 1,
-                          "discountAmount",
-                          el
-                        )
-                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddNewItem();
+                        }
+                      }}
                     />
                     <span className="inline-flex items-center px-3 text-sm text-gray-500 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md">
                       LKR
                     </span>
                   </div>
-                  {errors[`itemDiscountAmount${formData.items.length - 1}`] && (
+                  {errors.newItemDiscountAmount && (
                     <p className="mt-1 text-xs text-red-600">
-                      {errors[`itemDiscountAmount${formData.items.length - 1}`]}
+                      {errors.newItemDiscountAmount}
                     </p>
                   )}
                 </div>
@@ -1644,7 +1830,7 @@ const SalesInvoice = ({
                 <div className="md:col-span-1 flex items-end">
                   <button
                     type="button"
-                    onClick={addItem}
+                    onClick={handleAddNewItem}
                     className="w-full h-[42px] px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors flex items-center justify-center"
                   >
                     <svg
@@ -1698,13 +1884,19 @@ const SalesInvoice = ({
                         scope="col"
                         className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
-                        Unit Price
+                        MRP
                       </th>
                       <th
                         scope="col"
                         className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         Discount
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Price
                       </th>
                       <th
                         scope="col"
@@ -1720,28 +1912,14 @@ const SalesInvoice = ({
                       </th>
                     </tr>
                   </thead>
+
                   <tbody className="bg-white divide-y divide-gray-200">
                     {formData.items.map((item, index) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Select
-                            options={filteredProductOptions}
-                            value={
-                              filteredProductOptions.find(
-                                (option) => option.value === item.productId
-                              ) || null
-                            }
-                            onChange={(option) =>
-                              handleProductSelect(option, index)
-                            }
-                            styles={getSelectStyles(
-                              !!errors[`itemDescription${index}`]
-                            )}
-                            classNamePrefix="select"
-                            placeholder="Select product"
-                            isClearable
-                            isSearchable
-                          />
+                          <div className="text-gray-900 font-medium">
+                            {item.description || "N/A"}
+                          </div>
                           {item.discountScheme && (
                             <div className="text-xs text-green-600 mt-1">
                               {item.discountSchemeType === "product"
@@ -1756,14 +1934,25 @@ const SalesInvoice = ({
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                           {formatCurrency(item.unitPrice)}
                         </td>
+                        <td className="px-6 py-4 w-32 whitespace-nowrap text-right text-sm text-gray-500">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.discountAmount}
+                            onChange={(e) =>
+                              handleInputChange(
+                                e,
+                                "items",
+                                "discountAmount",
+                                index
+                              )
+                            }
+                            className="w-full p-1 text-right border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                          {item.discountAmount > 0 ? (
-                            <span className="text-red-600">
-                              -{formatCurrency(item.discountAmount)}
-                            </span>
-                          ) : (
-                            "-"
-                          )}
+                          {formatCurrency(item.salesPrice)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           {formatCurrency(item.total)}
@@ -1780,44 +1969,6 @@ const SalesInvoice = ({
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td
-                        colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
-                      >
-                        Subtotal
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                        {formatCurrency(subtotal)}
-                      </td>
-                      <td></td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
-                      >
-                        Tax ({formData.purchaseDetails.taxPercentage}%)
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                        {formatCurrency(tax)}
-                      </td>
-                      <td></td>
-                    </tr>
-                    <tr className="bg-gray-100">
-                      <td
-                        colSpan="4"
-                        className="px-6 py-4 text-right text-sm font-bold text-gray-700 uppercase"
-                      >
-                        Total
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
-                        {formatCurrency(total)}
-                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
             </div>

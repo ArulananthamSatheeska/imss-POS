@@ -130,7 +130,7 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
 
     // Sales
     Route::get('/next-bill-number', [SaleController::class, 'getLastBillNumber']);
-    Route::get('/sales/daily-profit-report', [SaleController::class, 'getDailyProfitReport']);
+    Route::get('/sales/daily-profit-report', [SaleController::class, 'getcombinedDailyProfitReport']);
     Route::get('/sales/bill-wise-profit-report', [SaleController::class, 'getCombinedBillWiseProfitReport']);
     Route::get('/sales/company-wise-profit-report', [SaleController::class, 'getCompanyWiseProfitReport']);
     Route::get('/sales/supplier-wise-profit-report', [SaleController::class, 'getSupplierWiseProfitReport']);

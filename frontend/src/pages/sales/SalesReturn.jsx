@@ -334,8 +334,8 @@ const SalesReturn = () => {
             ? parseInt(value)
             : 0
           : name === "selling_cost"
-          ? parseFloat(value) || 0
-          : value,
+            ? parseFloat(value) || 0
+            : value,
     }));
   };
 
@@ -862,7 +862,6 @@ const SalesReturn = () => {
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         min="0"
                         step="0.01"
-                        disabled={loading || !itemForm.product_id}
                       />
                     </div>
                     <div>
