@@ -27,7 +27,7 @@ const DailyProfitReport = () => {
       setLoading(true);
       setError("");
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/sales/daily-profit-report",
+        "http://127.0.0.1:8000/api/sales/daily-profit-report",
         {
           params: { date },
         }

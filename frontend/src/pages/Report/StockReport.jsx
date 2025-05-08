@@ -79,7 +79,7 @@ const StockReport = () => {
     setError(null);
     try {
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/detailed-stock-reports",
+        "http://127.0.0.1:8000/api/detailed-stock-reports",
         {
           params: {
             fromDate,

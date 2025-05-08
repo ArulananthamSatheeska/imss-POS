@@ -107,7 +107,7 @@ const Expiry = () => {
       setError(null);
       try {
         const response = await axios.get(
-          "https://sharvakshafoodcity.com.lk/backend/public/api/products"
+          "http://127.0.0.1:8000/api/products"
         );
         setItems(Array.isArray(response.data.data) ? response.data.data : []);
       } catch (e) {

@@ -13,7 +13,7 @@ const Units = () => {
   const fetchUnits = async () => {
     try {
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/units"
+        "http://127.0.0.1:8000/api/units"
       );
       setUnits(response.data);
     } catch (error) {

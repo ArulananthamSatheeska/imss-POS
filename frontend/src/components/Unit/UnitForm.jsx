@@ -22,7 +22,7 @@ const UnitForm = () => {
   const fetchUnits = async () => {
     try {
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/units"
+        "http://127.0.0.1:8000/api/units"
       );
       setUnits(response.data);
     } catch (error) {
@@ -37,7 +37,7 @@ const UnitForm = () => {
     try {
       if (selectedUnit) {
         await axios.put(
-          `https://sharvakshafoodcity.com.lk/backend/public/api/units/${selectedUnit.id}`,
+          `http://127.0.0.1:8000/api/units/${selectedUnit.id}`,
           {
             unit_name: unitName,
           }
@@ -50,7 +50,7 @@ const UnitForm = () => {
         fetchUnits();
       } else {
         await axios.post(
-          "https://sharvakshafoodcity.com.lk/backend/public/api/units",
+          "http://127.0.0.1:8000/api/units",
           {
             unit_name: unitName,
           }
@@ -89,7 +89,7 @@ const UnitForm = () => {
   const confirmDelete = async (id) => {
     try {
       await axios.delete(
-        `https://sharvakshafoodcity.com.lk/backend/public/api/units/${id}`
+        `http://127.0.0.1:8000/api/units/${id}`
       );
       fetchUnits(); // Re-fetch units after deletion
       setNotification({

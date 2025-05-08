@@ -13,7 +13,7 @@ const StoreLocations = () => {
   const fetchStoreLocations = async () => {
     try {
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/store-locations"
+        "http://127.0.0.1:8000/api/store-locations"
       );
       setStoreLocations(response.data);
     } catch (error) {

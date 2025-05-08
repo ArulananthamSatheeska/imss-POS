@@ -25,7 +25,7 @@
           "raw": "{\n  \"user_id\": 2,\n  \"terminal_id\": \"TERM-1234\",\n  \"opening_cash\": 1000.00\n}"
         },
         "url": {
-          "raw": "https://sharvakshafoodcity.com.lk/backend/public/api/register/open",
+          "raw": "http://127.0.0.1:8000/api/register/open",
           "protocol": "http",
           "host": ["localhost"],
           "port": "8000",
@@ -53,7 +53,7 @@
           "raw": "{\n  \"register_id\": 1,\n  \"closing_balance\": 1200.00,\n  \"actual_cash\": 1200.00\n}"
         },
         "url": {
-          "raw": "https://sharvakshafoodcity.com.lk/backend/public/api/register/close",
+          "raw": "http://127.0.0.1:8000/api/register/close",
           "protocol": "http",
           "host": ["localhost"],
           "port": "8000",
@@ -73,7 +73,7 @@
           }
         ],
         "url": {
-          "raw": "https://sharvakshafoodcity.com.lk/backend/public/api/register/status?user_id=2",
+          "raw": "http://127.0.0.1:8000/api/register/status?user_id=2",
           "protocol": "http",
           "host": ["localhost"],
           "port": "8000",

@@ -31,7 +31,7 @@ const CompanyWiseProfit = () => {
     try {
       setIsLoading(true);
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/sales/company-wise-profit-report",
+        "http://127.0.0.1:8000/api/sales/company-wise-profit-report",
         {
           params: { fromDate, toDate, paymentMethod: paymentMethodFilter },
         }
