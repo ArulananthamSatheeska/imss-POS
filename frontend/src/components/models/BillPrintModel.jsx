@@ -158,28 +158,28 @@ const BillPrintModal = ({
       }
     }
 
-    // Ensure we're using the latest calculated totals
-    const currentTotals = calculateTotals();
+    // Use the existing totals object instead of calculateTotals function
+    const currentTotals = totals;
 
     const billData = {
       bill_number: billNumber,
       customer_id: selectedCustomer?.id || null,
       customer_name: selectedCustomer?.name || "Walk-in Customer",
-      subtotal: parseFloat(currentTotals.subTotal.toFixed(2)),
+      subtotal: parseFloat((currentTotals.subTotal || 0).toFixed(2)),
       discount: parseFloat(
         (
-          currentTotals.totalItemDiscounts +
-          currentTotals.totalSpecialDiscounts +
-          currentTotals.totalBillDiscount
+          (currentTotals.totalItemDiscounts || 0) +
+          (currentTotals.totalSpecialDiscounts || 0) +
+          (currentTotals.totalBillDiscount || 0)
         ).toFixed(2)
       ),
-      tax: parseFloat(currentTotals.taxAmount.toFixed(2)),
+      tax: parseFloat((currentTotals.taxAmount || 0).toFixed(2)),
       shipping: parseFloat(initialShipping || 0),
-      total: parseFloat(currentTotals.finalTotal.toFixed(2)),
+      total: parseFloat((currentTotals.finalTotal || 0).toFixed(2)),
       payment_type: paymentType,
       received_amount: parseFloat(receivedAmount.toFixed(2)),
       balance_amount: parseFloat(
-        (receivedAmount - currentTotals.finalTotal).toFixed(2)
+        (receivedAmount - (currentTotals.finalTotal || 0)).toFixed(2)
       ),
       sale_type: saleType,
       items: products.map((product) => ({

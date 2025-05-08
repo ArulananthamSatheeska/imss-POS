@@ -23,25 +23,26 @@ class SalesInvoiceController extends Controller
 
         $validator = Validator::make(request()->all(), [
             'invoice.no' => 'nullable|string|max:255|unique:invoices,invoice_no',
-            'invoice.date' => 'required|date',
-            'invoice.time' => 'required|date_format:H:i',
-            'customer.name' => 'required|string|max:255',
+            'invoice.date' => 'nullable|date',
+            'invoice.time' => 'nullable|date_format:H:i',
+            'customer.name' => 'nullable|string|max:255',
             'customer.address' => 'nullable|string|max:255',
             'customer.phone' => 'nullable|string|max:20',
             'customer.email' => 'nullable|email|max:255',
-            'purchaseDetails.method' => 'required|string|in:cash,card,bank_transfer,cheque,online,credit',
-            'purchaseDetails.amount' => 'required|numeric|min:0',
+            'purchaseDetails.method' => 'nullable|string|in:cash,card,bank_transfer,cheque,online,credit',
+            'purchaseDetails.amount' => 'nullable|numeric|min:0',
             'purchaseDetails.taxPercentage' => 'nullable|numeric|min:0|max:100',
-            'items' => 'required|array|min:1',
+            'items' => 'nullable|array|min:1',
             'items.*.product_id' => 'nullable|exists:products,product_id',
-            'items.*.description' => 'required|string|max:255',
-            'items.*.qty' => 'required|numeric|min:0.01',
-            'items.*.unitPrice' => 'required|numeric|min:0',
-            'items.*.salesPrice' => 'required|numeric|min:0', // Added salesPrice validation
-            'items.*.discountAmount' => 'required|numeric|min:0',
-            'items.*.discountPercentage' => 'nullable|numeric|min:0|max:100',
-            'items.*.specialDiscount' => 'required|numeric|min:0',
-            'items.*.totalBuyingCost' => 'required|numeric|min:0',
+            'items.*.description' => 'nullable|string|max:255',
+            'items.*.qty' => 'nullable|numeric|min:0.01',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.sales_price' => 'nullable|numeric|min:0', // Added sales_price validation
+            'items.*.discount_amount' => 'nullable|numeric|min:0',
+            'items.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'items.*.special_discount' => 'nullable|numeric|min:0',
+            'items.*.total_buying_cost' => 'nullable|numeric|min:0',
+            'items.*.profit' => 'nullable|numeric|min:0', // Added profit validation
             'status' => 'nullable|string|in:pending,paid,cancelled',
             'items.*.supplier' => 'nullable|string|max:255',
             'items.*.category' => 'nullable|string|max:255',
@@ -69,22 +70,26 @@ class SalesInvoiceController extends Controller
         $itemsData = [];
 
         foreach ($validatedData['items'] as $itemInput) {
-            // Use salesPrice for calculations
-            $salesPrice = isset($itemInput['salesPrice']) ? $itemInput['salesPrice'] : $itemInput['unitPrice'];
-            $itemTotal = ($itemInput['qty'] * $salesPrice) - ($itemInput['specialDiscount'] ?? 0);
+            // Use sales_price for calculations
+            $salesPrice = isset($itemInput['sales_price']) ? $itemInput['sales_price'] : $itemInput['unit_price'];
+            $itemTotal = ($itemInput['qty'] * $salesPrice) - ($itemInput['special_discount'] ?? 0);
             $calculatedSubtotal += $itemTotal;
+
+            $buyingCost = $itemInput['total_buying_cost'] ?? 0;
+            $profit = ($salesPrice - $buyingCost / ($itemInput['qty'] ?: 1)) * $itemInput['qty'];
 
             $itemsData[] = [
                 'product_id' => $itemInput['product_id'] ?? null,
                 'description' => $itemInput['description'],
                 'quantity' => $itemInput['qty'],
-                'unit_price' => $itemInput['unitPrice'],
-                'sales_price' => $salesPrice, // Store salesPrice
-                'discount_amount' => $itemInput['discountAmount'],
-                'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
-                'special_discount' => $itemInput['specialDiscount'] ?? 0,
+                'unit_price' => $itemInput['unit_price'],
+                'sales_price' => $salesPrice, // Store sales_price
+                'discount_amount' => $itemInput['discount_amount'],
+                'discount_percentage' => $itemInput['discount_percentage'] ?? 0,
+                'special_discount' => $itemInput['special_discount'] ?? 0,
                 'total' => $itemTotal,
-                'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0,
+                'total_buying_cost' => $itemInput['total_buying_cost'] ?? 0,
+                'profit' => $profit >= 0 ? $profit : 0,
                 'supplier' => $itemInput['supplier'] ?? null,
                 'category' => $itemInput['category'] ?? null,
                 'store_location' => $itemInput['store_location'] ?? null,
@@ -174,6 +179,7 @@ class SalesInvoiceController extends Controller
             'items.*.discountPercentage' => 'nullable|numeric|min:0|max:100',
             'items.*.specialDiscount' => 'required|numeric|min:0',
             'items.*.totalBuyingCost' => 'required|numeric|min:0',
+            'items.*.profit' => 'nullable|numeric|min:0', // Added profit validation
             'status' => 'nullable|string|in:pending,paid,cancelled',
             'items.*.supplier' => 'nullable|string|max:255',
             'items.*.category' => 'nullable|string|max:255',
@@ -204,23 +210,27 @@ class SalesInvoiceController extends Controller
             $itemsData = [];
 
             foreach ($validatedData['items'] as $itemInput) {
-                // Use salesPrice for calculations
-                $salesPrice = isset($itemInput['salesPrice']) ? $itemInput['salesPrice'] : $itemInput['unitPrice'];
-                $itemTotal = ($itemInput['qty'] * $salesPrice) - ($itemInput['specialDiscount'] ?? 0);
+                // Use sales_price for calculations
+                $salesPrice = isset($itemInput['sales_price']) ? $itemInput['sales_price'] : $itemInput['unit_price'];
+                $itemTotal = ($itemInput['qty'] * $salesPrice) - ($itemInput['special_discount'] ?? 0);
                 $calculatedSubtotal += $itemTotal;
+
+                $buyingCost = $itemInput['total_buying_cost'] ?? 0;
+                $profit = ($salesPrice - $buyingCost / ($itemInput['qty'] ?: 1)) * $itemInput['qty'];
 
                 $itemsData[] = [
                     'id' => $itemInput['id'] ?? null,
                     'product_id' => $itemInput['product_id'] ?? null,
                     'description' => $itemInput['description'],
                     'quantity' => $itemInput['qty'],
-                    'unit_price' => $itemInput['unitPrice'],
-                    'sales_price' => $salesPrice, // Store salesPrice
-                    'discount_amount' => $itemInput['discountAmount'],
-                    'discount_percentage' => $itemInput['discountPercentage'] ?? 0,
-                    'special_discount' => $itemInput['specialDiscount'] ?? 0,
+                    'unit_price' => $itemInput['unit_price'],
+                    'sales_price' => $salesPrice, // Store sales_price
+                    'discount_amount' => $itemInput['discount_amount'],
+                    'discount_percentage' => $itemInput['discount_percentage'] ?? 0,
+                    'special_discount' => $itemInput['special_discount'] ?? 0,
                     'total' => $itemTotal,
-                    'total_buying_cost' => $itemInput['totalBuyingCost'] ?? 0,
+                    'total_buying_cost' => $itemInput['total_buying_cost'] ?? 0,
+                    'profit' => $profit >= 0 ? $profit : 0,
                 ];
             }
 

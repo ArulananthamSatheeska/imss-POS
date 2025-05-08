@@ -95,28 +95,7 @@ const SalesInvoice = ({
         time: format(new Date(), "HH:mm"),
       },
       customer: { id: null, name: "", address: "", phone: "", email: "" },
-      items: [
-        {
-          id: Date.now(),
-          description: "",
-          qty: 1,
-          unitPrice: "",
-          salesPrice: 0,
-          discountAmount: "",
-          discountPercentage: "",
-          specialDiscount: 0,
-          total: 0,
-          totalBuyingCost: 0,
-          productId: null,
-          buyingCost: 0,
-          categoryId: null,
-          mrp: 0,
-          stock: 0,
-          supplier: "",
-          category: "",
-          store_location: "",
-        },
-      ],
+      items: [],
       purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
       status: "pending",
       id: null,
@@ -162,8 +141,7 @@ const SalesInvoice = ({
             salesPrice,
             buyingCost,
             stock,
-            discountAmount: "",
-            discountPercentage: "",
+            discountAmount: 0,
             specialDiscount: parseFloat(item.specialDiscount || 0),
             total: parseFloat(
               item.total || qty * unitPrice - (item.specialDiscount || 0)
@@ -219,8 +197,7 @@ const SalesInvoice = ({
             salesPrice,
             buyingCost,
             stock,
-            discountAmount: "",
-            discountPercentage: "",
+            discountAmount: 0,
             specialDiscount: 0,
             total: 0,
             totalBuyingCost: 0,
@@ -249,6 +226,114 @@ const SalesInvoice = ({
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [discountSchemes, setDiscountSchemes] = useState([]);
+
+  const newItemQtyRef = useRef(null);
+  const newItemUnitPriceRef = useRef(null);
+  const newItemDiscountAmountRef = useRef(null);
+
+  const [newItem, setNewItem] = useState({
+    productId: null,
+    qty: 1,
+    unitPrice: 0,
+    discountAmount: 0,
+  });
+
+  const handleNewItemProductSelect = (selectedOption) => {
+    const productId = selectedOption ? selectedOption.value : null;
+    const product = products.find((p) => p.product_id === productId);
+    setNewItem((prev) => ({
+      ...prev,
+      productId,
+      unitPrice: product ? parseFloat(product.mrp) || 0 : 0,
+    }));
+    setErrors((prev) => ({ ...prev, newItemDescription: undefined }));
+  };
+
+  const handleNewItemInputChange = (e, field) => {
+    const value = e.target.value;
+    setNewItem((prev) => ({
+      ...prev,
+      [field]:
+        field === "qty" || field === "unitPrice" || field === "discountAmount"
+          ? value === ""
+            ? ""
+            : parseFloat(value) || 0
+          : value,
+    }));
+    setErrors((prev) => ({
+      ...prev,
+      [`newItem${field.charAt(0).toUpperCase() + field.slice(1)}`]: undefined,
+    }));
+  };
+
+  const handleAddNewItem = () => {
+    const { productId, qty, unitPrice, discountAmount } = newItem;
+    const newErrors = {};
+    if (qty === "" || qty <= 0)
+      newErrors.newItemQty = "Quantity must be positive";
+    if (unitPrice === "" || unitPrice < 0)
+      newErrors.newItemUnitPrice = "Unit price must be non-negative";
+    if (discountAmount !== "" && discountAmount < 0)
+      newErrors.newItemDiscountAmount = "Discount cannot be negative";
+    if (Object.keys(newErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...newErrors }));
+      return;
+    }
+
+    const product = products.find((p) => p.product_id === productId);
+
+    const newItemToAdd = {
+      id: Date.now(),
+      productId,
+      qty,
+      unitPrice: product ? parseFloat(product.mrp) || 0 : unitPrice,
+      discountAmount,
+      discountPercentage: "",
+      specialDiscount: 0,
+      total: 0,
+      totalBuyingCost:
+        qty * (product ? parseFloat(product.buying_cost) || 0 : 0),
+      description: product ? product.product_name : "",
+      salesPrice: product ? parseFloat(product.sales_price) || 0 : 0,
+      buyingCost: product ? parseFloat(product.buying_cost) || 0 : 0,
+      categoryId: product ? product.category_id : null,
+      mrp: product ? parseFloat(product.mrp) || 0 : 0,
+      stock: product ? parseFloat(product.opening_stock_quantity) || 0 : 0,
+      supplier: product ? product.supplier || "" : "",
+      category: product ? product.category || "" : "",
+      store_location: product ? product.store_location || "" : "",
+    };
+
+    // Recalculate totals for the new item
+    const newItemWithTotals = updateItemTotal(
+      newItemToAdd,
+      formData.invoice.date
+    );
+
+    console.log("Adding new item:", newItemWithTotals);
+
+    setFormData((prev) => {
+      const updatedItems = [...prev.items, newItemWithTotals];
+      console.log("Updated items array:", updatedItems);
+      return {
+        ...prev,
+        items: updatedItems,
+      };
+    });
+    setNewItem({
+      productId: null,
+      qty: 1,
+      unitPrice: 0,
+      discountAmount: 0,
+    });
+    setErrors((prev) => ({
+      ...prev,
+      newItemDescription: undefined,
+      newItemQty: undefined,
+      newItemUnitPrice: undefined,
+      newItemDiscountAmount: undefined,
+    }));
+  };
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -446,35 +531,19 @@ const SalesInvoice = ({
       const mrp = parseFloat(item.mrp) || 0;
       const buyingCost = parseFloat(item.buyingCost) || 0;
       let discountAmount = parseFloat(item.discountAmount) || 0;
-      let discountPercentage = parseFloat(item.discountPercentage) || 0;
+      const discountPercentage = parseFloat(item.discountPercentage) || 0;
 
-      // Calculate discount from percentage or amount
+      // Calculate discount amount or fallback to (mrp - salesPrice) * qty
       if (
-        item.discountPercentage !== "" &&
-        item.discountPercentage !== undefined
-      ) {
-        discountPercentage =
-          discountPercentage >= 0 && discountPercentage <= 100
-            ? discountPercentage
-            : 0;
-        discountAmount = (unitPrice * qty * discountPercentage) / 100;
-      } else if (
         item.discountAmount !== "" &&
-        item.discountAmount !== undefined
+        item.discountAmount !== undefined &&
+        item.discountAmount !== 0
       ) {
         discountAmount = discountAmount >= 0 ? discountAmount : 0;
-        discountPercentage =
-          unitPrice > 0 && qty > 0
-            ? (discountAmount / (unitPrice * qty)) * 100
-            : 0;
       } else {
-        // Calculate discount as (mrp - salesPrice) * qty if discountAmount is empty or zero
+        // Calculate discount as (mrp - salesPrice) * qty if discountAmount is empty, zero or undefined
         discountAmount = (mrp - item.salesPrice) * qty;
         discountAmount = discountAmount >= 0 ? discountAmount : 0;
-        discountPercentage =
-          unitPrice > 0 && qty > 0
-            ? (discountAmount / (unitPrice * qty)) * 100
-            : 0;
       }
 
       // Calculate special discount
@@ -484,22 +553,29 @@ const SalesInvoice = ({
         schemeType,
       } = calculateSpecialDiscount(item, invoiceDate);
 
-      // Calculate total: qty * unitPrice - (discountAmount + specialDiscount)
-      const total = qty * unitPrice - (discountAmount + specialDiscount);
+      // Combine discountAmount and specialDiscount for total discount
+      const totalDiscount = discountAmount + specialDiscount;
 
-      const profit = total - qty * buyingCost;
+      // Calculate total: qty * unitPrice - totalDiscount
+      const total = qty * unitPrice - totalDiscount;
+
+      const profit =
+        qty * (parseFloat(item.salesPrice) || 0) - qty * buyingCost;
 
       return {
         ...item,
         discountAmount: discountAmount >= 0 ? discountAmount : 0,
         discountPercentage,
         specialDiscount,
+        totalDiscount,
         discountScheme: scheme,
         discountSchemeType: schemeType,
         total: total >= 0 ? total : 0,
         totalBuyingCost: qty * buyingCost,
         mrp,
         profit: profit >= 0 ? profit : 0,
+        unitPrice: unitPrice || 0,
+        totalBuyingCost: qty * buyingCost || 0,
       };
     },
     [calculateSpecialDiscount]
@@ -517,14 +593,17 @@ const SalesInvoice = ({
         if (
           targetName === "qty" ||
           targetName === "unitPrice" ||
-          targetName === "discountAmount" ||
-          targetName === "discountPercentage"
+          targetName === "discountAmount"
         ) {
           processedValue = value === "" ? "" : parseFloat(value) || 0;
           newItems[index] = {
             ...newItems[index],
             [targetName]: processedValue,
           };
+          // Sync salesPrice with unitPrice when unitPrice changes
+          if (targetName === "unitPrice") {
+            newItems[index].salesPrice = processedValue;
+          }
           newItems[index] = updateItemTotal(
             newItems[index],
             newData.invoice.date
@@ -598,10 +677,14 @@ const SalesInvoice = ({
     const productId = selectedOption ? selectedOption.value : null;
     let product = products.find((p) => p.product_id === productId);
     // Fetch additional product details
-    let supplier = "", category = "", store_location = "";
+    let supplier = "",
+      category = "",
+      store_location = "";
     if (productId) {
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
+        const response = await axios.get(
+          `http://127.0.0.1:8000/api/products/${productId}`
+        );
         const productData = response.data.data;
         supplier = productData.supplier || "N/A";
         category = productData.category || "N/A";
@@ -612,6 +695,16 @@ const SalesInvoice = ({
       }
     }
 
+    console.log("handleProductSelect product:", product);
+    console.log(
+      "handleProductSelect product.mrp:",
+      product ? product.mrp : "N/A"
+    );
+    console.log(
+      "handleProductSelect product.sales_price:",
+      product ? product.sales_price : "N/A"
+    );
+
     setFormData((prev) => {
       const newItems = [...prev.items];
       if (!newItems[index]) {
@@ -620,7 +713,8 @@ const SalesInvoice = ({
       }
       const qty = parseFloat(newItems[index].qty) || 1;
       const mrp = product ? parseFloat(product.mrp) || 0 : 0;
-      // Set unitPrice to mrp instead of salesPrice
+      // Set unitPrice to sales_price (user feedback: unit price is sales price)
+      const unitPriceValue = product ? parseFloat(product.sales_price) || 0 : 0;
       const buyingCost = product ? parseFloat(product.buying_cost) || 0 : 0;
       const stock = product
         ? parseFloat(product.opening_stock_quantity) || 0
@@ -631,12 +725,12 @@ const SalesInvoice = ({
         productId: product ? product.product_id : null,
         categoryId: product ? product.category_id : null,
         description: product ? product.product_name : "",
-        unitPrice: mrp,
+        unitPrice: unitPriceValue,
         mrp,
         salesPrice: product ? parseFloat(product.sales_price) || mrp : 0,
         buyingCost,
         stock,
-        discountAmount: "",
+        discountAmount: 0,
         discountPercentage: "",
         totalBuyingCost: qty * buyingCost,
         supplier,
@@ -667,7 +761,7 @@ const SalesInvoice = ({
           qty: 1,
           unitPrice: "",
           salesPrice: 0,
-          discountAmount: "",
+          discountAmount: 0,
           discountPercentage: "",
           specialDiscount: 0,
           total: 0,
@@ -734,8 +828,9 @@ const SalesInvoice = ({
     if (!invoice.date) newErrors.invoiceDate = "Invoice date is required";
     if (!invoice.time || !/^\d{2}:\d{2}$/.test(invoice.time))
       newErrors.invoiceTime = "Invalid time format (HH:MM)";
-    if (!customer.name?.trim())
-      newErrors.customerName = "Customer name is required";
+    // Removed required validation for customer name as per user request
+    // if (formData.purchaseDetails.method !== "credit" && !customer.name?.trim())
+    //   newErrors.customerName = "Customer name is required";
     if (customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))
       newErrors.customerEmail = "Invalid email address";
     if (!items.length) newErrors.items = "At least one item is required";
@@ -766,9 +861,6 @@ const SalesInvoice = ({
     }
 
     items.forEach((item, idx) => {
-      if (!item.productId && !item.description?.trim())
-        newErrors[`itemDescription${idx}`] =
-          "Description or product is required";
       if (item.qty === "" || parseFloat(item.qty) <= 0)
         newErrors[`itemQty${idx}`] = "Quantity must be positive";
       if (item.unitPrice === "" || parseFloat(item.unitPrice) < 0)
@@ -809,9 +901,67 @@ const SalesInvoice = ({
         return;
       }
 
+      // Generate invoice number if empty
+      let invoiceNo = formData.invoice.no;
+      if (!invoiceNo || invoiceNo.trim() === "") {
+        // Use localStorage to keep track of last invoice number index
+        const lastIndexStr = localStorage.getItem("lastInvoiceIndex");
+        let lastIndex = lastIndexStr ? parseInt(lastIndexStr, 10) : 0;
+        lastIndex += 1;
+        localStorage.setItem("lastInvoiceIndex", lastIndex.toString());
+        // Format invoice number as INV-001, INV-002, etc.
+        invoiceNo = `INV-${lastIndex.toString().padStart(3, "0")}`;
+        setFormData((prev) => ({
+          ...prev,
+          invoice: {
+            ...prev.invoice,
+            no: invoiceNo,
+          },
+        }));
+        console.log("Generated invoice number:", invoiceNo);
+      } else {
+        console.log("Using existing invoice number:", invoiceNo);
+      }
+
+      // Additional validation for payload fields before sending
+      if (!invoiceNo) {
+        toast.error("Invoice number is required.");
+        return;
+      }
+      if (!formData.invoice.date) {
+        toast.error("Invoice date is required.");
+        return;
+      }
+      if (!formData.invoice.time) {
+        toast.error("Invoice time is required.");
+        return;
+      }
+      if (!formData.items || formData.items.length === 0) {
+        toast.error("At least one invoice item is required.");
+        return;
+      }
+      for (const item of formData.items) {
+        if (!item.productId) {
+          toast.error("All items must have a valid product selected.");
+          return;
+        }
+        if (item.qty <= 0) {
+          toast.error("Item quantity must be greater than zero.");
+          return;
+        }
+        if (item.unitPrice < 0) {
+          toast.error("Item unit price cannot be negative.");
+          return;
+        }
+      }
+
       setLoading(true);
       const payload = {
-        invoice: formData.invoice,
+        invoice: {
+          no: invoiceNo,
+          date: formData.invoice.date,
+          time: formData.invoice.time,
+        },
         customer: {
           id: formData.customer.id || null,
           name: formData.customer.name,
@@ -824,21 +974,22 @@ const SalesInvoice = ({
           product_id: item.productId || null,
           description: item.description || "Item",
           qty: parseFloat(item.qty) || 0,
-          unitPrice: parseFloat(item.unitPrice) || 0,
-          salesPrice: parseFloat(item.sales_price) || 0,
-          discountAmount: parseFloat(item.discountAmount) || 0,
-          discountPercentage: parseFloat(item.discountPercentage) || 0,
-          specialDiscount: parseFloat(item.specialDiscount) || 0,
+          unit_price: parseFloat(item.unitPrice) || 0,
+          sales_price: parseFloat(item.salesPrice) || 0,
+          discount_amount: parseFloat(item.discountAmount) || 0,
+          discount_percentage: parseFloat(item.discountPercentage) || 0,
+          special_discount: parseFloat(item.specialDiscount) || 0,
           total: parseFloat(item.total) || 0,
-          totalBuyingCost: parseFloat(item.totalBuyingCost) || 0,
+          total_buying_cost: parseFloat(item.totalBuyingCost) || 0,
           supplier: item.supplier || null,
           category: item.category || null,
           store_location: item.store_location || null,
+          mrp: parseFloat(item.mrp) || 0,
         })),
         purchaseDetails: {
           method: formData.purchaseDetails.method,
           amount: parseFloat(formData.purchaseDetails.amount) || 0,
-          taxPercentage:
+          tax_percentage:
             parseFloat(formData.purchaseDetails.taxPercentage) || 0,
         },
         status: formData.status,
@@ -859,25 +1010,7 @@ const SalesInvoice = ({
               time: format(new Date(), "HH:mm"),
             },
             customer: { id: null, name: "", address: "", phone: "", email: "" },
-            items: [
-              {
-                id: Date.now(),
-                description: "",
-                qty: 1,
-                unitPrice: "",
-                salesPrice: 0,
-                discountAmount: "",
-                discountPercentage: "",
-                specialDiscount: 0,
-                total: 0,
-                totalBuyingCost: 0,
-                productId: null,
-                buyingCost: 0,
-                categoryId: null,
-                mrp: 0,
-                stock: 0,
-              },
-            ],
+            items: [],
             purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
             status: "pending",
             id: null,
@@ -897,6 +1030,7 @@ const SalesInvoice = ({
           message,
           details,
           response: error.response?.data,
+          fullError: error,
         });
         toast.error(`${message}\n${details}`);
       } finally {
@@ -929,6 +1063,14 @@ const SalesInvoice = ({
       { ref: customerAddressRef, name: "customerAddress", type: "input" },
       { ref: customerPhoneRef, name: "customerPhone", type: "input" },
       { ref: customerEmailRef, name: "customerEmail", type: "input" },
+      // Add new item input refs here for enter key navigation
+      { ref: newItemQtyRef, name: "newItemQty", type: "input" },
+      { ref: newItemUnitPriceRef, name: "newItemUnitPrice", type: "input" },
+      {
+        ref: newItemDiscountAmountRef,
+        name: "newItemDiscountAmount",
+        type: "input",
+      },
     ];
     formData.items.forEach((_, index) => {
       fields.push(
@@ -1003,7 +1145,6 @@ const SalesInvoice = ({
       addItem();
       return;
     }
-
     if (currentField.name === `itemQty${formData.items.length - 1}`) {
       addItem();
       return;
@@ -1123,7 +1264,7 @@ const SalesInvoice = ({
   return (
     <ErrorBoundary>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm">
-        <div className="relative flex flex-col w-full h-full overflow-y-auto bg-white dark:bg-gray-800">
+        <div className="relative w-full h-full bg-white dark:bg-gray-800 overflow-y-auto flex flex-col">
           <h3 className="p-6 text-2xl font-bold text-blue-600 border-b border-gray-200">
             {isEditMode ? "Edit Invoice" : "Create New Invoice"}
           </h3>
@@ -1157,7 +1298,7 @@ const SalesInvoice = ({
                         ? "border-red-500"
                         : "border-gray-300 focus:border-blue-500"
                     }`}
-                    placeholder="INV-2024-001"
+                    placeholder="INV-2025-001"
                     readOnly
                   />
                 </div>
@@ -1500,7 +1641,7 @@ const SalesInvoice = ({
                 </div>
 
                 {/* Add Button */}
-                <div className="flex items-end md:col-span-1">
+                <div className="md:col-span-1 flex items-end">
                   <button
                     type="button"
                     onClick={addItem}
@@ -1543,37 +1684,37 @@ const SalesInvoice = ({
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         Product
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         Qty
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         Unit Price
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         Discount
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         Total
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         Actions
                       </th>
@@ -1583,28 +1724,39 @@ const SalesInvoice = ({
                     {formData.items.map((item, index) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {item.description || "No description"}
-                              </div>
-                              {item.discountScheme && (
-                                <div className="mt-1 text-xs text-green-600">
-                                  {item.discountSchemeType === "product"
-                                    ? `Product Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`
-                                    : `Category Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`}
-                                </div>
-                              )}
+                          <Select
+                            options={filteredProductOptions}
+                            value={
+                              filteredProductOptions.find(
+                                (option) => option.value === item.productId
+                              ) || null
+                            }
+                            onChange={(option) =>
+                              handleProductSelect(option, index)
+                            }
+                            styles={getSelectStyles(
+                              !!errors[`itemDescription${index}`]
+                            )}
+                            classNamePrefix="select"
+                            placeholder="Select product"
+                            isClearable
+                            isSearchable
+                          />
+                          {item.discountScheme && (
+                            <div className="text-xs text-green-600 mt-1">
+                              {item.discountSchemeType === "product"
+                                ? `Product Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`
+                                : `Category Discount: ${item.discountScheme.value}${item.discountScheme.type === "percentage" ? "%" : " LKR"}`}
                             </div>
-                          </div>
+                          )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                           {item.qty}
                         </td>
-                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                           {formatCurrency(item.unitPrice)}
                         </td>
-                        <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                           {item.discountAmount > 0 ? (
                             <span className="text-red-600">
                               -{formatCurrency(item.discountAmount)}
@@ -1613,14 +1765,14 @@ const SalesInvoice = ({
                             "-"
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           {formatCurrency(item.total)}
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="p-1 text-red-600 rounded-md hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md p-1"
                           >
                             Remove
                           </button>
@@ -1632,11 +1784,11 @@ const SalesInvoice = ({
                     <tr>
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-sm font-medium text-right text-gray-500 uppercase"
+                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
                       >
                         Subtotal
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900">
+                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
                         {formatCurrency(subtotal)}
                       </td>
                       <td></td>
@@ -1644,11 +1796,11 @@ const SalesInvoice = ({
                     <tr>
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-sm font-medium text-right text-gray-500 uppercase"
+                        className="px-6 py-4 text-right text-sm font-medium text-gray-500 uppercase"
                       >
                         Tax ({formData.purchaseDetails.taxPercentage}%)
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900">
+                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
                         {formatCurrency(tax)}
                       </td>
                       <td></td>
@@ -1656,11 +1808,11 @@ const SalesInvoice = ({
                     <tr className="bg-gray-100">
                       <td
                         colSpan="4"
-                        className="px-6 py-4 text-sm font-bold text-right text-gray-700 uppercase"
+                        className="px-6 py-4 text-right text-sm font-bold text-gray-700 uppercase"
                       >
                         Total
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-right text-gray-900">
+                      <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
                         {formatCurrency(total)}
                       </td>
                       <td></td>
