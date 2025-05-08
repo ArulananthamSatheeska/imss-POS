@@ -85,7 +85,7 @@ import { StoreAndLocationWiseProfit } from "./pages/Profit/StoreAndLocationWiseP
 import DailyProfitReport from "./pages/Profit/DailyProfit.jsx";
 import { SupplierWiseProfit } from "./pages/Profit/SupplierWiseProfit.jsx";
 import { CategoryWiseProfit } from "./pages/Profit/CategoryWiseProfit.jsx";
-
+import ItemForm from "./components/item Form/ItemForm.jsx";
 // === App Component ===
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(
@@ -170,7 +170,7 @@ function App() {
                   <Route path="units" element={<Units />} />
                   <Route path="UnitForm" element={<UnitForm />} />
                   <Route path="BarcodePage" element={<BarcodePage />} />
-
+                  <Route path="ItemForm" element={<ItemForm />} />
                   <Route path="SupplierForm" element={<SupplierForm />} />
                   <Route path="CategoryForm" element={<CategoryForm />} />
                   <Route path="store-locations" element={<StoreLocations />} />
@@ -179,7 +179,10 @@ function App() {
                     path="ItemWiseStockReport"
                     element={<ItemWiseReport />}
                   />
-                  <Route path="ItemWiseProfit" element={<DailyProfitReport/>} />
+                  <Route
+                    path="ItemWiseProfit"
+                    element={<DailyProfitReport />}
+                  />
                   <Route
                     path="BillWiseProfit"
                     element={<BillWiseProfitReport />}
@@ -236,7 +239,10 @@ function App() {
                     path="ProductionCategoryModal"
                     element={<ProductionCategoryModal />}
                   />
-                  <Route path="RawMaterialModal" element={<RawMaterialModal />} />
+                  <Route
+                    path="RawMaterialModal"
+                    element={<RawMaterialModal />}
+                  />
                 </Route>
               </Route>
 

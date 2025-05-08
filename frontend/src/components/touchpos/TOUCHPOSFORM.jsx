@@ -28,7 +28,6 @@ import HeldSalesList from "../pos/HeldSalesList";
 import { useRegister } from "../../context/RegisterContext";
 import RegisterModal from "../models/registerModel.jsx";
 import { useAuth } from "../../context/NewAuthContext.jsx";
-
 // Helper function to check if date is within discount scheme period
 const isDateWithinScheme = (invoiceDate, startDate, endDate) => {
   try {
@@ -145,6 +144,7 @@ const TOUCHPOSFORM = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [saleType, setSaleType] = useState("Retail");
   const [products, setProducts] = useState([]);
+  const [discountInputs, setDiscountInputs] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [items, setItems] = useState([]);
@@ -772,7 +772,7 @@ const TOUCHPOSFORM = () => {
     }
 
     const product = products[index];
-    const availableStock = parseFloat(product.stock || 0);
+    const availableStock = parseFloat(product.stock || 0).toFixed(2);
 
     if (parsedQty > availableStock) {
       alert(
@@ -783,14 +783,20 @@ const TOUCHPOSFORM = () => {
 
     const stockDifference = parsedQty - (product.qty || 0);
 
-    // Keep specialDiscount constant (not multiplied by quantity)
-    const specialDiscount = product.specialDiscount || 0;
-    const discountPerUnit = product.discountPerUnit || 0;
+    // Keep specialDiscountPerUnit separate
+    const specialDiscountPerUnit = product.specialDiscountPerUnit || 0;
+    let discountPerUnit = product.discountPerUnit || 0;
 
-    const totalDiscount = discountPerUnit * parsedQty;
+    // If quantity is zero, reset discountPerUnit to zero to avoid NaN issues
+    if (parsedQty === 0) {
+      discountPerUnit = 0;
+    }
 
-    const newTotal =
-      parsedQty * ((product.mrp || 0) - discountPerUnit) - specialDiscount;
+    // Calculate total discount as qty * (discountPerUnit + specialDiscountPerUnit)
+    const totalDiscount =
+      parsedQty * (discountPerUnit + specialDiscountPerUnit);
+
+    const newTotal = parsedQty * (product.mrp || 0) - totalDiscount;
 
     setProducts((prevProducts) =>
       prevProducts.map((p, i) =>
@@ -800,8 +806,9 @@ const TOUCHPOSFORM = () => {
               qty: parsedQty,
               price: product.price,
               discountPerUnit: discountPerUnit,
-              discount: totalDiscount,
-              specialDiscount: specialDiscount, // Keep original special discount amount
+              discount: discountPerUnit * parsedQty,
+              specialDiscountPerUnit: specialDiscountPerUnit,
+              specialDiscount: specialDiscountPerUnit * parsedQty,
               total: newTotal >= 0 ? newTotal : 0,
             }
           : p
@@ -1276,21 +1283,11 @@ const TOUCHPOSFORM = () => {
                           <div className="flex items-center justify-center gap-1 sm:gap-2">
                             <input
                               type="number"
-                              step="0.01"
-                              min="0"
                               className="w-16 p-1 text-sm text-center border rounded dark:bg-slate-700 dark:text-white sm:text-lg"
                               value={qty}
                               onChange={(e) =>
                                 updateProductQuantity(index, e.target.value)
                               }
-                              onBlur={(e) => {
-                                if (
-                                  e.target.value === "" ||
-                                  parseFloat(e.target.value) < 0
-                                ) {
-                                  updateProductQuantity(index, 0);
-                                }
-                              }}
                             />
                           </div>
                         </td>
@@ -1301,47 +1298,38 @@ const TOUCHPOSFORM = () => {
                         <td className="px-3 text-right border-r dark:border-gray-700">
                           <input
                             type="number"
-                            step="0.01"
-                            min="0"
                             className="w-20 py-1 text-sm text-right bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                             value={formatNumberWithCommas(
-                              parseFloat(
-                                (product.discountPerUnit || 0) +
-                                  (product.specialDiscount || 0) / product.qty
-                              ).toFixed(2)
+                              parseFloat(product.discountPerUnit || 0).toFixed(
+                                2
+                              )
                             )}
                             onChange={(e) => {
-                              const newTotalDiscountValue = parseFloat(
-                                e.target.value
+                              const newDiscountPerUnit = parseFloat(
+                                e.target.value.replace(/,/g, "")
                               );
                               if (
-                                isNaN(newTotalDiscountValue) ||
-                                newTotalDiscountValue < 0
+                                isNaN(newDiscountPerUnit) ||
+                                newDiscountPerUnit < 0
                               )
                                 return;
 
                               setProducts((prevProducts) =>
                                 prevProducts.map((p, i) => {
                                   if (i === index) {
-                                    // Calculate new discount per unit (excluding special discount)
-                                    const newDiscountPerUnit = Math.max(
-                                      0,
-                                      (newTotalDiscountValue -
-                                        (p.specialDiscount || 0)) /
-                                        (p.qty || 1)
-                                    );
+                                    const qty = p.qty || 1;
+                                    const specialDiscountPerUnit =
+                                      p.specialDiscountPerUnit || 0;
 
                                     const newPrice =
                                       (p.mrp || 0) - newDiscountPerUnit;
                                     const newTotal =
-                                      (p.qty || 1) * newPrice -
-                                      (p.specialDiscount || 0);
+                                      qty * (newPrice - specialDiscountPerUnit);
 
                                     return {
                                       ...p,
                                       discountPerUnit: newDiscountPerUnit,
-                                      discount:
-                                        newDiscountPerUnit * (p.qty || 1),
+                                      discount: newDiscountPerUnit * qty,
                                       price: newPrice >= 0 ? newPrice : 0,
                                       total: newTotal >= 0 ? newTotal : 0,
                                     };
@@ -1804,6 +1792,7 @@ const TOUCHPOSFORM = () => {
           onClose={closeBillModal}
         />
       )}
+
       {showCalculatorModal && (
         <CalculatorModal
           isOpen={showCalculatorModal}

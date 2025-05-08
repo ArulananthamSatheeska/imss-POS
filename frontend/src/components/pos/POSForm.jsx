@@ -1477,6 +1477,14 @@ const POSForm = ({
                   >
                     Disc
                   </th>
+
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-right border-r dark:border-gray-600 min-w-[80px]"
+                  >
+                    Unit Price
+                  </th>
+
                   <th
                     scope="col"
                     className="px-4 py-3 text-right border-r dark:border-gray-600 min-w-[110px]"
@@ -1576,6 +1584,11 @@ const POSForm = ({
                           }
                           onFocus={(e) => e.target.select()}
                         />
+                      </td>
+                      <td className="px-1 py-1 text-center border-r dark:border-gray-700">
+                        {formatNumberWithCommas(
+                          product.sales_price?.toFixed(2) ?? 0.0
+                        )}
                       </td>
                       <td className="px-4 py-2 font-medium text-right text-gray-900 border-r dark:text-white dark:border-gray-700">
                         {formatNumberWithCommas(

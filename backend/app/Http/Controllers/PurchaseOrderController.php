@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseOrder;
 use App\Models\OrderItem;
+use App\Http\Resources\PurchaseOrderResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
@@ -14,8 +15,8 @@ class PurchaseOrderController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $purchaseOrders = PurchaseOrder::with(['orderItems', 'supplier'])->get();
-            return response()->json($purchaseOrders);
+            $purchaseOrders = PurchaseOrder::with(['orderItems.product', 'supplier'])->get();
+            return PurchaseOrderResource::collection($purchaseOrders);
         } catch (\Exception $e) {
             Log::error('Error fetching purchase orders: ' . $e->getMessage());
             return response()->json([
@@ -34,6 +35,7 @@ class PurchaseOrderController extends Controller
                 'phone' => 'required|string|max:20',
                 'address' => 'required|string|max:255',
                 'items' => 'required|array|min:1',
+                'items.*.productId' => 'required|exists:products,id',
                 'items.*.description' => 'required|string|max:255',
                 'items.*.qty' => 'required|integer|min:1',
                 'items.*.unitPrice' => 'required|numeric|min:0',
@@ -53,6 +55,7 @@ class PurchaseOrderController extends Controller
             foreach ($validated['items'] as $item) {
                 OrderItem::create([
                     'purchase_order_id' => $purchaseOrder->id,
+                    'product_id' => $item['productId'],
                     'description' => $item['description'],
                     'qty' => $item['qty'],
                     'unit_price' => $item['unitPrice'],
@@ -88,10 +91,8 @@ class PurchaseOrderController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $purchaseOrder = PurchaseOrder::with(['orderItems', 'supplier'])->findOrFail($id);
-            return response()->json([
-                'purchaseOrder' => $purchaseOrder,
-            ]);
+            $purchaseOrder = PurchaseOrder::with(['orderItems.product', 'supplier'])->findOrFail($id);
+            return new PurchaseOrderResource($purchaseOrder);
         } catch (\Exception $e) {
             Log::error('Error fetching purchase order: ' . $e->getMessage());
             return response()->json([
@@ -132,6 +133,7 @@ class PurchaseOrderController extends Controller
             foreach ($validated['items'] as $item) {
                 OrderItem::create([
                     'purchase_order_id' => $purchaseOrder->id,
+                    'product_id' => $item['productId'],
                     'description' => $item['description'],
                     'qty' => $item['qty'],
                     'unit_price' => $item['unitPrice'],

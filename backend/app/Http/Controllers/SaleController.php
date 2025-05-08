@@ -576,6 +576,107 @@ class SaleController extends Controller
         }
     }
 
+    public function getCombinedDailyProfitReport(Request $request)
+    {
+       try {
+           $date = $request->input('date', now()->format('Y-m-d'));
+
+            $sales = Sale::with(['items.product'])
+              ->whereDate('created_at', $date)
+               ->get();
+          $invoices = \App\Models\Invoice::with('items.product')
+               ->whereDate('invoice_date', $date)
+               ->get();
+
+           $combinedReportData = [];
+            $totalCostPriceAll = 0;
+            $totalSellingPriceAll = 0;
+            $totalProfitAll = 0;
+
+            foreach ($sales as $sale) {
+                foreach ($sale->items as $item) {
+                    $product = $item->product;
+                    $productName = $product ? $product->product_name : 'Unknown Product';
+                    $costPrice = $product ? $product->buying_cost * $item->quantity : 0;
+                    $sellingPrice = $item->unit_price * $item->quantity;
+                    $profit = $sellingPrice - $costPrice;
+
+                    if (!isset($combinedReportData[$productName])) {
+                        $combinedReportData[$productName] = [
+                            'product_name' => $productName,
+                           'total_quantity_sold' => 0,
+                           'total_sales_amount' => 0,
+                           'total_cost' => 0,
+                            'total_profit' => 0,
+                        ];
+                   }
+
+                    $combinedReportData[$productName]['total_quantity_sold'] += $item->quantity;
+                    $combinedReportData[$productName]['total_sales_amount'] += $sellingPrice;
+                    $combinedReportData[$productName]['total_cost'] += $costPrice;
+                    $combinedReportData[$productName]['total_profit'] += $profit;
+                    $totalCostPriceAll += $costPrice;
+                    $totalSellingPriceAll += $sellingPrice;
+                    $totalProfitAll += $profit;
+               }
+          }
+
+            foreach ($invoices as $invoice) {
+                foreach ($invoice->items as $item) {
+                    $product = $item->product;
+                    $productName = $product ? $product->product_name : ($item->description ?? 'Unknown Product');
+                    $costPrice = $product ? $product->buying_cost * $item->quantity : 0;                    $sellingPrice = $item->sales_price * $item->quantity;
+                    $profit = $sellingPrice - $costPrice;
+
+                    if (!isset($combinedReportData[$productName])) {
+                        $combinedReportData[$productName] = [
+                            'product_name' => $productName,
+                            'total_quantity_sold' => 0,
+                            'total_sales_amount' => 0,                            'total_cost' => 0,
+                            'total_profit' => 0,
+                        ];
+                    }
+
+                    $combinedReportData[$productName]['total_quantity_sold'] += $item->quantity;
+                    $combinedReportData[$productName]['total_sales_amount'] += $sellingPrice;
+                    $combinedReportData[$productName]['total_cost'] += $costPrice;
+                    $combinedReportData[$productName]['total_profit'] += $profit;
+
+                    $totalCostPriceAll += $costPrice;
+                    $totalSellingPriceAll += $sellingPrice;
+                    $totalProfitAll += $profit;
+                }
+            }
+
+            $combinedReportData = array_map(function ($item) {
+                $profitPercentage = ($item['total_cost'] > 0) ? ($item['total_profit'] / $item['total_cost']) * 100 : 0;
+                return [
+                    'product_name' => $item['product_name'],
+                    'total_quantity_sold' => number_format($item['total_quantity_sold'], 2),
+                    'total_sales_amount' => number_format($item['total_sales_amount'], 2),
+                    'total_cost' => number_format($item['total_cost'], 2),
+                    'total_profit' => number_format($item['total_profit'], 2),
+                   'profit_percentage' => number_format($profitPercentage, 2) . '%',
+                ];     
+       }, array_values($combinedReportData));
+
+            $summary = [
+                'totalCostPriceAll' => number_format($totalCostPriceAll, 2),
+                'totalSellingPriceAll' => number_format($totalSellingPriceAll, 2),
+                'totalProfitAll' => number_format($totalProfitAll, 2),
+                'averageProfitPercentageAll' => ($totalCostPriceAll > 0) ? number_format(($totalProfitAll / $totalCostPriceAll) * 100, 2) . '%' : '0.00%',
+            ];
+
+            return response()->json([
+                'reportData' => $combinedReportData,
+                'summary' => $summary,
+            ]);
+      } catch (\Exception $e) {
+            Log::error('Error in getCombinedDailyProfitReport: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch combined daily profit report.'], 500);
+        }
+    }
+
     public function getCompanyWiseProfitReport(Request $request)
     {
         try {
