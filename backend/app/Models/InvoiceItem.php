@@ -31,6 +31,7 @@ class InvoiceItem extends Model
         'description',
         'quantity',
         'unit_price',
+        'sales_price',
         'discount_amount',
         'discount_percentage',
         'total',
@@ -50,6 +51,7 @@ class InvoiceItem extends Model
     protected $casts = [
         'quantity' => 'decimal:2',
         'unit_price' => 'decimal:2',
+        'sales_price' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'discount_percentage' => 'decimal:2',
         'special_discount' => 'decimal:2',

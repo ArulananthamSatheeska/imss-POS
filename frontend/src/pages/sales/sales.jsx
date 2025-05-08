@@ -161,12 +161,14 @@ const SalesReport = () => {
   ) => {
     const url = `${API_BASE_URL}/${type === "invoice" ? "invoices" : "sales"}`;
     try {
+      console.log("Sending invoice data to API:", newInvoiceData);
       const response = await axios.post(url, newInvoiceData, {
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
       });
+      console.log("API response:", response.data);
       fetchReportData();
       setShowInvoiceModal(false);
       alert(`${type === "invoice" ? "Invoice" : "Sale"} created successfully!`);
@@ -330,7 +332,8 @@ const SalesReport = () => {
           discount: parseFloat(item.discount) || 0,
           total:
             parseFloat(item.total) ||
-            (parseFloat(item.unit_price) || 0) * (parseFloat(item.quantity) || 1),
+            (parseFloat(item.unit_price) || 0) *
+              (parseFloat(item.quantity) || 1),
           serialNumber: index + 1,
           specialDiscount: 0, // Assuming no special discount for simplicity
         })
@@ -393,12 +396,15 @@ const SalesReport = () => {
             <div><strong>Customer:</strong> ${customerInfo.name}</div>
             <div><strong>Cashier:</strong> Admin</div>
             <div><strong>Payment:</strong> ${paymentType}</div>
-            <div><strong>Time:</strong> ${new Date().toLocaleTimeString("en-IN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: true,
-            })}</div>
+            <div><strong>Time:</strong> ${new Date().toLocaleTimeString(
+              "en-IN",
+              {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true,
+              }
+            )}</div>
           </div>
 
           <!-- Items Table -->
@@ -760,7 +766,8 @@ const SalesReport = () => {
           discount: parseFloat(item.discount) || 0,
           total:
             parseFloat(item.total) ||
-            (parseFloat(item.unit_price) || 0) * (parseFloat(item.quantity) || 1),
+            (parseFloat(item.unit_price) || 0) *
+              (parseFloat(item.quantity) || 1),
           serialNumber: index + 1,
         })
       );
@@ -896,6 +903,8 @@ const SalesReport = () => {
         quantity: parseFloat(product.qty) || 1,
         mrp: parseFloat(product.mrp) || 0,
         unit_price: parseFloat(product.price) || 0,
+        sales_price:
+          parseFloat(product.price) || parseFloat(product.unit_price) || 0,
         discount: parseFloat(product.discount) || 0,
         total: parseFloat(product.total) || 0,
       })),
@@ -1160,7 +1169,9 @@ const SalesReport = () => {
                     <React.Fragment key={`${row.type}-${row.id}`}>
                       <tr
                         className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${
-                          expandedRow === index ? "bg-blue-50 dark:bg-slate-700" : ""
+                          expandedRow === index
+                            ? "bg-blue-50 dark:bg-slate-700"
+                            : ""
                         }`}
                       >
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
@@ -1205,15 +1216,23 @@ const SalesReport = () => {
                               ${
                                 row.payment_method.toLowerCase() === "cash"
                                   ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
-                                  : row.payment_method.toLowerCase().includes("card")
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300"
-                                  : row.payment_method.toLowerCase().includes("online")
-                                  ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
-                                  : row.payment_method.toLowerCase().includes("cheque")
-                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300"
-                                  : row.payment_method.toLowerCase().includes("credit")
-                                  ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
-                                  : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200"
+                                  : row.payment_method
+                                        .toLowerCase()
+                                        .includes("card")
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300"
+                                    : row.payment_method
+                                          .toLowerCase()
+                                          .includes("online")
+                                      ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
+                                      : row.payment_method
+                                            .toLowerCase()
+                                            .includes("cheque")
+                                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300"
+                                        : row.payment_method
+                                              .toLowerCase()
+                                              .includes("credit")
+                                          ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
+                                          : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200"
                               }`}
                           >
                             {row.payment_method}
@@ -1299,14 +1318,19 @@ const SalesReport = () => {
                                     Discount:
                                   </div>
                                   <div className="font-medium text-right text-red-600 dark:text-red-400">
-                                    -{formatCurrency(
+                                    -
+                                    {formatCurrency(
                                       row.items.reduce(
                                         (sum, item) =>
                                           sum +
                                           (parseFloat(
-                                            item.discount || item.discount_amount || 0
+                                            item.discount ||
+                                              item.discount_amount ||
+                                              0
                                           ) +
-                                            parseFloat(item.special_discount || 0)),
+                                            parseFloat(
+                                              item.special_discount || 0
+                                            )),
                                         0
                                       )
                                     )}
@@ -1375,7 +1399,8 @@ const SalesReport = () => {
                                 <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-400">
                                   Items Purchased ({row.items?.length || 0})
                                 </h4>
-                                {Array.isArray(row.items) && row.items.length > 0 ? (
+                                {Array.isArray(row.items) &&
+                                row.items.length > 0 ? (
                                   <div className="overflow-x-auto max-h-60">
                                     <table className="min-w-full text-xs divide-y divide-gray-200 dark:divide-slate-600">
                                       <thead className="sticky top-0 text-gray-700 bg-gray-100 dark:bg-slate-700 dark:text-gray-300">
@@ -1405,7 +1430,8 @@ const SalesReport = () => {
                                           <tr key={item.id || i}>
                                             <td className="px-2 py-1 font-medium text-gray-900 dark:text-white">
                                               {row.type === "sale"
-                                                ? item.product_name || "Unknown Product"
+                                                ? item.product_name ||
+                                                  "Unknown Product"
                                                 : item.description || "N/A"}
                                             </td>
                                             <td className="px-2 py-1 text-center text-gray-600 dark:text-gray-300">
@@ -1413,16 +1439,22 @@ const SalesReport = () => {
                                             </td>
                                             <td className="px-2 py-1 text-right text-gray-600 dark:text-gray-300">
                                               {formatCurrency(
-                                                item.unit_price || item.sales_price || 0
+                                                item.unit_price ||
+                                                  item.sales_price ||
+                                                  0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
                                               {formatCurrency(
-                                                item.discount || item.discount_amount || 0
+                                                item.discount ||
+                                                  item.discount_amount ||
+                                                  0
                                               )}
                                             </td>
                                             <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
-                                              {formatCurrency(item.special_discount || 0)}
+                                              {formatCurrency(
+                                                item.special_discount || 0
+                                              )}
                                             </td>
                                             <td className="px-2 py-1 font-semibold text-right text-gray-900 dark:text-white">
                                               {formatCurrency(item.total || 0)}
