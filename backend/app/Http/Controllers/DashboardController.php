@@ -17,89 +17,153 @@ class DashboardController extends Controller
     {
         try {
             $today = Carbon::today();
-
-            // Total Sales: sum of POS sales for today (include fully and partially paid)
-            $posSalesTotal = Sale::whereDate('created_at', $today)
-                ->sum('total');
-
-            // Total Sales from invoices for today (include fully and partially paid)
-            $invoiceSalesTotal = DB::table('invoices')
-                ->whereDate('created_at', $today)
-                ->sum('total_amount');
-
-            $totalTodaysSales = $posSalesTotal + $invoiceSalesTotal;
-
-            // Total Items (count of active products)
-            $totalItems = Product::count();
-
-            // Today's Total Costs: sum of buying_cost * quantity sold today (POS sales only)
-            $todaySalesItems = SaleItem::whereHas('sale', function ($query) use ($today) {
-                $query->whereDate('created_at', $today);
-            })->get();
-
-            $todaysTotalCosts = 0;
-            foreach ($todaySalesItems as $item) {
-                $buyingCost = $item->product ? $item->product->buying_cost : 0;
-                $todaysTotalCosts += $buyingCost * $item->quantity;
-            }
-
-            // Total Profit: calculate as total sales minus total costs
-            $totalProfit = $totalTodaysSales - $todaysTotalCosts;
-
-            // Financial Status
-            // Sales Payment Due: sum of due amounts from invoices only (exclude POS sales)
-            $salesPaymentDue = DB::table('invoices')
-                ->where('balance', '>', 0)
-                ->sum('balance');
-
-            // Purchase Payment Due (sum of total - paid_amount for unpaid/partially paid purchases)
-            $purchasePaymentDue = Purchase::whereColumn('paid_amount', '<', 'total')
-                ->sum(DB::raw('total - paid_amount'));
-
-            // Expiry Tracking
             $thirtyDaysLater = $today->copy()->addDays(30);
-            $itemsGoingToExpire = Product::whereBetween('expiry_date', [$today, $thirtyDaysLater])->count();
-            $alreadyExpiredItems = Product::whereDate('expiry_date', '<', $today)->count();
 
-            // Charts and Reports
-            $monthlySales = Sale::select(
-                    DB::raw("DATE_FORMAT(created_at, '%Y-%m') as month"),
-                    DB::raw('SUM(total) as total_sales')
-                )
-                ->where('created_at', '>=', $today->copy()->subMonths(11)->startOfMonth())
-                ->groupBy('month')
-                ->orderBy('month')
-                ->get();
-
-            $topSellingProducts = SaleItem::select('product_id', 'product_name', DB::raw('SUM(quantity) as total_quantity_sold'))
-                ->groupBy('product_id', 'product_name')
-                ->orderByDesc('total_quantity_sold')
-                ->limit(10)
-                ->get();
+            // Today's financial calculations
+            $todayFinancials = $this->calculateDailyFinancials($today);
+            
+            // Total financial calculations
+            $totalFinancials = $this->calculateTotalFinancials();
+            
+            // Payment dues
+            $paymentDues = $this->calculatePaymentDues();
+            
+            // Expiry tracking
+            $expiryTracking = [
+                'itemsGoingToExpire' => Product::whereBetween('expiry_date', [$today, $thirtyDaysLater])->count(),
+                'alreadyExpiredItems' => Product::whereDate('expiry_date', '<', $today)->count(),
+            ];
+            
+            // Charts and reports
+            $reports = $this->generateReports($today);
 
             return response()->json([
                 'summaryCards' => [
-                    'totalTodaysSales' => round($totalTodaysSales, 2),
-                    'totalItems' => $totalItems,
-                    'todaysTotalCosts' => round($todaysTotalCosts, 2),
-                    'todaysProfit' => round($totalProfit, 2),
+                    'totalTodaysSales' => round($todayFinancials['revenue'], 2),
+                    'todaysProfit' => round($todayFinancials['profit'], 2),
+                    'totalItems' => Product::count(),
+                    'totalProfit' => round($totalFinancials['profit'], 2),
                 ],
                 'financialStatus' => [
-                    'salesPaymentDue' => round($salesPaymentDue, 2),
-                    'purchasePaymentDue' => round($purchasePaymentDue, 2),
+                    'salesPaymentDue' => round($paymentDues['sales'], 2),
+                    'purchasePaymentDue' => round($paymentDues['purchases'], 2),
                 ],
-                'expiryTracking' => [
-                    'itemsGoingToExpire' => $itemsGoingToExpire,
-                    'alreadyExpiredItems' => $alreadyExpiredItems,
-                ],
-                'chartsAndReports' => [
-                    'monthlySales' => $monthlySales,
-                    'topSellingProducts' => $topSellingProducts,
-                ],
+                'expiryTracking' => $expiryTracking,
+                'chartsAndReports' => $reports,
             ]);
+
         } catch (\Exception $e) {
-            Log::error('Error in DashboardController@dashboard: ' . $e->getMessage());
-            return response()->json(['error' => 'Internal Server Error: ' . $e->getMessage()], 500);
+            Log::error('Dashboard error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json(['error' => 'Internal Server Error', 'message' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
+    }
+
+    protected function calculateDailyFinancials(Carbon $date)
+    {
+        // Today's sales revenue and profit (POS)
+        $salesData = SaleItem::with('product')
+            ->whereHas('sale', fn($q) => $q->whereDate('created_at', $date))
+            ->selectRaw('SUM(unit_price * quantity) as revenue, 
+                         SUM((unit_price - COALESCE(products.buying_cost, 0)) * quantity) as profit')
+            ->join('products', 'sale_items.product_id', '=', 'products.product_id')
+            ->first();
+
+        // Today's invoice revenue and profit
+        $invoiceData = DB::table('invoice_items')
+            ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+            ->whereDate('invoices.invoice_date', $date)
+            ->selectRaw('SUM(sales_price * quantity) as revenue,
+                        SUM((sales_price * quantity) - total_buying_cost) as profit')
+            ->first();
+
+        return [
+            'revenue' => ($salesData->revenue ?? 0) + ($invoiceData->revenue ?? 0),
+            'profit' => ($salesData->profit ?? 0) + ($invoiceData->profit ?? 0)
+        ];
+    }
+
+    protected function calculateTotalFinancials()
+    {
+        $salesData = DB::table('sale_items')
+            ->join('products', 'sale_items.product_id', '=', 'products.product_id')
+            ->selectRaw('SUM(unit_price * quantity) as revenue, 
+                         SUM((unit_price - COALESCE(products.buying_cost, 0)) * quantity) as profit')
+            ->first();
+
+        $invoiceData = DB::table('invoice_items')
+            ->selectRaw('SUM(sales_price * quantity) as revenue,
+                        SUM((sales_price * quantity) - total_buying_cost) as profit')
+            ->first();
+
+        return [
+            'revenue' => ($salesData->revenue ?? 0) + ($invoiceData->revenue ?? 0),
+            'profit' => ($salesData->profit ?? 0) + ($invoiceData->profit ?? 0)
+        ];
+    }
+
+    protected function calculatePaymentDues()
+    {
+        return [
+            'sales' => DB::table('invoices')->where('balance', '>', 0)->sum('balance'),
+            'purchases' => DB::table('purchases')
+                ->whereRaw('paid_amount < total')
+                ->selectRaw('SUM(total - paid_amount) as due')
+                ->value('due') ?? 0
+        ];
+    }
+
+    protected function generateReports(Carbon $today)
+    {
+        // Get monthly sales from POS sales
+        $posMonthlySales = Sale::query()
+            ->select(
+                DB::raw("DATE_FORMAT(created_at, '%Y-%m') as month"),
+                DB::raw('SUM(total) as total_sales')
+            )
+            ->where('created_at', '>=', $today->copy()->subMonths(11)->startOfMonth())
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        // Get monthly sales from invoices
+        $invoiceMonthlySales = DB::table('invoices')
+            ->select(
+                DB::raw("DATE_FORMAT(invoice_date, '%Y-%m') as month"),
+                DB::raw('SUM(total_amount) as total_sales')
+            )
+            ->where('invoice_date', '>=', $today->copy()->subMonths(11)->startOfMonth())
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        // Combine POS and invoice monthly sales
+        $combinedMonthlySales = [];
+
+        $allMonths = $posMonthlySales->keys()->merge($invoiceMonthlySales->keys())->unique()->sort();
+
+        foreach ($allMonths as $month) {
+            $posSales = $posMonthlySales->has($month) ? $posMonthlySales[$month]->total_sales : 0;
+            $invoiceSales = $invoiceMonthlySales->has($month) ? $invoiceMonthlySales[$month]->total_sales : 0;
+            $combinedMonthlySales[] = [
+                'month' => $month,
+                'total_sales' => $posSales + $invoiceSales,
+            ];
+        }
+
+        return [
+            'monthlySales' => $combinedMonthlySales,
+            'topSellingProducts' => SaleItem::query()
+                ->with('product')
+                ->select('product_id', 
+                    DB::raw('MAX(product_name) as product_name'),
+                    DB::raw('SUM(quantity) as total_quantity_sold')
+                )
+                ->groupBy('product_id')
+                ->orderByDesc('total_quantity_sold')
+                ->limit(10)
+                ->get()
+        ];
     }
 }

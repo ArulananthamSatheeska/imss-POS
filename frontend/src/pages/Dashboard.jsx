@@ -104,10 +104,10 @@ const Dashboard = () => {
     },
     {
       title: "Total Profit",
-      value: `LKR ${Number(dashboardData.summaryCards.todaysProfit).toLocaleString()}`,
+      value: `LKR ${Number(dashboardData.summaryCards.totalProfit).toLocaleString()}`,
       icon: TrendingUp,
       trend:
-        Number(dashboardData.summaryCards.todaysProfit) >= 0 ? "up" : "down",
+        Number(dashboardData.summaryCards.totalProfit) >= 0 ? "up" : "down",
       percentage: "Total Profit",
     },
   ];
