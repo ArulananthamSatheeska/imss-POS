@@ -134,7 +134,7 @@ const SalesInvoice = ({
       customer: { id: null, name: "", address: "", phone: "", email: "" },
       items: [],
       purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
-      status: "pending",
+      status: "unpaid",
       id: null,
     };
   };
@@ -1036,6 +1036,21 @@ const SalesInvoice = ({
     );
   }, [calculateTotal, formData.purchaseDetails.amount]);
 
+  // Update status based on payment amount and total
+  useEffect(() => {
+    const amountPaid = parseFloat(formData.purchaseDetails.amount) || 0;
+    const totalAmount = calculateTotal();
+    if (amountPaid >= totalAmount) {
+      if (formData.status !== "paid") {
+        setFormData((prev) => ({ ...prev, status: "paid" }));
+      }
+    } else {
+      if (formData.status !== "unpaid") {
+        setFormData((prev) => ({ ...prev, status: "unpaid" }));
+      }
+    }
+  }, [formData.purchaseDetails.amount, calculateTotal, formData.status]);
+
   const validateForm = () => {
     const newErrors = {};
     const { invoice, customer, items, purchaseDetails } = formData;
@@ -1229,11 +1244,21 @@ const SalesInvoice = ({
             customer: { id: null, name: "", address: "", phone: "", email: "" },
             items: [],
             purchaseDetails: { method: "cash", amount: 0, taxPercentage: 0 },
-            status: "pending",
+            status: "unpaid",
             id: null,
           });
           setErrors({});
           invoiceNoRef.current?.focus();
+        }
+        // Update status after save based on paid amount and grand total
+        const amountPaid = parseFloat(formData.purchaseDetails.amount) || 0;
+        const subtotal = calculateSubtotal();
+        const tax = calculateTax(subtotal);
+        const grandTotal = subtotal + tax;
+        if (amountPaid >= grandTotal) {
+          setFormData((prev) => ({ ...prev, status: "paid" }));
+        } else {
+          setFormData((prev) => ({ ...prev, status: "unpaid" }));
         }
       } catch (error) {
         const message =
@@ -1254,7 +1279,15 @@ const SalesInvoice = ({
         setLoading(false);
       }
     },
-    [formData, isEditMode, onGenerateInvoice, onUpdateInvoice, products]
+    [
+      formData,
+      isEditMode,
+      onGenerateInvoice,
+      onUpdateInvoice,
+      products,
+      calculateSubtotal,
+      calculateTax,
+    ]
   );
 
   useEffect(() => {
@@ -2074,10 +2107,18 @@ const SalesInvoice = ({
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Subtotal:</span>
+
                     <span className="text-sm font-medium">
-                      {formatCurrency(subtotal)}
+                      {formatCurrency(total)}
                     </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Discount:</span>
+                    <span className="text-sm font-medium">
+                      {formatCurrency(calculateTotalDiscount())}
+                    </span>
+                  </div>
+
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">
                       Tax ({formData.purchaseDetails.taxPercentage}%):
@@ -2087,13 +2128,15 @@ const SalesInvoice = ({
                     </span>
                   </div>
                   <div className="flex justify-between pt-3 border-t border-gray-200">
-                    <span className="text-base font-semibold">Total:</span>
                     <span className="text-base font-semibold">
-                      {formatCurrency(total)}
+                      Grand Total:
+                    </span>
+                    <span className="text-base font-semibold">
+                      {formatCurrency(total - calculateTotalDiscount())}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Amount Paid:</span>
+                    <span className="text-sm text-gray-600">Paid:</span>
                     <span className="text-sm font-medium">
                       {formatCurrency(
                         parseFloat(formData.purchaseDetails.amount) || 0

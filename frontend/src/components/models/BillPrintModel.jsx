@@ -229,141 +229,175 @@ const BillPrintModal = ({
     iframe.style.width = "0px";
     iframe.style.height = "0px";
     iframe.style.border = "none";
+    iframe.style.left = "-1000px"; // Move off-screen
     document.body.appendChild(iframe);
 
     const iframeDoc = iframe.contentWindow.document;
     iframeDoc.open();
     iframeDoc.write(`
       <html>
-        <head>
-          <style>
-            body {
-              font-family: "Arial", sans-serif;
-              font-size: 12px;
-              text-align: center;
-              margin: 1px;
-              padding: 0;
-              background-color: #fff;
-            }
-            .bill-header {
-              margin-bottom: 10px;
-            }
-            .shop-name {
-              font-size: 22px;
-              font-weight: bold;
-              text-transform: uppercase;
-              color: #222;
-              margin-bottom: 0;
-            }
-            .shop-address, .shop-contact {
-              font-size: 14px;
-              font-weight: normal;
-              color: #555;
-              margin-bottom: 2px;
-            }
-            .bill-info {
-              font-size: 10px;
-              color: #000;
-              margin-top: 0;
-              padding-top: 0;
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 10px;
-            }
-            .bill-info div {
-              text-align: left;
-            }
-            .bill-info div:nth-child(odd) {
-              margin-left: 10px;
-            }
-            .bill-table {
-              padding: 2px;
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-            }
-            .bill-table th, .bill-table td {
-              font-size: 12px;
-              border-bottom: 1px dashed #000;
-              padding: 4px;
-              text-align: right;
-            }
-            .bill-table th {
-              background-color: #f5f5f5;
-              color: #000;
-              font-weight: bold;
-              text-align: center;
-              border-bottom: 1px dashed #000;
-              border-top: 1px solid #000;
-            }
-            .bill-table td:nth-child(2) {
-              text-align: left;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .bill-summary {
-              text-align: right;
-              margin-top: 10px;
-              font-size: 14px;
-              padding-top: 6px;
-              border-top: 1px solid #000;
-            }
-            .bill-summary p {
-              margin: 6px 0;
-              font-weight: bold;
-            }
-            .total-amount {
-              font-size: 16px;
-              font-weight: bold;
-              color: #d32f2f;
-            }
-            .terms-conditions {
-              font-size: 11px;
-              text-align: left;
-              margin-top: 12px;
-              border-top: 1px solid #000;
-              padding-top: 2px;
-            }
-            .terms-conditions h4 {
-              font-weight: bold;
-              text-align: center;
-            }
-            .thanks {
-              font-size: 13px;
-              font-weight: bold;
-              margin: 0;
-              color: #000;
-            }
-            .systemby {
-              font-size: 8px;
-              font-weight: bold;
-              margin: 0px;
-              color: #444;
-              padding: 0;
-            }
-            .systemby-web {
-              font-size: 10px;
-              font-style: italic;
-              color: #777;
-              padding: 0;
-              margin: 0;
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
+  <head>
+    <title>Receipt Print</title>
+    <style>
+      /* Reset and base styles */
+      * {
+        marginright: 2px;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Arial", sans-serif;
+        font-size: 12px;
+        width: 95%; /* Thermal printer width */
+        margin: 0;
+        padding: 2mm; /* Reduced from auto to 2mm */
+        color: #000;
+        background: white;
+      }
+      
+      /* Header styles */
+      .bill-header {
+        margin-bottom: 3px;
+        text-align: center;
+      }
+      .bill-header img {
+        max-width: 60mm; /* Reduced from 70mm */
+        height: auto;
+        margin: 0 auto 3px auto;
+      }
+      .shop-address {
+        font-size: 13px; /* Reduced from 15px */
+        margin-bottom: 2px;
+      }
+      .shop-contact {
+        font-size: 12px; /* Reduced from 14px */
+        margin-bottom: 3px;
+      }
+      
+      /* Bill info grid */
+      .bill-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px; /* Reduced from 2px */
+        font-size: 12px;
+        margin-bottom: 3px; /* Reduced from 5px */
+        padding: 0; /* Added slight side padding */
+      }
+      .bill-info div:nth-child(even) {
+        text-align: right;
+      }
+      
+      /* Table styles */
+      table {
+        width: 100%;
+        margin: 5px 0; /* Reduced from 5px */
+        font-size: 12px; /* Reduced from 14px */
+      }
+      th, td {
+        padding: 1px 0.5px; /* Reduced padding */
+      }
+      th {
+        border-bottom: 1px solid #000;
+        border-top: 1px solid #000;
+        background-color: #f0f0f0;
+        text-align: center;
+        font-size: 13px; /* Added for consistency */
+      }
+      .tr-name td {
+        border-bottom: none;
+        font-weight:lighter;
+        font-size: 14px;
+      }
+      .tr-details td {
+        border-top: none;
+        font-size: 13px; /* Reduced from 12px */
+
+      }
+      td:nth-child(1) { width: 8%; text-align: center; }
+      td:nth-child(2) { width: 32%; text-align: left; padding-left: 1px; }
+      td:nth-child(3) { width: 10%; text-align: center; }
+      td:nth-child(4),
+      td:nth-child(5),
+      td:nth-child(6),
+      td:nth-child(7) { width: 15%; text-align: right; padding-right: 1px; }
+      
+      /* Summary section */
+      .billing-summary {
+        margin-top: 5px; /* Reduced from 8px */
+        font-size: 13px; /* Reduced from 16px */
+        padding: 0 1mm; /* Added side padding */
+      }
+      .billing-summary h3 {
+        font-size: 12px;
+        margin-bottom: 2px; /* Reduced from 3px */
+        text-decoration: underline;
+      }
+      .billing-summary p {
+        margin: 1px 0; /* Reduced from 2px */
+      }
+      .billing-summary .grand-total {
+        font-size: 13px;
+        font-weight: bold;
+        margin-top: 2px; /* Reduced from 3px */
+      }
+      
+      /* Footer sections */
+      .terms-conditions {
+        font-size: 9px;
+        margin-top: 5px; /* Reduced from 8px */
+        padding: 2px 1mm 0 1mm; /* Added side padding */
+        border-top: 1px dashed #000;
+      }
+      .terms-conditions h4 {
+        text-align: center;
+        margin-bottom: 1px; /* Reduced from 2px */
+        font-size: 10px; /* Reduced from 11px */
+      }
+      .thanks {
+        font-size: 12px;
+        font-weight: bold;
+        margin: 3px 0; /* Reduced from 5px */
+        text-align: center;
+      }
+      .systemby {
+        font-size: 8px;
+        text-align: center;
+        margin-top: 2px; /* Reduced from 3px */
+      }
+      .systemby-web {
+        font-size: 9px;
+        text-align: center;
+        font-style: italic;
+        margin-bottom: 2px; /* Added for bottom spacing */
+      }
+      
+      /* Utility classes */
+      .text-left { text-align: left; }
+      .text-center { text-align: center; }
+      .text-right { text-align: right; }
+      .font-bold { font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    ${printContent}
+  </body>
+</html>
     `);
     iframeDoc.close();
 
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
+    // Wait for content to load before printing
+    iframe.onload = function () {
+      setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
 
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 500);
+        // Clean up after printing
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 500);
+      }, 100);
+    };
   };
 
   // Handle confirm actions
@@ -840,12 +874,12 @@ const BillPrintModal = ({
                 src={logo}
                 alt="Logo"
                 className="mx-auto my-0 mb-2 p-0"
-                style={{ width: "70px", height: "auto", objectFit: "contain" }}
+                style={{ width: "140px", height: "auto", objectFit: "contain" }}
               />
               {/* <div className="text-xl font-bold uppercase shop-name">
                 SHARVAKSHA FOOD CITY
               </div> */}
-              <div className="text-sm shop-address">
+              <div className="text-lg shop-address">
                 Main Street Thambiluvil 01
               </div>
               <div className="text-sm shop-contact">Mob: 0750296343</div>
@@ -853,7 +887,7 @@ const BillPrintModal = ({
             </div>
 
             {/* Bill Info */}
-            <div className="grid grid-cols-2 gap-2 mt-2 text-xs bill-info">
+            <div className="grid grid-cols-2 gap-2 mt-2 text-sm bill-info">
               <div>
                 <strong>Bill No:</strong> {initialCustomerInfo.bill_number}
               </div>
@@ -865,7 +899,21 @@ const BillPrintModal = ({
                 {selectedCustomer?.name || "Walk-in Customer"}
               </div>
               <div>
-                <strong>Cashier:</strong> Admin
+                <strong>Cashier:</strong>{" "}
+                {(() => {
+                  try {
+                    const storedUser =
+                      localStorage.getItem("user") ||
+                      sessionStorage.getItem("user");
+                    if (storedUser) {
+                      const user = JSON.parse(storedUser);
+                      return user.name || user.username || "Admin";
+                    }
+                    return "Admin";
+                  } catch {
+                    return "Admin";
+                  }
+                })()}
               </div>
               <div>
                 <strong>Payment:</strong> {paymentType}
@@ -882,11 +930,11 @@ const BillPrintModal = ({
             </div>
 
             {/* Items Table */}
-            <table className="w-full mt-2 border-collapse bill-table">
+            <table className="w-full text-sm mt-2 border-collapse bill-table">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="px-2 py-1 text-left border border-black">
-                    S.No
+                    No
                   </th>
                   <th className="px-2 py-1 text-left border border-black">
                     Name
@@ -898,10 +946,10 @@ const BillPrintModal = ({
                     MRP
                   </th>
                   <th className="px-2 py-1 text-right border border-black">
-                    U.Price
+                    Price
                   </th>
                   <th className="px-2 py-1 text-right border border-black">
-                    U.Dis
+                    Dis
                   </th>
                   <th className="px-2 py-1 text-right border border-black">
                     Total
@@ -928,19 +976,21 @@ const BillPrintModal = ({
                       <td className="px-2 py-1 text-left border border-black"></td>
                       <td className="px-2 py-1 text-left border border-black"></td>
                       <td className="px-2 py-1 text-center border border-black">
-                        {product.qty}
+                        {product.qty} x
                       </td>
                       <td className="px-2 py-1 text-right border border-black">
-                        {product.mrp}
+                        {product.mrp.toFixed(2)}
                       </td>
                       <td className="px-2 py-1 text-right border border-black">
-                        {product.price}
+                        {product.price.toFixed(2)}
                       </td>
                       <td className="px-2 py-1 text-right border border-black">
-                        {product.discount + (product.specialDiscount || 0)}
+                        {(
+                          product.discount + (product.specialDiscount || 0)
+                        ).toFixed(2)}
                       </td>
                       <td className="px-2 py-1 font-bold text-right border border-black">
-                        {product.total}
+                        {product.total.toFixed(2)}
                       </td>
                     </tr>
                   </React.Fragment>
@@ -949,16 +999,16 @@ const BillPrintModal = ({
             </table>
 
             <div className="p-4 space-y-2 rounded-md bg-gray-50">
-              <h3 className="text-lg font-semibold text-gray-800">
+              <h3 className="billing-summary  text-lg font-semibold text-gray-800">
                 Billing Summary
               </h3>
-              <div className="pt-4 mt-4 border-t">
-                <p>
-                  <strong>Subtotal (MRP):</strong>{" "}
-                  {formatCurrency(totals.subTotalMRP)}
+              <div className="pt-4 mt-4 border-t text-right">
+                <p className="text-right">
+                  <strong>Subtotal:</strong>{" "}
+                  {formatCurrency(totals.subTotalMRP.toFixed(2))}
                 </p>
-                <p>
-                  <strong>Item Discounts:</strong>{" "}
+                <p className="text-right">
+                  <strong>Total Discounts:</strong>{" "}
                   {formatCurrency(totals.totalItemDiscounts)}
                 </p>
                 {totals.totalBillDiscount > 0 && (
@@ -967,9 +1017,17 @@ const BillPrintModal = ({
                     {formatCurrency(totals.totalBillDiscount)}
                   </p>
                 )}
-                <p className="text-lg font-bold">
+                <p className="text-lg text-right font-bold">
                   <strong>Grand Total:</strong>{" "}
-                  {formatCurrency(totals.finalTotal)}
+                  {formatCurrency(totals.finalTotal.toFixed(2))}
+                </p>
+                <p className="text-lg text-right font-bold">
+                  <strong>Paid:</strong>{" "}
+                  {formatCurrency(receivedAmount.toFixed(2))}
+                </p>
+                <p className="text-lg text-right font-bold">
+                  <strong>Balance:</strong>{" "}
+                  {formatCurrency(balanceAmount.toFixed(2))}
                 </p>
               </div>
             </div>
