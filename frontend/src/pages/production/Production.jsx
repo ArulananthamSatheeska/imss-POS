@@ -9,7 +9,7 @@ import {
   Filter,
   ChevronsUpDown, // Correct import name
   Pencil,
-  Trash2
+  Trash2,
 } from "lucide-react";
 
 import { ToastContainer, toast } from "react-toastify";
@@ -49,7 +49,7 @@ function ProductionManagement() {
 
   // Axios instance for products API
   const api = axios.create({
-    baseURL: "http://127.0.0.1:8000/api",
+    baseURL: "https://sharvakshafoodcity.com.lk/backend/public/api",
     headers: {
       Authorization: `Bearer ${currentUser?.token}`,
       "Content-Type": "application/json",
@@ -72,7 +72,7 @@ function ProductionManagement() {
         console.error("Error fetching data:", error);
         toast.error(
           "Failed to fetch data: " +
-          (error.response?.data?.message || error.message)
+            (error.response?.data?.message || error.message)
         );
       }
     };
@@ -94,8 +94,8 @@ function ProductionManagement() {
                 .map(([key, value]) =>
                   Array.isArray(value)
                     ? value
-                      .map((v) => `${key}[]=${encodeURIComponent(v)}`)
-                      .join("&")
+                        .map((v) => `${key}[]=${encodeURIComponent(v)}`)
+                        .join("&")
                     : `${key}=${encodeURIComponent(value)}`
                 )
                 .join("&");
@@ -139,7 +139,7 @@ function ProductionManagement() {
       console.error("Error refreshing data:", error);
       toast.error(
         "Failed to refresh data: " +
-        (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
       );
     }
   };
@@ -153,7 +153,7 @@ function ProductionManagement() {
       console.error("Error refreshing categories:", error);
       toast.error(
         "Failed to refresh categories: " +
-        (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
       );
     }
   };
@@ -170,7 +170,7 @@ function ProductionManagement() {
       console.error("Error adding raw material:", error);
       toast.error(
         "Failed to add raw material: " +
-        (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
       );
     }
   };
@@ -188,7 +188,7 @@ function ProductionManagement() {
       console.error("Error deleting raw material:", error);
       toast.error(
         "Failed to delete raw material: " +
-        (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
       );
     }
   };
@@ -199,26 +199,35 @@ function ProductionManagement() {
       let response;
       if (editingCategory) {
         // Assuming updateProductionCategory API exists
-        response = await api.put(`/production-categories/${editingCategory.id}`, category);
+        response = await api.put(
+          `/production-categories/${editingCategory.id}`,
+          category
+        );
       } else {
         response = await createProductionCategory(category);
       }
       setShowProductionCategoryModal(false);
       setEditingCategory(null);
-      toast.success(`Production category ${editingCategory ? "updated" : "added"} successfully`);
+      toast.success(
+        `Production category ${editingCategory ? "updated" : "added"} successfully`
+      );
       await refreshCategories();
     } catch (error) {
       console.error("Error adding/editing production category:", error);
       toast.error(
         "Failed to add/edit production category: " +
-        (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
       );
     }
   };
 
   // Handle deleting production category
   const handleDeleteProductionCategory = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this production category?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this production category?"
+      )
+    ) {
       return;
     }
     try {
@@ -229,7 +238,7 @@ function ProductionManagement() {
       console.error("Error deleting production category:", error);
       toast.error(
         "Failed to delete production category: " +
-        (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
       );
     }
   };
@@ -246,8 +255,8 @@ function ProductionManagement() {
       console.error("Error adding production item:", error);
       const errorMessages = error.response?.data?.errors
         ? Object.entries(error.response.data.errors)
-          .map(([key, messages]) => `${key}: ${messages.join(", ")}`)
-          .join("; ")
+            .map(([key, messages]) => `${key}: ${messages.join(", ")}`)
+            .join("; ")
         : error.response?.data?.message || error.message;
       toast.error(`Failed to add production item: ${errorMessages}`);
     }
@@ -261,7 +270,9 @@ function ProductionManagement() {
 
   // Handle deleting production item
   const handleDeleteProductionItem = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this production item?")) {
+    if (
+      !window.confirm("Are you sure you want to delete this production item?")
+    ) {
       return;
     }
     try {
@@ -272,7 +283,7 @@ function ProductionManagement() {
       console.error("Error deleting production item:", error);
       toast.error(
         "Failed to delete production item: " +
-        (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message)
       );
     }
   };
@@ -291,22 +302,21 @@ function ProductionManagement() {
       console.error("Error updating production item:", error);
       const errorMessages = error.response?.data?.errors
         ? Object.entries(error.response.data.errors)
-          .map(([key, messages]) => `${key}: ${messages.join(", ")}`)
-          .join("; ")
+            .map(([key, messages]) => `${key}: ${messages.join(", ")}`)
+            .join("; ")
         : error.response?.data?.message || error.message;
       toast.error(`Failed to update production item: ${errorMessages}`);
     }
   };
-
 
   // Handle adding to items
   const handleAddToItems = (item) => {
     console.log("Preparing ItemForm for:", item);
     const totalCost = item.formulas
       ? item.formulas.reduce(
-        (sum, formula) => sum + (formula.quantity * formula.price || 0),
-        0
-      )
+          (sum, formula) => sum + (formula.quantity * formula.price || 0),
+          0
+        )
       : 0;
     setSelectedProductionItem({
       product_id: null,
@@ -359,8 +369,8 @@ function ProductionManagement() {
               .map(([key, value]) =>
                 Array.isArray(value)
                   ? value
-                    .map((v) => `${key}[]=${encodeURIComponent(v)}`)
-                    .join("&")
+                      .map((v) => `${key}[]=${encodeURIComponent(v)}`)
+                      .join("&")
                   : `${key}=${encodeURIComponent(value)}`
               )
               .join("&");
@@ -425,7 +435,6 @@ function ProductionManagement() {
         />
       )}
 
-
       {showItemForm && (
         <ItemForm
           onSubmit={handleItemFormSubmit}
@@ -438,7 +447,6 @@ function ProductionManagement() {
         />
       )}
 
-
       {/* Raw Materials Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
         <div className="flex justify-between items-center mb-6">
@@ -447,10 +455,11 @@ function ProductionManagement() {
             Raw Materials Inventory
           </h2>
           <div className="flex space-x-2">
-            <button className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center"
-              onClick={() => setShowRawMaterialModal(true)}>
+            <button
+              className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center"
+              onClick={() => setShowRawMaterialModal(true)}
+            >
               <Plus className="w-4 h-4 mr-1" />
-
               Add Material
             </button>
             <button className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors flex items-center">
@@ -505,19 +514,27 @@ function ProductionManagement() {
                     <ChevronsUpDown className="w-4 h-4 ml-1 opacity-70" />
                   </div>
                 </th>
-                <th className="p-3 text-right border-b dark:border-gray-600">Actions</th>
+                <th className="p-3 text-right border-b dark:border-gray-600">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {rawMaterials.map((material) => (
-                <tr key={material.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <tr
+                  key={material.id}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                >
                   <td className="p-3 text-gray-800 dark:text-gray-200 font-medium">
                     {material.name}
                   </td>
                   <td className="p-3 text-gray-600 dark:text-gray-300">
-                    <span className={`px-2 py-1 text-xs rounded-full ${material.category_id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200' : 'bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-gray-300'}`}>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${material.category_id ? "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200" : "bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-gray-300"}`}
+                    >
                       {(() => {
-                        const categoryId = material.category_id ?? material.category?.id;
+                        const categoryId =
+                          material.category_id ?? material.category?.id;
                         const category = categories.find(
                           (cat) => cat.id === categoryId
                         );
@@ -527,7 +544,9 @@ function ProductionManagement() {
                   </td>
                   <td className="p-3">
                     <div className="flex items-center">
-                      <span className={`font-medium ${material.stock < 10 ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <span
+                        className={`font-medium ${material.stock < 10 ? "text-red-600 dark:text-red-400" : "text-gray-700 dark:text-gray-300"}`}
+                      >
                         {material.stock || 0}
                       </span>
                       {material.stock < 10 && (
@@ -544,12 +563,18 @@ function ProductionManagement() {
                     {material.supplier?.supplier_name || "N/A"}
                   </td>
                   <td className="p-3 text-gray-700 dark:text-gray-300">
-                    LKR {material.cost_price ? Number(material.cost_price).toFixed(2) : '0.00'}
+                    LKR{" "}
+                    {material.cost_price
+                      ? Number(material.cost_price).toFixed(2)
+                      : "0.00"}
                   </td>
                   <td className="p-3 font-medium text-gray-800 dark:text-gray-200">
-                    LKR {(material.cost_price && material.stock ?
-                      (Number(material.cost_price) * Number(material.stock)).toFixed(2) :
-                      '0.00')}
+                    LKR{" "}
+                    {material.cost_price && material.stock
+                      ? (
+                          Number(material.cost_price) * Number(material.stock)
+                        ).toFixed(2)
+                      : "0.00"}
                   </td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end space-x-2">
@@ -581,7 +606,8 @@ function ProductionManagement() {
         {/* Table Footer */}
         <div className="flex flex-col sm:flex-row justify-between items-center mt-4 pt-4 border-t dark:border-gray-700">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-0">
-            Showing <span className="font-medium">1</span> to <span className="font-medium">{rawMaterials.length}</span> of{' '}
+            Showing <span className="font-medium">1</span> to{" "}
+            <span className="font-medium">{rawMaterials.length}</span> of{" "}
             <span className="font-medium">{rawMaterials.length}</span> results
           </div>
           <div className="flex space-x-1">
@@ -635,29 +661,34 @@ function ProductionManagement() {
               {productionItems.map((item, index) => {
                 const totalCost = item.formulas
                   ? item.formulas.reduce(
-                    (sum, formula) => sum + (formula.quantity * formula.price || 0),
-                    0
-                  )
+                      (sum, formula) =>
+                        sum + (formula.quantity * formula.price || 0),
+                      0
+                    )
                   : 0;
                 return (
                   <tr
                     key={item.id}
-                    className={`border-b dark:border-gray-600 ${index % 2 === 0
-                      ? "bg-white dark:bg-gray-800"
-                      : "bg-gray-50 dark:bg-gray-700"
-                      }`}
+                    className={`border-b dark:border-gray-600 ${
+                      index % 2 === 0
+                        ? "bg-white dark:bg-gray-800"
+                        : "bg-gray-50 dark:bg-gray-700"
+                    }`}
                   >
                     <td className="p-3 dark:text-gray-300">{item.name}</td>
                     <td className="p-3 dark:text-gray-300">
                       {(() => {
-                        const categoryId = item.category_id ?? item.category?.id;
+                        const categoryId =
+                          item.category_id ?? item.category?.id;
                         const category = categories.find(
                           (cat) => cat.id === categoryId
                         );
                         return category ? category.name : "N/A";
                       })()}
                     </td>
-                    <td className="p-3 dark:text-gray-300">{item.sales_price}</td>
+                    <td className="p-3 dark:text-gray-300">
+                      {item.sales_price}
+                    </td>
                     <td className="p-3 dark:text-gray-300">
                       {item.wholesale_price}
                     </td>
@@ -665,7 +696,9 @@ function ProductionManagement() {
                     <td className="p-3 dark:text-gray-300">
                       {item.formulas?.length || 0} items
                     </td>
-                    <td className="p-3 dark:text-gray-300">{totalCost.toFixed(2)}</td>
+                    <td className="p-3 dark:text-gray-300">
+                      {totalCost.toFixed(2)}
+                    </td>
                     <td className="p-3 dark:text-gray-300">
                       {existingItems.includes(item.name) ? (
                         <span className="text-green-500">In Items</span>

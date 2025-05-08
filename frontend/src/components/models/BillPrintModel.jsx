@@ -62,13 +62,13 @@ const BillPrintModal = ({
       try {
         // Fetch customers
         const customersResponse = await axios.get(
-          "http://127.0.0.1:8000/api/customers"
+          "https://sharvakshafoodcity.com.lk/backend/public/api/customers"
         );
         setCustomers(customersResponse.data.data);
 
         // Fetch company details
         const companyResponse = await axios.get(
-          "http://127.0.0.1:8000/api/company-details"
+          "https://sharvakshafoodcity.com.lk/backend/public/api/company-details"
         );
         if (companyResponse.data) {
           setCompanyDetails({
@@ -199,7 +199,7 @@ const BillPrintModal = ({
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/sales",
+        "https://sharvakshafoodcity.com.lk/backend/public/api/sales",
         billData,
         getAuthHeaders()
       );
@@ -474,7 +474,7 @@ const BillPrintModal = ({
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/customers",
+        "https://sharvakshafoodcity.com.lk/backend/public/api/customers",
         {
           customer_name: newCustomer.name,
           phone: newCustomer.mobile,
@@ -486,7 +486,7 @@ const BillPrintModal = ({
 
       // Refresh customers list
       const customersResponse = await axios.get(
-        "http://127.0.0.1:8000/api/customers"
+        "https://sharvakshafoodcity.com.lk/backend/public/api/customers"
       );
       setCustomers(customersResponse.data.data);
 

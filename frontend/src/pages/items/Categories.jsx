@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import CategoryForm from "../../components/category/CategoryForm";
 
-
 const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -13,13 +12,14 @@ const Categories = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/categories");
+      const response = await axios.get(
+        "https://sharvakshafoodcity.com.lk/backend/public/api/categories"
+      );
       setCategories(response.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
     }
   };
-
 
   return (
     <div>
@@ -30,7 +30,6 @@ const Categories = () => {
           fetchCategories();
         }}
       />
-
     </div>
   );
 };

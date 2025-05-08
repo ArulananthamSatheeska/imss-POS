@@ -14,10 +14,16 @@ const CategoryForm = ({ category, onSuccess }) => {
     e.preventDefault();
     try {
       if (category) {
-        await axios.put(`http://127.0.0.1:8000/api/categories/${category.id}`, { name });
+        await axios.put(
+          `https://sharvakshafoodcity.com.lk/backend/public/api/categories/${category.id}`,
+          { name }
+        );
         onSuccess("Category updated successfully!", "success");
       } else {
-        await axios.post("http://127.0.0.1:8000/api/categories", { name });
+        await axios.post(
+          "https://sharvakshafoodcity.com.lk/backend/public/api/categories",
+          { name }
+        );
         onSuccess("Category added successfully!", "success");
       }
       setName(""); // Reset form field after success
@@ -68,7 +74,10 @@ const CategoryTable = ({ categories, onEdit, onDelete }) => {
         </thead>
         <tbody className="text-center">
           {categories.map((category, index) => (
-            <tr key={category.id} className="hover:bg-gray-100 transition duration-200 ease-in-out">
+            <tr
+              key={category.id}
+              className="hover:bg-gray-100 transition duration-200 ease-in-out"
+            >
               <td className="px-4 py-2 border-b">{index + 1}</td>
               <td className="px-4 py-2 border-b text-left">{category.name}</td>
               <td className="px-4 py-2 border-b">
@@ -98,7 +107,12 @@ const CategoryTable = ({ categories, onEdit, onDelete }) => {
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [notification, setNotification] = useState({ message: "", type: "", visible: false, onConfirm: null });
+  const [notification, setNotification] = useState({
+    message: "",
+    type: "",
+    visible: false,
+    onConfirm: null,
+  });
 
   useEffect(() => {
     fetchCategories();
@@ -106,7 +120,9 @@ const CategoryManagement = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/categories");
+      const response = await axios.get(
+        "https://sharvakshafoodcity.com.lk/backend/public/api/categories"
+      );
       setCategories(response.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -128,19 +144,23 @@ const CategoryManagement = () => {
 
   const confirmDelete = async (id) => {
     try {
-      const response = await axios.delete(`http://127.0.0.1:8000/api/categories/${id}`);
+      const response = await axios.delete(
+        `https://sharvakshafoodcity.com.lk/backend/public/api/categories/${id}`
+      );
       if (response.status === 200) {
         fetchCategories();
         showNotification("Category deleted successfully!", "success");
       } else {
-        showNotification("Failed to delete category. Please try again.", "error");
+        showNotification(
+          "Failed to delete category. Please try again.",
+          "error"
+        );
       }
     } catch (error) {
       console.error("Error deleting category:", error);
       showNotification("Error deleting category!", "error");
     }
   };
-
 
   const handleSuccess = (message, type) => {
     setSelectedCategory(null);
@@ -161,7 +181,9 @@ const CategoryManagement = () => {
         <Notification
           message={notification.message}
           type={notification.type}
-          onClose={() => setNotification((prev) => ({ ...prev, visible: false }))}
+          onClose={() =>
+            setNotification((prev) => ({ ...prev, visible: false }))
+          }
         >
           {notification.type === "confirm" && (
             <div className="flex justify-center mt-4 space-x-4">
@@ -172,7 +194,9 @@ const CategoryManagement = () => {
                 Yes, Delete
               </button>
               <button
-                onClick={() => setNotification((prev) => ({ ...prev, visible: false }))}
+                onClick={() =>
+                  setNotification((prev) => ({ ...prev, visible: false }))
+                }
                 className="px-4 py-2 bg-gray-400 text-white rounded-lg"
               >
                 Cancel
@@ -186,7 +210,11 @@ const CategoryManagement = () => {
           <CategoryForm category={selectedCategory} onSuccess={handleSuccess} />
         </div>
         <div className="flex-1">
-          <CategoryTable categories={categories} onEdit={handleEdit} onDelete={handleDelete} />
+          <CategoryTable
+            categories={categories}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         </div>
       </div>
     </div>

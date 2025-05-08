@@ -25,18 +25,24 @@ const SupplierForm = ({ supplier, onSuccess }) => {
 
     try {
       if (supplier) {
-        await axios.put(`http://127.0.0.1:8000/api/suppliers/${supplier.id}`, {
-          supplier_name: supplierName,
-          contact,
-          address,
-        });
+        await axios.put(
+          `https://sharvakshafoodcity.com.lk/backend/public/api/suppliers/${supplier.id}`,
+          {
+            supplier_name: supplierName,
+            contact,
+            address,
+          }
+        );
         onSuccess("Supplier updated successfully!", "success");
       } else {
-        await axios.post("http://127.0.0.1:8000/api/suppliers", {
-          supplier_name: supplierName,
-          contact,
-          address,
-        });
+        await axios.post(
+          "https://sharvakshafoodcity.com.lk/backend/public/api/suppliers",
+          {
+            supplier_name: supplierName,
+            contact,
+            address,
+          }
+        );
         onSuccess("Supplier added successfully!", "success");
       }
 
@@ -44,7 +50,6 @@ const SupplierForm = ({ supplier, onSuccess }) => {
       setSupplierName("");
       setContact("");
       setAddress("");
-
     } catch (error) {
       console.error("Error saving supplier:", error);
       onSuccess("Error saving supplier!", "error");
@@ -110,7 +115,9 @@ const SupplierTable = ({ suppliers, onEdit, onDelete }) => {
         <thead className="bg-gray-500">
           <tr className="text-left">
             <th className="px-4 py-2 border-b-2 border-gray-300">S.No</th>
-            <th className="px-4 py-2 border-b-2 border-gray-300">Supplier Name</th>
+            <th className="px-4 py-2 border-b-2 border-gray-300">
+              Supplier Name
+            </th>
             <th className="px-4 py-2 border-b-2 border-gray-300">Contact</th>
             <th className="px-4 py-2 border-b-2 border-gray-300">Address</th>
             <th className="px-4 py-2 border-b-2 border-gray-300">Actions</th>
@@ -119,10 +126,18 @@ const SupplierTable = ({ suppliers, onEdit, onDelete }) => {
         <tbody className="text-center">
           {suppliers.map((supplier, index) => (
             <tr key={supplier.id} className="hover:bg-gray-100">
-              <td className="px-4 py-2 border-b border-gray-300">{index + 1}</td>
-              <td className="px-4 py-2 border-b border-gray-300">{supplier.supplier_name}</td>
-              <td className="px-4 py-2 border-b border-gray-300">{supplier.contact}</td>
-              <td className="px-4 py-2 border-b border-gray-300">{supplier.address}</td>
+              <td className="px-4 py-2 border-b border-gray-300">
+                {index + 1}
+              </td>
+              <td className="px-4 py-2 border-b border-gray-300">
+                {supplier.supplier_name}
+              </td>
+              <td className="px-4 py-2 border-b border-gray-300">
+                {supplier.contact}
+              </td>
+              <td className="px-4 py-2 border-b border-gray-300">
+                {supplier.address}
+              </td>
               <td className="px-4 py-2 border-b border-gray-300">
                 <div className="flex justify-center space-x-2">
                   <button
@@ -152,7 +167,12 @@ const SupplierTable = ({ suppliers, onEdit, onDelete }) => {
 const SupplierManagement = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [notification, setNotification] = useState({ message: '', type: '', visible: false, onConfirm: null });
+  const [notification, setNotification] = useState({
+    message: "",
+    type: "",
+    visible: false,
+    onConfirm: null,
+  });
 
   useEffect(() => {
     fetchSuppliers();
@@ -160,7 +180,9 @@ const SupplierManagement = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/suppliers");
+      const response = await axios.get(
+        "https://sharvakshafoodcity.com.lk/backend/public/api/suppliers"
+      );
       setSuppliers(response.data);
     } catch (error) {
       console.error("Error fetching suppliers:", error);
@@ -182,7 +204,9 @@ const SupplierManagement = () => {
 
   const confirmDelete = async (id) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/suppliers/${id}`);
+      await axios.delete(
+        `https://sharvakshafoodcity.com.lk/backend/public/api/suppliers/${id}`
+      );
       fetchSuppliers();
       showNotification("Supplier deleted successfully!", "success");
     } catch (error) {
@@ -199,7 +223,10 @@ const SupplierManagement = () => {
 
   const showNotification = (message, type) => {
     setNotification({ message, type, visible: true, onConfirm: null });
-    setTimeout(() => setNotification({ ...notification, visible: false }), 3000);
+    setTimeout(
+      () => setNotification({ ...notification, visible: false }),
+      3000
+    );
   };
 
   return (
@@ -222,7 +249,9 @@ const SupplierManagement = () => {
                 Yes, Delete
               </button>
               <button
-                onClick={() => setNotification({ ...notification, visible: false })}
+                onClick={() =>
+                  setNotification({ ...notification, visible: false })
+                }
                 className="px-4 py-2 text-white bg-gray-400 rounded-lg"
               >
                 Cancel
@@ -233,7 +262,11 @@ const SupplierManagement = () => {
       )}
       <div className="flex flex-col md:flex-row md:space-x-4">
         <SupplierForm supplier={selectedSupplier} onSuccess={handleSuccess} />
-        <SupplierTable suppliers={suppliers} onEdit={handleEdit} onDelete={handleDelete} />
+        <SupplierTable
+          suppliers={suppliers}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       </div>
     </div>
   );

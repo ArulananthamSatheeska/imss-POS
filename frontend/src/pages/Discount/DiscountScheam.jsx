@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
 
 // Helper function to check if a date is in the past (considers the whole day)
 const isDateInPast = (dateString) => {
@@ -10,7 +10,7 @@ const isDateInPast = (dateString) => {
     endDate.setHours(23, 59, 59, 999);
     return endDate < new Date();
   } catch (e) {
-    console.error('Error parsing date for past check:', dateString, e);
+    console.error("Error parsing date for past check:", dateString, e);
     return false;
   }
 };
@@ -27,25 +27,25 @@ const DiscountScheam = () => {
   const [customers, setCustomers] = useState([]); // New state for customers
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
-    name: '',
-    type: 'percentage',
-    value: '',
-    appliesTo: 'product',
-    target: '',
-    startDate: '',
-    endDate: '',
+    name: "",
+    type: "percentage",
+    value: "",
+    appliesTo: "product",
+    target: "",
+    startDate: "",
+    endDate: "",
     active: true,
   });
   const [editSchemeId, setEditSchemeId] = useState(null);
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false); // New state for customer dropdown
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [schemeToDelete, setSchemeToDelete] = useState(null);
-  const [filterType, setFilterType] = useState('');
-  const [filterValue, setFilterValue] = useState('');
-  const [filterSearchTerm, setFilterSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState("");
+  const [filterValue, setFilterValue] = useState("");
+  const [filterSearchTerm, setFilterSearchTerm] = useState("");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const productInputRef = useRef(null);
   const categoryInputRef = useRef(null);
@@ -59,18 +59,45 @@ const DiscountScheam = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [productResponse, categoryResponse, customerResponse, schemeResponse] = await Promise.all([
-          axios.get('http://127.0.0.1:8000/api/products'),
-          axios.get('http://127.0.0.1:8000/api/categories'),
-          axios.get('http://127.0.0.1:8000/api/customers'), // Fetch customers
-          axios.get('http://127.0.0.1:8000/api/discount-schemes'),
+        const [
+          productResponse,
+          categoryResponse,
+          customerResponse,
+          schemeResponse,
+        ] = await Promise.all([
+          axios.get(
+            "https://sharvakshafoodcity.com.lk/backend/public/api/products"
+          ),
+          axios.get(
+            "https://sharvakshafoodcity.com.lk/backend/public/api/categories"
+          ),
+          axios.get(
+            "https://sharvakshafoodcity.com.lk/backend/public/api/customers"
+          ), // Fetch customers
+          axios.get(
+            "https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes"
+          ),
         ]);
 
-        setProducts(Array.isArray(productResponse.data.data) ? productResponse.data.data : []);
-        setCategories(Array.isArray(categoryResponse.data) ? categoryResponse.data : []);
-        setCustomers(Array.isArray(customerResponse.data.data) ? customerResponse.data.data : []); // Set customers
+        setProducts(
+          Array.isArray(productResponse.data.data)
+            ? productResponse.data.data
+            : []
+        );
+        setCategories(
+          Array.isArray(categoryResponse.data) ? categoryResponse.data : []
+        );
+        setCustomers(
+          Array.isArray(customerResponse.data.data)
+            ? customerResponse.data.data
+            : []
+        ); // Set customers
 
-        const fetchedSchemes = (Array.isArray(schemeResponse.data.data) ? schemeResponse.data.data : []).map((s) => ({
+        const fetchedSchemes = (
+          Array.isArray(schemeResponse.data.data)
+            ? schemeResponse.data.data
+            : []
+        ).map((s) => ({
           ...s,
           appliesTo: s.applies_to,
           startDate: s.start_date,
@@ -79,7 +106,7 @@ const DiscountScheam = () => {
 
         setSchemes(fetchedSchemes);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error("Error fetching data:", error);
         setProducts([]);
         setCategories([]);
         setCustomers([]);
@@ -94,16 +121,31 @@ const DiscountScheam = () => {
   // Close dropdowns and modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (form.appliesTo === 'product' && productInputRef.current && !productInputRef.current.contains(event.target)) {
+      if (
+        form.appliesTo === "product" &&
+        productInputRef.current &&
+        !productInputRef.current.contains(event.target)
+      ) {
         setIsProductDropdownOpen(false);
       }
-      if (form.appliesTo === 'category' && categoryInputRef.current && !categoryInputRef.current.contains(event.target)) {
+      if (
+        form.appliesTo === "category" &&
+        categoryInputRef.current &&
+        !categoryInputRef.current.contains(event.target)
+      ) {
         setIsCategoryDropdownOpen(false);
       }
-      if (form.appliesTo === 'customerGroup' && customerInputRef.current && !customerInputRef.current.contains(event.target)) {
+      if (
+        form.appliesTo === "customerGroup" &&
+        customerInputRef.current &&
+        !customerInputRef.current.contains(event.target)
+      ) {
         setIsCustomerDropdownOpen(false);
       }
-      if (filterInputRef.current && !filterInputRef.current.contains(event.target)) {
+      if (
+        filterInputRef.current &&
+        !filterInputRef.current.contains(event.target)
+      ) {
         setIsFilterDropdownOpen(false);
       }
       if (modalRef.current && !modalRef.current.contains(event.target)) {
@@ -111,14 +153,14 @@ const DiscountScheam = () => {
         setSchemeToDelete(null);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [form.appliesTo]);
 
   // Close modal/dropdowns with Escape key
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         if (showDeleteModal) {
           setShowDeleteModal(false);
           setSchemeToDelete(null);
@@ -129,37 +171,43 @@ const DiscountScheam = () => {
         if (isCustomerDropdownOpen) setIsCustomerDropdownOpen(false);
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showDeleteModal, isFilterDropdownOpen, isProductDropdownOpen, isCategoryDropdownOpen, isCustomerDropdownOpen]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [
+    showDeleteModal,
+    isFilterDropdownOpen,
+    isProductDropdownOpen,
+    isCategoryDropdownOpen,
+    isCustomerDropdownOpen,
+  ]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    if (name === 'appliesTo') {
+    if (name === "appliesTo") {
       setForm((prev) => ({
         ...prev,
         [name]: value,
-        target: '',
+        target: "",
       }));
-      setSearchTerm('');
+      setSearchTerm("");
       setIsProductDropdownOpen(false);
       setIsCategoryDropdownOpen(false);
       setIsCustomerDropdownOpen(false);
-    } else if (name === 'target') {
+    } else if (name === "target") {
       setSearchTerm(value);
       setForm((prev) => ({ ...prev, [name]: value }));
-      if (form.appliesTo === 'product') {
+      if (form.appliesTo === "product") {
         setIsProductDropdownOpen(true);
-      } else if (form.appliesTo === 'category') {
+      } else if (form.appliesTo === "category") {
         setIsCategoryDropdownOpen(true);
-      } else if (form.appliesTo === 'customerGroup') {
+      } else if (form.appliesTo === "customerGroup") {
         setIsCustomerDropdownOpen(true);
       }
     } else {
       setForm((prev) => ({
         ...prev,
-        [name]: type === 'checkbox' ? checked : value,
+        [name]: type === "checkbox" ? checked : value,
       }));
     }
   };
@@ -168,11 +216,11 @@ const DiscountScheam = () => {
   const handleSelect = (value, type) => {
     setForm((prev) => ({ ...prev, target: value }));
     setSearchTerm(value);
-    if (type === 'product') {
+    if (type === "product") {
       setIsProductDropdownOpen(false);
-    } else if (type === 'category') {
+    } else if (type === "category") {
       setIsCategoryDropdownOpen(false);
-    } else if (type === 'customer') {
+    } else if (type === "customer") {
       setIsCustomerDropdownOpen(false);
     }
   };
@@ -192,27 +240,31 @@ const DiscountScheam = () => {
       value: scheme.value,
       appliesTo: scheme.appliesTo,
       target: scheme.target,
-      startDate: formatDate(scheme.startDate) === 'N/A' ? '' : formatDate(scheme.startDate),
-      endDate: formatDate(scheme.endDate) === 'N/A' ? '' : formatDate(scheme.endDate),
+      startDate:
+        formatDate(scheme.startDate) === "N/A"
+          ? ""
+          : formatDate(scheme.startDate),
+      endDate:
+        formatDate(scheme.endDate) === "N/A" ? "" : formatDate(scheme.endDate),
       active: scheme.active,
     });
     setSearchTerm(scheme.target);
     setEditSchemeId(scheme.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleCancelEdit = () => {
     setForm({
-      name: '',
-      type: 'percentage',
-      value: '',
-      appliesTo: 'product',
-      target: '',
-      startDate: '',
-      endDate: '',
+      name: "",
+      type: "percentage",
+      value: "",
+      appliesTo: "product",
+      target: "",
+      startDate: "",
+      endDate: "",
       active: true,
     });
-    setSearchTerm('');
+    setSearchTerm("");
     setEditSchemeId(null);
     setIsProductDropdownOpen(false);
     setIsCategoryDropdownOpen(false);
@@ -223,24 +275,37 @@ const DiscountScheam = () => {
     e.preventDefault();
 
     // Input Validations
-    if (form.appliesTo === 'product' && !products.some((p) => p.product_name === form.target)) {
-      alert('Please select a valid product from the list.');
+    if (
+      form.appliesTo === "product" &&
+      !products.some((p) => p.product_name === form.target)
+    ) {
+      alert("Please select a valid product from the list.");
       return;
     }
-    if (form.appliesTo === 'category' && !categories.some((c) => c.name === form.target)) {
-      alert('Please select a valid category from the list.');
+    if (
+      form.appliesTo === "category" &&
+      !categories.some((c) => c.name === form.target)
+    ) {
+      alert("Please select a valid category from the list.");
       return;
     }
-    if (form.appliesTo === 'customerGroup' && !customers.some((c) => c.customer_name === form.target)) {
-      alert('Please select a valid customer from the list.');
+    if (
+      form.appliesTo === "customerGroup" &&
+      !customers.some((c) => c.customer_name === form.target)
+    ) {
+      alert("Please select a valid customer from the list.");
       return;
     }
-    if (form.value === '' || parseFloat(form.value) < 0) {
-      alert('Please enter a valid non-negative discount value.');
+    if (form.value === "" || parseFloat(form.value) < 0) {
+      alert("Please enter a valid non-negative discount value.");
       return;
     }
-    if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate)) {
-      alert('End date cannot be earlier than the start date.');
+    if (
+      form.startDate &&
+      form.endDate &&
+      new Date(form.endDate) < new Date(form.startDate)
+    ) {
+      alert("End date cannot be earlier than the start date.");
       return;
     }
 
@@ -260,17 +325,27 @@ const DiscountScheam = () => {
     try {
       let response;
       if (editSchemeId) {
-        response = await axios.put(`http://127.0.0.1:8000/api/discount-schemes/${editSchemeId}`, payload);
+        response = await axios.put(
+          `https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes/${editSchemeId}`,
+          payload
+        );
         const updatedScheme = {
           ...response.data.data,
           appliesTo: response.data.data.applies_to,
           startDate: response.data.data.start_date,
           endDate: response.data.data.end_date,
         };
-        setSchemes(schemes.map((scheme) => (scheme.id === editSchemeId ? updatedScheme : scheme)));
-        alert('Discount scheme updated successfully!');
+        setSchemes(
+          schemes.map((scheme) =>
+            scheme.id === editSchemeId ? updatedScheme : scheme
+          )
+        );
+        alert("Discount scheme updated successfully!");
       } else {
-        response = await axios.post('http://127.0.0.1:8000/api/discount-schemes', payload);
+        response = await axios.post(
+          "https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes",
+          payload
+        );
         const newScheme = {
           ...response.data.data,
           appliesTo: response.data.data.applies_to,
@@ -278,12 +353,17 @@ const DiscountScheam = () => {
           endDate: response.data.data.end_date,
         };
         setSchemes([...schemes, newScheme]);
-        alert('Discount scheme created successfully!');
+        alert("Discount scheme created successfully!");
       }
       handleCancelEdit();
     } catch (error) {
-      console.error('Error saving discount scheme:', error.response?.data || error.message);
-      const errorMsg = error.response?.data?.message || `Failed to ${editSchemeId ? 'update' : 'create'} discount scheme.`;
+      console.error(
+        "Error saving discount scheme:",
+        error.response?.data || error.message
+      );
+      const errorMsg =
+        error.response?.data?.message ||
+        `Failed to ${editSchemeId ? "update" : "create"} discount scheme.`;
       alert(errorMsg);
     }
   };
@@ -296,14 +376,20 @@ const DiscountScheam = () => {
   const confirmDelete = async () => {
     if (!schemeToDelete) return;
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/discount-schemes/${schemeToDelete}`);
+      await axios.delete(
+        `https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes/${schemeToDelete}`
+      );
       setSchemes(schemes.filter((scheme) => scheme.id !== schemeToDelete));
       setShowDeleteModal(false);
       setSchemeToDelete(null);
-      alert('Discount scheme deleted successfully!');
+      alert("Discount scheme deleted successfully!");
     } catch (error) {
-      console.error('Error deleting discount scheme:', error.response?.data || error.message);
-      const errorMsg = error.response?.data?.message || 'Failed to delete discount scheme.';
+      console.error(
+        "Error deleting discount scheme:",
+        error.response?.data || error.message
+      );
+      const errorMsg =
+        error.response?.data?.message || "Failed to delete discount scheme.";
       alert(errorMsg);
       setShowDeleteModal(false);
       setSchemeToDelete(null);
@@ -317,18 +403,22 @@ const DiscountScheam = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'filterType') {
+    if (name === "filterType") {
       setFilterType(value);
-      setFilterValue('');
-      setFilterSearchTerm('');
+      setFilterValue("");
+      setFilterSearchTerm("");
       setIsFilterDropdownOpen(false);
-      if (value === 'date') {
-        const today = new Date().toISOString().split('T')[0];
+      if (value === "date") {
+        const today = new Date().toISOString().split("T")[0];
         setFilterValue(today);
       }
-    } else if (name === 'filterValue') {
+    } else if (name === "filterValue") {
       setFilterValue(value);
-      if (filterType === 'category' || filterType === 'product' || filterType === 'customerGroup') {
+      if (
+        filterType === "category" ||
+        filterType === "product" ||
+        filterType === "customerGroup"
+      ) {
         setFilterSearchTerm(value);
         setIsFilterDropdownOpen(true);
       } else {
@@ -338,62 +428,84 @@ const DiscountScheam = () => {
   };
 
   const clearFilter = () => {
-    setFilterType('');
-    setFilterValue('');
-    setFilterSearchTerm('');
+    setFilterType("");
+    setFilterValue("");
+    setFilterSearchTerm("");
     setIsFilterDropdownOpen(false);
   };
 
   const formatCurrency = (amount) => {
     const num = parseFloat(amount);
-    if (isNaN(num)) return 'N/A';
+    if (isNaN(num)) return "N/A";
     return `Rs. ${num.toFixed(2)}`;
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        return 'N/A';
+        return "N/A";
       }
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     } catch (error) {
-      console.error('Error formatting date:', dateString, error);
-      return 'N/A';
+      console.error("Error formatting date:", dateString, error);
+      return "N/A";
     }
   };
 
   const filteredProducts = useMemo(
-    () => products.filter((product) => product.product_name.toLowerCase().includes(searchTerm.toLowerCase())),
+    () =>
+      products.filter((product) =>
+        product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
     [products, searchTerm]
   );
 
   const filteredCategories = useMemo(
-    () => categories.filter((category) => category.name.toLowerCase().includes(searchTerm.toLowerCase())),
+    () =>
+      categories.filter((category) =>
+        category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
     [categories, searchTerm]
   );
 
   const filteredCustomers = useMemo(
-    () => customers.filter((customer) => customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase())),
+    () =>
+      customers.filter((customer) =>
+        customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
     [customers, searchTerm]
   );
 
   const filteredFilterProducts = useMemo(
-    () => products.filter((product) => product.product_name.toLowerCase().includes(filterSearchTerm.toLowerCase())),
+    () =>
+      products.filter((product) =>
+        product.product_name
+          .toLowerCase()
+          .includes(filterSearchTerm.toLowerCase())
+      ),
     [products, filterSearchTerm]
   );
 
   const filteredFilterCategories = useMemo(
-    () => categories.filter((category) => category.name.toLowerCase().includes(filterSearchTerm.toLowerCase())),
+    () =>
+      categories.filter((category) =>
+        category.name.toLowerCase().includes(filterSearchTerm.toLowerCase())
+      ),
     [categories, filterSearchTerm]
   );
 
   const filteredFilterCustomers = useMemo(
-    () => customers.filter((customer) => customer.customer_name.toLowerCase().includes(filterSearchTerm.toLowerCase())),
+    () =>
+      customers.filter((customer) =>
+        customer.customer_name
+          .toLowerCase()
+          .includes(filterSearchTerm.toLowerCase())
+      ),
     [customers, filterSearchTerm]
   );
 
@@ -405,39 +517,52 @@ const DiscountScheam = () => {
         try {
           const isEffectivelyActive = calculateEffectiveActiveStatus(scheme);
 
-          if (filterType === 'status') {
-            const filterStatus = filterValue === 'true';
+          if (filterType === "status") {
+            const filterStatus = filterValue === "true";
             return isEffectivelyActive === filterStatus;
           }
-          if (filterType === 'date') {
+          if (filterType === "date") {
             const filterDate = new Date(filterValue);
             if (isNaN(filterDate.getTime())) return false;
             filterDate.setHours(0, 0, 0, 0);
 
-            const schemeStartDate = scheme.startDate ? new Date(scheme.startDate) : null;
+            const schemeStartDate = scheme.startDate
+              ? new Date(scheme.startDate)
+              : null;
             if (schemeStartDate) schemeStartDate.setHours(0, 0, 0, 0);
 
-            const schemeEndDate = scheme.endDate ? new Date(scheme.endDate) : null;
+            const schemeEndDate = scheme.endDate
+              ? new Date(scheme.endDate)
+              : null;
             if (schemeEndDate) schemeEndDate.setHours(23, 59, 59, 999);
 
-            const startsBeforeOrOnFilter = !schemeStartDate || schemeStartDate <= filterDate;
-            const endsAfterOrOnFilter = !schemeEndDate || schemeEndDate >= filterDate;
+            const startsBeforeOrOnFilter =
+              !schemeStartDate || schemeStartDate <= filterDate;
+            const endsAfterOrOnFilter =
+              !schemeEndDate || schemeEndDate >= filterDate;
 
-            return scheme.active && startsBeforeOrOnFilter && endsAfterOrOnFilter;
+            return (
+              scheme.active && startsBeforeOrOnFilter && endsAfterOrOnFilter
+            );
           }
-          if (filterType === 'category') {
-            return scheme.appliesTo === 'category' && scheme.target === filterValue;
+          if (filterType === "category") {
+            return (
+              scheme.appliesTo === "category" && scheme.target === filterValue
+            );
           }
-          if (filterType === 'product') {
-            return scheme.appliesTo === 'product' && scheme.target === filterValue;
+          if (filterType === "product") {
+            return (
+              scheme.appliesTo === "product" && scheme.target === filterValue
+            );
           }
-          if
-
-            (filterType === 'customerGroup') {
-            return scheme.appliesTo === 'customerGroup' && scheme.target === filterValue;
+          if (filterType === "customerGroup") {
+            return (
+              scheme.appliesTo === "customerGroup" &&
+              scheme.target === filterValue
+            );
           }
         } catch (e) {
-          console.error('Filtering error for scheme:', scheme, e);
+          console.error("Filtering error for scheme:", scheme, e);
           return false;
         }
         return true;
@@ -452,7 +577,7 @@ const DiscountScheam = () => {
   };
 
   const inputStyle =
-    'p-2 sm:p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border border-gray-300 text-black placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 text-sm sm:text-base transition duration-200 ease-in-out';
+    "p-2 sm:p-3 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border border-gray-300 text-black placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 text-sm sm:text-base transition duration-200 ease-in-out";
 
   if (loading) {
     return (
@@ -544,11 +669,19 @@ const DiscountScheam = () => {
             className="p-4 mb-8 text-gray-900 bg-gray-100 border border-gray-200 shadow-md sm:p-6 lg:p-8 sm:mb-12 dark:bg-gray-800 dark:text-white rounded-2xl dark:border-gray-700 no-print"
           >
             <h2 className="mb-4 text-xl font-semibold sm:mb-6 sm:text-2xl">
-              {editSchemeId ? 'Edit Discount Scheme' : 'Create New Discount Scheme'}
+              {editSchemeId
+                ? "Edit Discount Scheme"
+                : "Create New Discount Scheme"}
             </h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 bg-transparent sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
+            <form
+              onSubmit={handleSubmit}
+              className="grid grid-cols-1 gap-4 bg-transparent sm:grid-cols-2 lg:grid-cols-3 sm:gap-6"
+            >
               <div>
-                <label htmlFor="name" className="block mb-1 text-sm font-medium">
+                <label
+                  htmlFor="name"
+                  className="block mb-1 text-sm font-medium"
+                >
                   Scheme Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -563,16 +696,29 @@ const DiscountScheam = () => {
                 />
               </div>
               <div>
-                <label htmlFor="type" className="block mb-1 text-sm font-medium">
+                <label
+                  htmlFor="type"
+                  className="block mb-1 text-sm font-medium"
+                >
                   Discount Type <span className="text-red-500">*</span>
                 </label>
-                <select id="type" name="type" value={form.type} onChange={handleChange} className={inputStyle} required>
+                <select
+                  id="type"
+                  name="type"
+                  value={form.type}
+                  onChange={handleChange}
+                  className={inputStyle}
+                  required
+                >
                   <option value="percentage">Percentage (%)</option>
                   <option value="amount">Fixed Amount (Rs.)</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="value" className="block mb-1 text-sm font-medium">
+                <label
+                  htmlFor="value"
+                  className="block mb-1 text-sm font-medium"
+                >
                   Discount Value <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -581,29 +727,50 @@ const DiscountScheam = () => {
                   name="value"
                   value={form.value}
                   onChange={handleChange}
-                  placeholder={form.type === 'percentage' ? 'Enter % (e.g., 10)' : 'Enter Amount (e.g., 50.00)'}
+                  placeholder={
+                    form.type === "percentage"
+                      ? "Enter % (e.g., 10)"
+                      : "Enter Amount (e.g., 50.00)"
+                  }
                   className={inputStyle}
                   required
                   min="0"
-                  step={form.type === 'percentage' ? '0.1' : '0.01'}
+                  step={form.type === "percentage" ? "0.1" : "0.01"}
                 />
               </div>
               <div>
-                <label htmlFor="appliesTo" className="block mb-1 text-sm font-medium">
+                <label
+                  htmlFor="appliesTo"
+                  className="block mb-1 text-sm font-medium"
+                >
                   Applies To <span className="text-red-500">*</span>
                 </label>
-                <select id="appliesTo" name="appliesTo" value={form.appliesTo} onChange={handleChange} className={inputStyle} required>
+                <select
+                  id="appliesTo"
+                  name="appliesTo"
+                  value={form.appliesTo}
+                  onChange={handleChange}
+                  className={inputStyle}
+                  required
+                >
                   <option value="product">Specific Product</option>
                   <option value="category">Category</option>
                   <option value="customerGroup">Customer Group</option>
                 </select>
               </div>
               <div className="relative">
-                <label htmlFor="target" className="block mb-1 text-sm font-medium">
-                  {form.appliesTo === 'product' ? 'Product' : form.appliesTo === 'category' ? 'Category' : 'Customer Group'}
+                <label
+                  htmlFor="target"
+                  className="block mb-1 text-sm font-medium"
+                >
+                  {form.appliesTo === "product"
+                    ? "Product"
+                    : form.appliesTo === "category"
+                      ? "Category"
+                      : "Customer Group"}
                   <span className="text-red-500">*</span>
                 </label>
-                {form.appliesTo === 'product' ? (
+                {form.appliesTo === "product" ? (
                   <div ref={productInputRef}>
                     <input
                       id="target"
@@ -621,7 +788,7 @@ const DiscountScheam = () => {
                       {isProductDropdownOpen && (
                         <motion.ul
                           initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
+                          animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.2 }}
                           className="absolute z-20 w-full mt-1 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 sm:max-h-60 dark:bg-gray-700 dark:border-gray-600"
@@ -630,7 +797,9 @@ const DiscountScheam = () => {
                             filteredProducts.map((product) => (
                               <li
                                 key={product.id}
-                                onClick={() => handleSelect(product.product_name, 'product')}
+                                onClick={() =>
+                                  handleSelect(product.product_name, "product")
+                                }
                                 className="px-3 py-1 text-sm text-black cursor-pointer sm:px-4 sm:py-2 sm:text-base hover:bg-blue-100 dark:text-white dark:hover:bg-blue-600"
                               >
                                 {product.product_name}
@@ -645,7 +814,7 @@ const DiscountScheam = () => {
                       )}
                     </AnimatePresence>
                   </div>
-                ) : form.appliesTo === 'category' ? (
+                ) : form.appliesTo === "category" ? (
                   <div ref={categoryInputRef}>
                     <input
                       id="target"
@@ -663,7 +832,7 @@ const DiscountScheam = () => {
                       {isCategoryDropdownOpen && (
                         <motion.ul
                           initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
+                          animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.2 }}
                           className="absolute z-20 w-full mt-1 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 sm:max-h-60 dark:bg-gray-700 dark:border-gray-600"
@@ -672,7 +841,9 @@ const DiscountScheam = () => {
                             filteredCategories.map((category) => (
                               <li
                                 key={category.id}
-                                onClick={() => handleSelect(category.name, 'category')}
+                                onClick={() =>
+                                  handleSelect(category.name, "category")
+                                }
                                 className="px-3 py-1 text-sm text-black cursor-pointer sm:px-4 sm:py-2 sm:text-base hover:bg-blue-100 dark:text-white dark:hover:bg-blue-600"
                               >
                                 {category.name}
@@ -705,7 +876,7 @@ const DiscountScheam = () => {
                       {isCustomerDropdownOpen && (
                         <motion.ul
                           initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
+                          animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.2 }}
                           className="absolute z-20 w-full mt-1 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 sm:max-h-60 dark:bg-gray-700 dark:border-gray-600"
@@ -714,7 +885,12 @@ const DiscountScheam = () => {
                             filteredCustomers.map((customer) => (
                               <li
                                 key={customer.id}
-                                onClick={() => handleSelect(customer.customer_name, 'customer')}
+                                onClick={() =>
+                                  handleSelect(
+                                    customer.customer_name,
+                                    "customer"
+                                  )
+                                }
                                 className="px-3 py-1 text-sm text-black cursor-pointer sm:px-4 sm:py-2 sm:text-base hover:bg-blue-100 dark:text-white dark:hover:bg-blue-600"
                               >
                                 {customer.customer_name}
@@ -732,7 +908,10 @@ const DiscountScheam = () => {
                 )}
               </div>
               <div>
-                <label htmlFor="startDate" className="block mb-1 text-sm font-medium">
+                <label
+                  htmlFor="startDate"
+                  className="block mb-1 text-sm font-medium"
+                >
                   Start Date (Optional)
                 </label>
                 <input
@@ -745,7 +924,10 @@ const DiscountScheam = () => {
                 />
               </div>
               <div>
-                <label htmlFor="endDate" className="block mb-1 text-sm font-medium">
+                <label
+                  htmlFor="endDate"
+                  className="block mb-1 text-sm font-medium"
+                >
                   End Date (Optional)
                 </label>
                 <input
@@ -766,14 +948,16 @@ const DiscountScheam = () => {
                   onChange={handleChange}
                   className="w-4 h-4 text-blue-500 rounded sm:w-5 sm:h-5 focus:ring-blue-400 dark:bg-gray-600 dark:border-gray-500"
                 />
-                <span className="text-sm font-medium sm:text-base">Set Active</span>
+                <span className="text-sm font-medium sm:text-base">
+                  Set Active
+                </span>
               </label>
               <div className="flex flex-col gap-4 mt-4 sm:flex-row sm:col-span-2 lg:col-span-3 sm:items-center sm:justify-start">
                 <button
                   type="submit"
                   className="px-6 py-2 text-sm font-semibold text-white transition duration-200 ease-in-out sm:py-3 sm:text-base bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl hover:from-blue-700 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
                 >
-                  {editSchemeId ? 'Update Scheme' : 'Add Scheme'}
+                  {editSchemeId ? "Update Scheme" : "Add Scheme"}
                 </button>
                 {editSchemeId && (
                   <button
@@ -798,9 +982,14 @@ const DiscountScheam = () => {
           >
             <div className="flex flex-col items-start justify-between gap-4 mb-4 sm:flex-row sm:items-center sm:mb-6">
               <h2 className="text-xl font-semibold sm:text-2xl">
-                Discount Schemes List{' '}
+                Discount Schemes List{" "}
                 {filterType &&
-                  `(Filtered by ${filterType}: ${filterType === 'status' ? (filterValue === 'true' ? 'Active' : 'Inactive') : filterValue
+                  `(Filtered by ${filterType}: ${
+                    filterType === "status"
+                      ? filterValue === "true"
+                        ? "Active"
+                        : "Inactive"
+                      : filterValue
                   })`}
               </h2>
               <button
@@ -813,10 +1002,19 @@ const DiscountScheam = () => {
 
             <div className="flex flex-col gap-4 mb-4 sm:flex-row sm:flex-wrap sm:items-end sm:mb-6 no-print">
               <div className="flex-grow min-w-[150px]">
-                <label htmlFor="filterType" className="block mb-1 text-sm font-medium sm:text-base">
+                <label
+                  htmlFor="filterType"
+                  className="block mb-1 text-sm font-medium sm:text-base"
+                >
                   Filter By
                 </label>
-                <select id="filterType" name="filterType" value={filterType} onChange={handleFilterChange} className={inputStyle}>
+                <select
+                  id="filterType"
+                  name="filterType"
+                  value={filterType}
+                  onChange={handleFilterChange}
+                  className={inputStyle}
+                >
                   <option value="">All Schemes</option>
                   <option value="status">Status (Effective)</option>
                   <option value="date">Active On Date</option>
@@ -825,9 +1023,12 @@ const DiscountScheam = () => {
                   <option value="customerGroup">Customer Group</option>
                 </select>
               </div>
-              {filterType === 'status' && (
+              {filterType === "status" && (
                 <div className="flex-grow min-w-[150px]">
-                  <label htmlFor="filterValueStatus" className="block mb-1 text-sm font-medium sm:text-base">
+                  <label
+                    htmlFor="filterValueStatus"
+                    className="block mb-1 text-sm font-medium sm:text-base"
+                  >
                     Status
                   </label>
                   <select
@@ -846,9 +1047,12 @@ const DiscountScheam = () => {
                   </select>
                 </div>
               )}
-              {filterType === 'date' && (
+              {filterType === "date" && (
                 <div className="flex-grow min-w-[150px]">
-                  <label htmlFor="filterValueDate" className="block mb-1 text-sm font-medium sm:text-base">
+                  <label
+                    htmlFor="filterValueDate"
+                    className="block mb-1 text-sm font-medium sm:text-base"
+                  >
                     Date
                   </label>
                   <input
@@ -862,10 +1066,22 @@ const DiscountScheam = () => {
                   />
                 </div>
               )}
-              {(filterType === 'category' || filterType === 'product' || filterType === 'customerGroup') && (
-                <div className="relative flex-grow min-w-[200px]" ref={filterInputRef}>
-                  <label htmlFor="filterValueSearch" className="block mb-1 text-sm font-medium sm:text-base">
-                    {filterType === 'category' ? 'Category Name' : filterType === 'product' ? 'Product Name' : 'Customer Name'}
+              {(filterType === "category" ||
+                filterType === "product" ||
+                filterType === "customerGroup") && (
+                <div
+                  className="relative flex-grow min-w-[200px]"
+                  ref={filterInputRef}
+                >
+                  <label
+                    htmlFor="filterValueSearch"
+                    className="block mb-1 text-sm font-medium sm:text-base"
+                  >
+                    {filterType === "category"
+                      ? "Category Name"
+                      : filterType === "product"
+                        ? "Product Name"
+                        : "Customer Name"}
                   </label>
                   <input
                     id="filterValueSearch"
@@ -883,17 +1099,19 @@ const DiscountScheam = () => {
                     {isFilterDropdownOpen && (
                       <motion.ul
                         initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
+                        animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.2 }}
                         className="absolute z-20 w-full mt-1 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 sm:max-h-60 dark:bg-gray-700 dark:border-gray-600"
                       >
-                        {filterType === 'category' ? (
+                        {filterType === "category" ? (
                           filteredFilterCategories.length > 0 ? (
                             filteredFilterCategories.map((category) => (
                               <li
                                 key={category.id}
-                                onClick={() => handleFilterSelect(category.name, 'category')}
+                                onClick={() =>
+                                  handleFilterSelect(category.name, "category")
+                                }
                                 className="px-3 py-1 text-sm text-black cursor-pointer sm:px-4 sm:py-2 sm:text-base hover:bg-blue-100 dark:text-white dark:hover:bg-blue-600"
                               >
                                 {category.name}
@@ -904,12 +1122,17 @@ const DiscountScheam = () => {
                               No categories found matching "{filterSearchTerm}"
                             </li>
                           )
-                        ) : filterType === 'product' ? (
+                        ) : filterType === "product" ? (
                           filteredFilterProducts.length > 0 ? (
                             filteredFilterProducts.map((product) => (
                               <li
                                 key={product.id}
-                                onClick={() => handleFilterSelect(product.product_name, 'product')}
+                                onClick={() =>
+                                  handleFilterSelect(
+                                    product.product_name,
+                                    "product"
+                                  )
+                                }
                                 className="px-3 py-1 text-sm text-black cursor-pointer sm:px-4 sm:py-2 sm:text-base hover:bg-blue-100 dark:text-white dark:hover:bg-blue-600"
                               >
                                 {product.product_name}
@@ -920,22 +1143,25 @@ const DiscountScheam = () => {
                               No products found matching "{filterSearchTerm}"
                             </li>
                           )
-                        ) : (
-                          filteredFilterCustomers.length > 0 ? (
-                            filteredFilterCustomers.map((customer) => (
-                              <li
-                                key={customer.id}
-                                onClick={() => handleFilterSelect(customer.customer_name, 'customer')}
-                                className="px-3 py-1 text-sm text-black cursor-pointer sm:px-4 sm:py-2 sm:text-base hover:bg-blue-100 dark:text-white dark:hover:bg-blue-600"
-                              >
-                                {customer.customer_name}
-                              </li>
-                            ))
-                          ) : (
-                            <li className="px-3 py-1 text-sm text-gray-500 sm:px-4 sm:py-2 sm:text-base dark:text-gray-400">
-                              No customers found matching "{filterSearchTerm}"
+                        ) : filteredFilterCustomers.length > 0 ? (
+                          filteredFilterCustomers.map((customer) => (
+                            <li
+                              key={customer.id}
+                              onClick={() =>
+                                handleFilterSelect(
+                                  customer.customer_name,
+                                  "customer"
+                                )
+                              }
+                              className="px-3 py-1 text-sm text-black cursor-pointer sm:px-4 sm:py-2 sm:text-base hover:bg-blue-100 dark:text-white dark:hover:bg-blue-600"
+                            >
+                              {customer.customer_name}
                             </li>
-                          )
+                          ))
+                        ) : (
+                          <li className="px-3 py-1 text-sm text-gray-500 sm:px-4 sm:py-2 sm:text-base dark:text-gray-400">
+                            No customers found matching "{filterSearchTerm}"
+                          </li>
                         )}
                       </motion.ul>
                     )}
@@ -954,27 +1180,46 @@ const DiscountScheam = () => {
 
             {filteredSchemes.length === 0 ? (
               <p className="text-sm italic text-center opacity-75 sm:text-base">
-                {schemes.length === 0 ? 'No discount schemes have been created yet.' : 'No discount schemes match the current filter.'}
+                {schemes.length === 0
+                  ? "No discount schemes have been created yet."
+                  : "No discount schemes match the current filter."}
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-xs text-left sm:text-sm">
                   <thead className="bg-gray-200 dark:bg-gray-700">
                     <tr>
-                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">Name</th>
-                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">Type</th>
-                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">Value</th>
-                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">Applies To</th>
-                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">Target</th>
-                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">Duration</th>
-                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">Status</th>
-                      <th className="px-2 py-2 font-semibold text-center sm:px-4 sm:py-3 action-col no-print">Action</th>
+                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">
+                        Name
+                      </th>
+                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">
+                        Type
+                      </th>
+                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">
+                        Value
+                      </th>
+                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">
+                        Applies To
+                      </th>
+                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">
+                        Target
+                      </th>
+                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">
+                        Duration
+                      </th>
+                      <th className="px-2 py-2 font-semibold sm:px-4 sm:py-3">
+                        Status
+                      </th>
+                      <th className="px-2 py-2 font-semibold text-center sm:px-4 sm:py-3 action-col no-print">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     <AnimatePresence>
                       {filteredSchemes.map((scheme) => {
-                        const isEffectivelyActive = calculateEffectiveActiveStatus(scheme);
+                        const isEffectivelyActive =
+                          calculateEffectiveActiveStatus(scheme);
                         return (
                           <motion.tr
                             key={scheme.id}
@@ -985,26 +1230,38 @@ const DiscountScheam = () => {
                             transition={{ duration: 0.3 }}
                             className="hover:bg-gray-50 dark:hover:bg-gray-700"
                           >
-                            <td className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">{scheme.name}</td>
-                            <td className="px-2 py-2 capitalize sm:px-4 sm:py-3">{scheme.type}</td>
-                            <td className="px-2 py-2 sm:px-4 sm:py-3">
-                              {scheme.type === 'percentage' ? `${scheme.value}%` : formatCurrency(scheme.value)}
+                            <td className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">
+                              {scheme.name}
                             </td>
                             <td className="px-2 py-2 capitalize sm:px-4 sm:py-3">
-                              {scheme.appliesTo === 'customerGroup' ? 'Customer Group' : scheme.appliesTo}
+                              {scheme.type}
                             </td>
-                            <td className="px-2 py-2 sm:px-4 sm:py-3">{scheme.target}</td>
+                            <td className="px-2 py-2 sm:px-4 sm:py-3">
+                              {scheme.type === "percentage"
+                                ? `${scheme.value}%`
+                                : formatCurrency(scheme.value)}
+                            </td>
+                            <td className="px-2 py-2 capitalize sm:px-4 sm:py-3">
+                              {scheme.appliesTo === "customerGroup"
+                                ? "Customer Group"
+                                : scheme.appliesTo}
+                            </td>
+                            <td className="px-2 py-2 sm:px-4 sm:py-3">
+                              {scheme.target}
+                            </td>
                             <td className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">
-                              {formatDate(scheme.startDate)} → {formatDate(scheme.endDate)}
+                              {formatDate(scheme.startDate)} →{" "}
+                              {formatDate(scheme.endDate)}
                             </td>
                             <td className="px-2 py-2 sm:px-4 sm:py-3">
                               <span
-                                className={`status-badge px-1 sm:px-2 py-1 rounded-full text-xs font-medium ${isEffectivelyActive
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300'
-                                  }`}
+                                className={`status-badge px-1 sm:px-2 py-1 rounded-full text-xs font-medium ${
+                                  isEffectivelyActive
+                                    ? "bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100"
+                                    : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                                }`}
                               >
-                                {isEffectivelyActive ? 'Active' : 'Inactive'}
+                                {isEffectivelyActive ? "Active" : "Inactive"}
                               </span>
                             </td>
                             <td className="px-2 py-2 text-center sm:px-4 sm:py-3 action-col no-print">
@@ -1049,11 +1306,15 @@ const DiscountScheam = () => {
                   aria-modal="true"
                   aria-labelledby="modal-title"
                 >
-                  <h3 id="modal-title" className="text-lg font-semibold text-gray-900 sm:text-xl dark:text-white">
+                  <h3
+                    id="modal-title"
+                    className="text-lg font-semibold text-gray-900 sm:text-xl dark:text-white"
+                  >
                     Confirm Deletion
                   </h3>
                   <p className="mt-2 text-sm text-gray-600 sm:text-base dark:text-gray-300">
-                    Are you sure you want to delete this discount scheme? This action cannot be undone.
+                    Are you sure you want to delete this discount scheme? This
+                    action cannot be undone.
                   </p>
                   <div className="flex flex-col gap-3 mt-4 sm:flex-row sm:justify-end sm:gap-4 sm:mt-6">
                     <button

@@ -132,7 +132,7 @@ const Items = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const api = axios.create({
-    baseURL: "http://127.0.0.1:8000/api",
+    baseURL: "https://sharvakshafoodcity.com.lk/backend/public/api",
     headers: {
       Authorization: `Bearer ${currentUser?.token}`,
       "Content-Type": "application/json",

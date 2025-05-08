@@ -297,7 +297,7 @@ const TOUCHPOSFORM = () => {
         const token = auth?.user?.token;
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const response = await axios.get(
-          "http://127.0.0.1:8000/api/next-bill-number",
+          "https://sharvakshafoodcity.com.lk/backend/public/api/next-bill-number",
           { headers }
         );
         if (response.data && response.data.next_bill_number) {
@@ -321,7 +321,7 @@ const TOUCHPOSFORM = () => {
       try {
         setLoadingCategories(true);
         const response = await axios.get(
-          "http://127.0.0.1:8000/api/categories"
+          "https://sharvakshafoodcity.com.lk/backend/public/api/categories"
         );
         const fetchedCategories = Array.isArray(response.data)
           ? response.data
@@ -349,7 +349,7 @@ const TOUCHPOSFORM = () => {
     setLoadingItems(true);
     setLoadingBrands(true);
     axios
-      .get("http://127.0.0.1:8000/api/products")
+      .get("https://sharvakshafoodcity.com.lk/backend/public/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => ({
@@ -419,7 +419,9 @@ const TOUCHPOSFORM = () => {
   useEffect(() => {
     setLoadingSchemes(true);
     axios
-      .get("http://127.0.0.1:8000/api/discount-schemes")
+      .get(
+        "https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes"
+      )
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const formattedSchemes = response.data.data.map((s) => ({
@@ -1036,7 +1038,7 @@ const TOUCHPOSFORM = () => {
         const fetchNextBillNumber = async () => {
           try {
             const response = await axios.get(
-              "http://127.0.0.1:8000/api/next-bill-number"
+              "https://sharvakshafoodcity.com.lk/backend/public/api/next-bill-number"
             );
             setBillNumber(response.data.next_bill_number);
           } catch (error) {

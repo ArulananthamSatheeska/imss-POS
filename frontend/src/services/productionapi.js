@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 
 // Create an Axios instance with base configuration
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
+  baseURL: "https://sharvakshafoodcity.com.lk/backend/public/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -32,12 +32,10 @@ api.interceptors.response.use(
 
 // Production Categories
 export const getProductionCategories = () => api.get("/categories");
-export const createProductionCategory = (data) =>
-  api.post("/categories", data);
+export const createProductionCategory = (data) => api.post("/categories", data);
 export const updateProductionCategory = (id, data) =>
   api.put(`/categories/${id}`, data);
-export const deleteProductionCategory = (id) =>
-  api.delete(`/categories/${id}`);
+export const deleteProductionCategory = (id) => api.delete(`/categories/${id}`);
 
 // Raw Materials
 export const getRawMaterials = () => api.get("/raw-materials");

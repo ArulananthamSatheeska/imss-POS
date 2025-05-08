@@ -12,7 +12,9 @@ const Suppliers = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/suppliers");
+      const response = await axios.get(
+        "https://sharvakshafoodcity.com.lk/backend/public/api/suppliers"
+      );
       setSuppliers(response.data);
     } catch (error) {
       console.error("Error fetching suppliers:", error);

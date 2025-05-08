@@ -11,7 +11,11 @@ const StoreLocationForm = () => {
   });
   const [stores, setStores] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
-  const [notification, setNotification] = useState({ message: "", type: "", visible: false });
+  const [notification, setNotification] = useState({
+    message: "",
+    type: "",
+    visible: false,
+  });
 
   // Refs for input fields
   const storeNameRef = useRef(null);
@@ -24,7 +28,9 @@ const StoreLocationForm = () => {
 
   const fetchStores = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/store-locations");
+      const response = await axios.get(
+        "https://sharvakshafoodcity.com.lk/backend/public/api/store-locations"
+      );
       setStores(response.data);
     } catch (error) {
       console.error("Error fetching store locations:", error);
@@ -70,10 +76,16 @@ const StoreLocationForm = () => {
     e.preventDefault();
     try {
       if (selectedStore) {
-        await axios.put(`http://127.0.0.1:8000/api/store-locations/${selectedStore.id}`, formData);
+        await axios.put(
+          `https://sharvakshafoodcity.com.lk/backend/public/api/store-locations/${selectedStore.id}`,
+          formData
+        );
         showNotification("Store location updated successfully!", "success");
       } else {
-        await axios.post("http://127.0.0.1:8000/api/store-locations", formData);
+        await axios.post(
+          "https://sharvakshafoodcity.com.lk/backend/public/api/store-locations",
+          formData
+        );
         showNotification("Store location added successfully!", "success");
       }
       fetchStores();
@@ -96,7 +108,9 @@ const StoreLocationForm = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/store-locations/${id}`);
+      await axios.delete(
+        `https://sharvakshafoodcity.com.lk/backend/public/api/store-locations/${id}`
+      );
       fetchStores();
       showNotification("Store deleted successfully!", "success");
     } catch (error) {
@@ -120,7 +134,10 @@ const StoreLocationForm = () => {
 
       <div className="flex space-x-8">
         {/* Store Location Form */}
-        <form onSubmit={handleSubmit} className="max-w-md w-3/6 p-6 bg-white rounded-lg shadow-lg">
+        <form
+          onSubmit={handleSubmit}
+          className="max-w-md w-3/6 p-6 bg-white rounded-lg shadow-lg"
+        >
           <h2 className="text-2xl font-bold text-center mb-4 text-amber-600">
             {selectedStore ? "Update" : "Add"} Store Location
           </h2>
@@ -166,7 +183,10 @@ const StoreLocationForm = () => {
             />
           </div>
 
-          <button type="submit" className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <button
+            type="submit"
+            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
             {selectedStore ? "Update" : "Add"} Store
           </button>
         </form>
@@ -191,10 +211,16 @@ const StoreLocationForm = () => {
                   <td className="px-4 py-2 border-b">{store.phone_number}</td>
                   <td className="px-4 py-2 border-b">{store.address}</td>
                   <td className="px-4 py-2 border-b flex space-x-2">
-                    <button onClick={() => handleEdit(store)} className="text-blue-600">
+                    <button
+                      onClick={() => handleEdit(store)}
+                      className="text-blue-600"
+                    >
                       <Edit size={16} />
                     </button>
-                    <button onClick={() => handleDelete(store.id)} className="text-red-600">
+                    <button
+                      onClick={() => handleDelete(store.id)}
+                      className="text-red-600"
+                    >
                       <Trash size={16} />
                     </button>
                   </td>

@@ -21,7 +21,9 @@ const UnitForm = () => {
 
   const fetchUnits = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/units");
+      const response = await axios.get(
+        "https://sharvakshafoodcity.com.lk/backend/public/api/units"
+      );
       setUnits(response.data);
     } catch (error) {
       console.error("Error fetching units:", error);
@@ -34,23 +36,38 @@ const UnitForm = () => {
 
     try {
       if (selectedUnit) {
-        await axios.put(`http://127.0.0.1:8000/api/units/${selectedUnit.id}`, {
-          unit_name: unitName,
+        await axios.put(
+          `https://sharvakshafoodcity.com.lk/backend/public/api/units/${selectedUnit.id}`,
+          {
+            unit_name: unitName,
+          }
+        );
+        setNotification({
+          message: "Unit updated successfully!",
+          type: "success",
+          visible: true,
         });
-        setNotification({ message: "Unit updated successfully!", type: "success", visible: true });
         fetchUnits();
       } else {
-        await axios.post("http://127.0.0.1:8000/api/units", {
-          unit_name: unitName,
+        await axios.post(
+          "https://sharvakshafoodcity.com.lk/backend/public/api/units",
+          {
+            unit_name: unitName,
+          }
+        );
+        setNotification({
+          message: "Unit added successfully!",
+          type: "success",
+          visible: true,
         });
-        setNotification({ message: "Unit added successfully!", type: "success", visible: true });
         fetchUnits();
       }
       setUnitName(""); // Clear input after submission
       setSelectedUnit(null); // Reset selected unit
     } catch (error) {
       console.error("Error saving unit:", error);
-      const errorMessage = error.response?.data?.message || "Unit already exists!";
+      const errorMessage =
+        error.response?.data?.message || "Unit already exists!";
       setNotification({ message: errorMessage, type: "error", visible: true });
     }
   };
@@ -71,7 +88,9 @@ const UnitForm = () => {
 
   const confirmDelete = async (id) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/units/${id}`);
+      await axios.delete(
+        `https://sharvakshafoodcity.com.lk/backend/public/api/units/${id}`
+      );
       fetchUnits(); // Re-fetch units after deletion
       setNotification({
         message: "Unit deleted successfully!",
@@ -116,7 +135,9 @@ const UnitForm = () => {
                 Yes, Delete
               </button>
               <button
-                onClick={() => setNotification({ ...notification, visible: false })}
+                onClick={() =>
+                  setNotification({ ...notification, visible: false })
+                }
                 className="px-4 py-2 bg-gray-400 text-white rounded-lg"
               >
                 Cancel
@@ -162,15 +183,23 @@ const UnitForm = () => {
             <thead className="bg-gray-500">
               <tr className="text-left">
                 <th className="px-4 py-2 border-b-2 border-gray-300">S.No</th>
-                <th className="px-4 py-2 border-b-2 border-gray-300">Unit Name</th>
-                <th className="px-4 py-2 border-b-2 border-gray-300">Actions</th>
+                <th className="px-4 py-2 border-b-2 border-gray-300">
+                  Unit Name
+                </th>
+                <th className="px-4 py-2 border-b-2 border-gray-300">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="text-center">
               {units.map((unit, index) => (
                 <tr key={unit.id} className="hover:bg-gray-100">
-                  <td className="px-4 py-2 border-b border-gray-300">{index + 1}</td>
-                  <td className="px-4 py-2 border-b border-gray-300">{unit.unit_name}</td>
+                  <td className="px-4 py-2 border-b border-gray-300">
+                    {index + 1}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-300">
+                    {unit.unit_name}
+                  </td>
                   <td className="px-4 py-2 border-b border-gray-300">
                     <div className="flex justify-center space-x-2">
                       <button
