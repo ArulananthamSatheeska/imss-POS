@@ -8,7 +8,7 @@ const Product = ({ match }) => {
     const fetchProduct = async () => {
       try {
         const response = await axios.get(
-          `https://sharvakshafoodcity.com.lk/backend/public/product/${match.params.id}`
+          `http://127.0.0.1:8000/product/${match.params.id}`
         );
         setProduct(response.data);
       } catch (error) {
@@ -44,7 +44,7 @@ const Product = ({ match }) => {
       <p>Cabinet: {product.cabinet}</p>
       <p>Row: {product.row}</p>
       <img
-        src={`https://sharvakshafoodcity.com.lk/backend/public/barcode/${product.product_id}`}
+        src={`http://127.0.0.1:8000/barcode/${product.product_id}`}
         alt="Barcode"
       />
     </div>

@@ -23,7 +23,7 @@ export const SupplierWiseProfit = () => {
   const fetchSuppliers = async () => {
     try {
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/suppliers"
+        "http://127.0.0.1:8000/api/suppliers"
       );
       // Transform suppliers for react-select
       const supplierOptions = response.data.map((supplier) => ({
@@ -56,7 +56,7 @@ export const SupplierWiseProfit = () => {
       setLoading(true);
       setError("");
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/sales/supplier-wise-profit-report",
+        "http://127.0.0.1:8000/api/sales/supplier-wise-profit-report",
         {
           params: {
             supplierName: selectedSupplier.value, // Use value from react-select

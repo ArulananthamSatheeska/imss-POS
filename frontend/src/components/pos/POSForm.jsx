@@ -200,7 +200,7 @@ const POSForm = ({
           const token = user?.token;
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
           const response = await axios.get(
-            "https://sharvakshafoodcity.com.lk/backend/public/api/next-bill-number",
+            "http://127.0.0.1:8000/api/next-bill-number",
             { headers }
           );
           setBillNumber(response.data.next_bill_number);
@@ -221,7 +221,7 @@ const POSForm = ({
   useEffect(() => {
     setLoadingItems(true);
     axios
-      .get("https://sharvakshafoodcity.com.lk/backend/public/api/products")
+      .get("http://127.0.0.1:8000/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => {
@@ -262,7 +262,7 @@ const POSForm = ({
     setLoadingSchemes(true);
     axios
       .get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes"
+        "http://127.0.0.1:8000/api/discount-schemes"
       )
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
@@ -1023,7 +1023,7 @@ const POSForm = ({
             const token = user?.token;
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             const response = await axios.get(
-              "https://sharvakshafoodcity.com.lk/backend/public/api/next-bill-number",
+              "http://127.0.0.1:8000/api/next-bill-number",
               { headers }
             );
             setBillNumber(response.data.next_bill_number);

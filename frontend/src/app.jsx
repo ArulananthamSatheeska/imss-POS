@@ -86,6 +86,7 @@ import DailyProfitReport from "./pages/Profit/DailyProfit.jsx";
 import { SupplierWiseProfit } from "./pages/Profit/SupplierWiseProfit.jsx";
 import { CategoryWiseProfit } from "./pages/Profit/CategoryWiseProfit.jsx";
 import ItemForm from "./components/item Form/ItemForm.jsx";
+import FrontPage from "./pages/frontpage.jsx";
 // === App Component ===
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(
@@ -295,7 +296,7 @@ function App() {
                     />
                   }
                 >
-                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route index element={<Navigate to="/FrontPage" replace />} />
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="reports" element={<Reports />} />
                 </Route>

@@ -13,7 +13,7 @@ const ProductDetailsModal = ({ productId, onClose }) => {
     const fetchProductDetails = async () => {
       try {
         const response = await axios.get(
-          `https://sharvakshafoodcity.com.lk/backend/public/api/products/${productId}`
+          `http://127.0.0.1:8000/api/products/${productId}`
         );
         setProduct(response.data.data);
         setError(null);

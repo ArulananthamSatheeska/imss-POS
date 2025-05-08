@@ -26,7 +26,7 @@ const SupplierForm = ({ supplier, onSuccess }) => {
     try {
       if (supplier) {
         await axios.put(
-          `https://sharvakshafoodcity.com.lk/backend/public/api/suppliers/${supplier.id}`,
+          `http://127.0.0.1:8000/api/suppliers/${supplier.id}`,
           {
             supplier_name: supplierName,
             contact,
@@ -36,7 +36,7 @@ const SupplierForm = ({ supplier, onSuccess }) => {
         onSuccess("Supplier updated successfully!", "success");
       } else {
         await axios.post(
-          "https://sharvakshafoodcity.com.lk/backend/public/api/suppliers",
+          "http://127.0.0.1:8000/api/suppliers",
           {
             supplier_name: supplierName,
             contact,
@@ -181,7 +181,7 @@ const SupplierManagement = () => {
   const fetchSuppliers = async () => {
     try {
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/suppliers"
+        "http://127.0.0.1:8000/api/suppliers"
       );
       setSuppliers(response.data);
     } catch (error) {
@@ -205,7 +205,7 @@ const SupplierManagement = () => {
   const confirmDelete = async (id) => {
     try {
       await axios.delete(
-        `https://sharvakshafoodcity.com.lk/backend/public/api/suppliers/${id}`
+        `http://127.0.0.1:8000/api/suppliers/${id}`
       );
       fetchSuppliers();
       showNotification("Supplier deleted successfully!", "success");

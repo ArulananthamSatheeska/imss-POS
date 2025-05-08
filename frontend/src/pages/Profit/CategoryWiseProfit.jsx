@@ -23,7 +23,7 @@ export const CategoryWiseProfit = () => {
   const fetchCategories = async () => {
     try {
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/categories"
+        "http://127.0.0.1:8000/api/categories"
       );
       const categoryOptions = response.data.map((category) => ({
         value: category.name,
@@ -55,7 +55,7 @@ export const CategoryWiseProfit = () => {
       setLoading(true);
       setError("");
       const response = await axios.get(
-        "https://sharvakshafoodcity.com.lk/backend/public/api/sales/category-wise-profit-report",
+        "http://127.0.0.1:8000/api/sales/category-wise-profit-report",
         {
           params: {
             categoryName: selectedCategory.value,

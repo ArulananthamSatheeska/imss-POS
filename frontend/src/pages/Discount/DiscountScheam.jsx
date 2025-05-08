@@ -66,16 +66,16 @@ const DiscountScheam = () => {
           schemeResponse,
         ] = await Promise.all([
           axios.get(
-            "https://sharvakshafoodcity.com.lk/backend/public/api/products"
+            "http://127.0.0.1:8000/api/products"
           ),
           axios.get(
-            "https://sharvakshafoodcity.com.lk/backend/public/api/categories"
+            "http://127.0.0.1:8000/api/categories"
           ),
           axios.get(
-            "https://sharvakshafoodcity.com.lk/backend/public/api/customers"
+            "http://127.0.0.1:8000/api/customers"
           ), // Fetch customers
           axios.get(
-            "https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes"
+            "http://127.0.0.1:8000/api/discount-schemes"
           ),
         ]);
 
@@ -326,7 +326,7 @@ const DiscountScheam = () => {
       let response;
       if (editSchemeId) {
         response = await axios.put(
-          `https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes/${editSchemeId}`,
+          `http://127.0.0.1:8000/api/discount-schemes/${editSchemeId}`,
           payload
         );
         const updatedScheme = {
@@ -343,7 +343,7 @@ const DiscountScheam = () => {
         alert("Discount scheme updated successfully!");
       } else {
         response = await axios.post(
-          "https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes",
+          "http://127.0.0.1:8000/api/discount-schemes",
           payload
         );
         const newScheme = {
@@ -377,7 +377,7 @@ const DiscountScheam = () => {
     if (!schemeToDelete) return;
     try {
       await axios.delete(
-        `https://sharvakshafoodcity.com.lk/backend/public/api/discount-schemes/${schemeToDelete}`
+        `http://127.0.0.1:8000/api/discount-schemes/${schemeToDelete}`
       );
       setSchemes(schemes.filter((scheme) => scheme.id !== schemeToDelete));
       setShowDeleteModal(false);
