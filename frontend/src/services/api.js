@@ -25,7 +25,7 @@ class ApiError extends Error {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
-const API_URL = "http://127.0.0.1:8000/api";
+const API_URL = "https://imssposerp.com/backend/public/api";
 const DEFAULT_TIMEOUT = 10000;
 
 console.log("API Configuration:", {

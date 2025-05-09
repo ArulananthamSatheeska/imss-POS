@@ -9,7 +9,7 @@ import {
 } from "react-icons/fi";
 import PrintablePurchaseOrder from "./PrintablePurchaseOrder";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = "https://imssposerp.com/backend/public/api";
 
 // New component for printing all orders
 const PrintableOrdersReport = ({ orders, formatCurrency }) => {

@@ -26,7 +26,7 @@ const SupplierForm = ({ supplier, onSuccess }) => {
     try {
       if (supplier) {
         await axios.put(
-          `http://127.0.0.1:8000/api/suppliers/${supplier.id}`,
+          `https://imssposerp.com/backend/public/api/suppliers/${supplier.id}`,
           {
             supplier_name: supplierName,
             contact,
@@ -36,7 +36,7 @@ const SupplierForm = ({ supplier, onSuccess }) => {
         onSuccess("Supplier updated successfully!", "success");
       } else {
         await axios.post(
-          "http://127.0.0.1:8000/api/suppliers",
+          "https://imssposerp.com/backend/public/api/suppliers",
           {
             supplier_name: supplierName,
             contact,
@@ -181,7 +181,7 @@ const SupplierManagement = () => {
   const fetchSuppliers = async () => {
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/api/suppliers"
+        "https://imssposerp.com/backend/public/api/suppliers"
       );
       setSuppliers(response.data);
     } catch (error) {
@@ -205,7 +205,7 @@ const SupplierManagement = () => {
   const confirmDelete = async (id) => {
     try {
       await axios.delete(
-        `http://127.0.0.1:8000/api/suppliers/${id}`
+        `https://imssposerp.com/backend/public/api/suppliers/${id}`
       );
       fetchSuppliers();
       showNotification("Supplier deleted successfully!", "success");

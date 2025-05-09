@@ -15,13 +15,13 @@ const CategoryForm = ({ category, onSuccess }) => {
     try {
       if (category) {
         await axios.put(
-          `http://127.0.0.1:8000/api/categories/${category.id}`,
+          `https://imssposerp.com/backend/public/api/categories/${category.id}`,
           { name }
         );
         onSuccess("Category updated successfully!", "success");
       } else {
         await axios.post(
-          "http://127.0.0.1:8000/api/categories",
+          "https://imssposerp.com/backend/public/api/categories",
           { name }
         );
         onSuccess("Category added successfully!", "success");
@@ -121,7 +121,7 @@ const CategoryManagement = () => {
   const fetchCategories = async () => {
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/api/categories"
+        "https://imssposerp.com/backend/public/api/categories"
       );
       setCategories(response.data);
     } catch (error) {
@@ -145,7 +145,7 @@ const CategoryManagement = () => {
   const confirmDelete = async (id) => {
     try {
       const response = await axios.delete(
-        `http://127.0.0.1:8000/api/categories/${id}`
+        `https://imssposerp.com/backend/public/api/categories/${id}`
       );
       if (response.status === 200) {
         fetchCategories();

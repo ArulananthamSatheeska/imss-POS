@@ -26,7 +26,7 @@ const PurchaseInvoice = () => {
     try {
       const timestamp = new Date().getTime(); // Cache-busting
       const response = await axios.get(
-        `http://127.0.0.1:8000/api/purchases?_t=${timestamp}`,
+        `https://imssposerp.com/backend/public/api/purchases?_t=${timestamp}`,
         {
           headers: {
             Authorization: `Bearer ${currentUser.token}`,
@@ -88,7 +88,7 @@ const PurchaseInvoice = () => {
       if (newInvoice.id) {
         // Update existing invoice
         response = await axios.put(
-          `http://127.0.0.1:8000/api/purchases/${newInvoice.id}`,
+          `https://imssposerp.com/backend/public/api/purchases/${newInvoice.id}`,
           invoiceData,
           {
             headers: {
@@ -101,7 +101,7 @@ const PurchaseInvoice = () => {
       } else {
         // Create new invoice
         response = await axios.post(
-          "http://127.0.0.1:8000/api/purchases",
+          "https://imssposerp.com/backend/public/api/purchases",
           invoiceData,
           {
             headers: {
@@ -162,7 +162,7 @@ const PurchaseInvoice = () => {
     try {
       setLoading(true);
       await axios.delete(
-        `http://127.0.0.1:8000/api/purchases/${id}`,
+        `https://imssposerp.com/backend/public/api/purchases/${id}`,
         {
           headers: {
             Authorization: `Bearer ${currentUser.token}`,

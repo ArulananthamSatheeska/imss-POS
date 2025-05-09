@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import axios from "axios";
 import { useRegister } from "../../context/RegisterContext";
-import logo from "./logo.jpg";
+import logo from "./MUNSI.png";
 
 const BillPrintModal = ({
   initialProducts = [],
@@ -26,9 +26,9 @@ const BillPrintModal = ({
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [paymentType, setPaymentType] = useState("cash");
   const [companyDetails, setCompanyDetails] = useState({
-    company_name: "SHARVAKSHA FOOD CITY",
-    business_address: "Main Street Thambiluvil-01",
-    contact_number: "0750296343",
+    company_name: "MUNSI TEX",
+    business_address: "MOSQUE BUILDING, POLICE ROAD, KALMUNAI",
+    contact_number: "076 731 78 51, 074 301 43 57",
   });
 
   // Added products state to allow editing discounts
@@ -62,13 +62,13 @@ const BillPrintModal = ({
       try {
         // Fetch customers
         const customersResponse = await axios.get(
-          "http://127.0.0.1:8000/api/customers"
+          "https://imssposerp.com/backend/public/api/customers"
         );
         setCustomers(customersResponse.data.data);
 
         // Fetch company details
         const companyResponse = await axios.get(
-          "http://127.0.0.1:8000/api/company-details"
+          "https://imssposerp.com/backend/public/api/company-details"
         );
         if (companyResponse.data) {
           setCompanyDetails({
@@ -199,7 +199,7 @@ const BillPrintModal = ({
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/sales",
+        "https://imssposerp.com/backend/public/api/sales",
         billData,
         getAuthHeaders()
       );
@@ -247,7 +247,7 @@ const BillPrintModal = ({
         box-sizing: border-box;
       }
       body {
-        font-family: "Arial", sans-serif;
+        font-family: "calibri", sans-serif;
         font-size: 12px;
         width: 95%; /* Thermal printer width */
         margin: 0;
@@ -265,6 +265,18 @@ const BillPrintModal = ({
         max-width: 60mm; /* Reduced from 70mm */
         height: auto;
         margin: 0 auto 3px auto;
+      }
+      .shop-name {
+        font-size: 20px; 
+        font-weight: bold;
+        margin-bottom: 2px;
+        font-family: "Cressida", Elephant, cursive;
+      }
+      .shop-name-tamil {
+        font-size: 16px; /* Reduced from 18px */
+        font-weight: bold;
+        margin-bottom: 2px;
+        font-family: "BAMINI-Tamil18", Elephant;
       }
       .shop-address {
         font-size: 13px; /* Reduced from 15px */
@@ -353,6 +365,9 @@ const BillPrintModal = ({
         text-align: center;
         margin-bottom: 1px; /* Reduced from 2px */
         font-size: 10px; /* Reduced from 11px */
+      }
+      .terms-tamil{
+      font-family: "Bamini", bamini;
       }
       .thanks {
         font-size: 12px;
@@ -474,7 +489,7 @@ const BillPrintModal = ({
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/customers",
+        "https://imssposerp.com/backend/public/api/customers",
         {
           customer_name: newCustomer.name,
           phone: newCustomer.mobile,
@@ -486,7 +501,7 @@ const BillPrintModal = ({
 
       // Refresh customers list
       const customersResponse = await axios.get(
-        "http://127.0.0.1:8000/api/customers"
+        "https://imssposerp.com/backend/public/api/customers"
       );
       setCustomers(customersResponse.data.data);
 
@@ -877,26 +892,28 @@ const BillPrintModal = ({
                 style={{ width: "140px", height: "auto", objectFit: "contain" }}
               />
               {/* <div className="text-xl font-bold uppercase shop-name">
-                SHARVAKSHA FOOD CITY
+                Munsi Tex
+              </div>
+              <div className="text-xl font-bold uppercase shop-name-Tamil">
+                Kd;]p nlf;];
               </div> */}
               <div className="text-lg shop-address">
-                Main Street Thambiluvil 01
+                Mosque Building, Police Road, Kalmunai{" "}
               </div>
-              <div className="text-sm shop-contact">Mob: 0750296343</div>
+              <div className="text-sm shop-contact">
+                Mob: 0767317851, 0743014357, 0773754234{" "}
+              </div>
               <hr className="my-1 border-t border-black" />
             </div>
 
             {/* Bill Info */}
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm bill-info">
               <div>
-                <strong>Bill No:</strong> {initialCustomerInfo.bill_number}
-              </div>
-              <div>
-                <strong>Date:</strong> {new Date().toLocaleDateString()}
-              </div>
-              <div>
                 <strong>Customer:</strong>{" "}
                 {selectedCustomer?.name || "Walk-in Customer"}
+              </div>
+              <div>
+                <strong>Bill No:</strong> {initialCustomerInfo.bill_number}
               </div>
               <div>
                 <strong>Cashier:</strong>{" "}
@@ -915,6 +932,10 @@ const BillPrintModal = ({
                   }
                 })()}
               </div>
+              <div>
+                <strong>Date:</strong> {new Date().toLocaleDateString()}
+              </div>
+
               <div>
                 <strong>Payment:</strong> {paymentType}
               </div>
@@ -976,7 +997,7 @@ const BillPrintModal = ({
                       <td className="px-2 py-1 text-left border border-black"></td>
                       <td className="px-2 py-1 text-left border border-black"></td>
                       <td className="px-2 py-1 text-center border border-black">
-                        {product.qty} x
+                        {product.qty}x
                       </td>
                       <td className="px-2 py-1 text-right border border-black">
                         {product.mrp.toFixed(2)}
@@ -1035,11 +1056,14 @@ const BillPrintModal = ({
             {/* Terms & Conditions */}
             <div className="mt-2 text-xs text-left terms-conditions">
               <h4 className="font-bold text-center">Terms and Conditions</h4>
-              <p>
-                - Goods once sold cannot be returned. <br />
-                - Please keep the bill for future reference. <br />
-                - Exchange is allowed within 7 days with original bill. <br />
-                - No refunds, only exchange for unused items. <br />
+              <p className="terms-tamil">
+                tpw;f;fg;gLk; nghUl;fs; xU thuj;jpw;Fs;
+                <br />
+                khj;jpuk; khw;wpf; nfhLf;fg;gLk;
+              </p>
+
+              <p className="terms-english">
+                Exchange is allowed within 7 days with original bill. <br />
               </p>
             </div>
 
