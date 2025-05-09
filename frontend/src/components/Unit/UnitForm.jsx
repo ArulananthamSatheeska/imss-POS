@@ -22,7 +22,7 @@ const UnitForm = () => {
   const fetchUnits = async () => {
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/api/units"
+        "https://imssposerp.com/backend/public/api/units"
       );
       setUnits(response.data);
     } catch (error) {
@@ -37,7 +37,7 @@ const UnitForm = () => {
     try {
       if (selectedUnit) {
         await axios.put(
-          `http://127.0.0.1:8000/api/units/${selectedUnit.id}`,
+          `https://imssposerp.com/backend/public/api/units/${selectedUnit.id}`,
           {
             unit_name: unitName,
           }
@@ -49,12 +49,9 @@ const UnitForm = () => {
         });
         fetchUnits();
       } else {
-        await axios.post(
-          "http://127.0.0.1:8000/api/units",
-          {
-            unit_name: unitName,
-          }
-        );
+        await axios.post("https://imssposerp.com/backend/public/api/units", {
+          unit_name: unitName,
+        });
         setNotification({
           message: "Unit added successfully!",
           type: "success",
@@ -89,7 +86,7 @@ const UnitForm = () => {
   const confirmDelete = async (id) => {
     try {
       await axios.delete(
-        `http://127.0.0.1:8000/api/units/${id}`
+        `https://imssposerp.com/backend/public/api/units/${id}`
       );
       fetchUnits(); // Re-fetch units after deletion
       setNotification({

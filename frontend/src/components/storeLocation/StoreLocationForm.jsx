@@ -29,7 +29,7 @@ const StoreLocationForm = () => {
   const fetchStores = async () => {
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/api/store-locations"
+        "https://imssposerp.com/backend/public/api/store-locations"
       );
       setStores(response.data);
     } catch (error) {
@@ -77,13 +77,13 @@ const StoreLocationForm = () => {
     try {
       if (selectedStore) {
         await axios.put(
-          `http://127.0.0.1:8000/api/store-locations/${selectedStore.id}`,
+          `https://imssposerp.com/backend/public/api/store-locations/${selectedStore.id}`,
           formData
         );
         showNotification("Store location updated successfully!", "success");
       } else {
         await axios.post(
-          "http://127.0.0.1:8000/api/store-locations",
+          "https://imssposerp.com/backend/public/api/store-locations",
           formData
         );
         showNotification("Store location added successfully!", "success");
@@ -109,7 +109,7 @@ const StoreLocationForm = () => {
   const handleDelete = async (id) => {
     try {
       await axios.delete(
-        `http://127.0.0.1:8000/api/store-locations/${id}`
+        `https://imssposerp.com/backend/public/api/store-locations/${id}`
       );
       fetchStores();
       showNotification("Store deleted successfully!", "success");
