@@ -367,7 +367,7 @@ const BillPrintModal = ({
         font-size: 10px; /* Reduced from 11px */
       }
       .terms-tamil{
-      font-family: "Bamini", bamini;
+      font-family: "Adankappidaari", Adankappidaari;
       }
       .thanks {
         font-size: 12px;
