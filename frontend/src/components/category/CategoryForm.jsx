@@ -14,16 +14,12 @@ const CategoryForm = ({ category, onSuccess }) => {
     e.preventDefault();
     try {
       if (category) {
-        await axios.put(
-          `https://imssposerp.com/backend/public/api/categories/${category.id}`,
-          { name }
-        );
+        await axios.put(`http://127.0.0.1:8000/api/categories/${category.id}`, {
+          name,
+        });
         onSuccess("Category updated successfully!", "success");
       } else {
-        await axios.post(
-          "https://imssposerp.com/backend/public/api/categories",
-          { name }
-        );
+        await axios.post("http://127.0.0.1:8000/api/categories", { name });
         onSuccess("Category added successfully!", "success");
       }
       setName(""); // Reset form field after success
@@ -120,9 +116,7 @@ const CategoryManagement = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(
-        "https://imssposerp.com/backend/public/api/categories"
-      );
+      const response = await axios.get("http://127.0.0.1:8000/api/categories");
       setCategories(response.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -145,7 +139,7 @@ const CategoryManagement = () => {
   const confirmDelete = async (id) => {
     try {
       const response = await axios.delete(
-        `https://imssposerp.com/backend/public/api/categories/${id}`
+        `http://127.0.0.1:8000/api/categories/${id}`
       );
       if (response.status === 200) {
         fetchCategories();

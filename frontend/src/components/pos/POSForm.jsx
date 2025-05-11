@@ -200,7 +200,7 @@ const POSForm = ({
           const token = user?.token;
           const headers = token ? { Authorization: `Bearer ${token}` } : {};
           const response = await axios.get(
-            "https://imssposerp.com/backend/public/api/next-bill-number",
+            "http://127.0.0.1:8000/api/next-bill-number",
             { headers }
           );
           setBillNumber(response.data.next_bill_number);
@@ -221,7 +221,7 @@ const POSForm = ({
   useEffect(() => {
     setLoadingItems(true);
     axios
-      .get("https://imssposerp.com/backend/public/api/products")
+      .get("http://127.0.0.1:8000/api/products")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const productsWithOpeningStock = response.data.data.map((p) => {
@@ -261,7 +261,7 @@ const POSForm = ({
   useEffect(() => {
     setLoadingSchemes(true);
     axios
-      .get("https://imssposerp.com/backend/public/api/discount-schemes")
+      .get("http://127.0.0.1:8000/api/discount-schemes")
       .then((response) => {
         if (response.data && Array.isArray(response.data.data)) {
           const formattedSchemes = response.data.data.map((s) => ({
@@ -1021,7 +1021,7 @@ const POSForm = ({
             const token = user?.token;
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             const response = await axios.get(
-              "https://imssposerp.com/backend/public/api/next-bill-number",
+              "http://127.0.0.1:8000/api/next-bill-number",
               { headers }
             );
             setBillNumber(response.data.next_bill_number);

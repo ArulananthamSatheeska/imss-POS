@@ -65,12 +65,10 @@ const DiscountScheam = () => {
           customerResponse,
           schemeResponse,
         ] = await Promise.all([
-          axios.get("https://imssposerp.com/backend/public/api/products"),
-          axios.get("https://imssposerp.com/backend/public/api/categories"),
-          axios.get("https://imssposerp.com/backend/public/api/customers"), // Fetch customers
-          axios.get(
-            "https://imssposerp.com/backend/public/api/discount-schemes"
-          ),
+          axios.get("http://127.0.0.1:8000/api/products"),
+          axios.get("http://127.0.0.1:8000/api/categories"),
+          axios.get("http://127.0.0.1:8000/api/customers"), // Fetch customers
+          axios.get("http://127.0.0.1:8000/api/discount-schemes"),
         ]);
 
         setProducts(
@@ -320,7 +318,7 @@ const DiscountScheam = () => {
       let response;
       if (editSchemeId) {
         response = await axios.put(
-          `https://imssposerp.com/backend/public/api/discount-schemes/${editSchemeId}`,
+          `http://127.0.0.1:8000/api/discount-schemes/${editSchemeId}`,
           payload
         );
         const updatedScheme = {
@@ -337,7 +335,7 @@ const DiscountScheam = () => {
         alert("Discount scheme updated successfully!");
       } else {
         response = await axios.post(
-          "https://imssposerp.com/backend/public/api/discount-schemes",
+          "http://127.0.0.1:8000/api/discount-schemes",
           payload
         );
         const newScheme = {
@@ -371,7 +369,7 @@ const DiscountScheam = () => {
     if (!schemeToDelete) return;
     try {
       await axios.delete(
-        `https://imssposerp.com/backend/public/api/discount-schemes/${schemeToDelete}`
+        `http://127.0.0.1:8000/api/discount-schemes/${schemeToDelete}`
       );
       setSchemes(schemes.filter((scheme) => scheme.id !== schemeToDelete));
       setShowDeleteModal(false);

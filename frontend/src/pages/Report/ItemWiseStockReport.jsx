@@ -32,8 +32,8 @@ const ItemWiseStockReportForm = () => {
     const fetchCategoriesAndSuppliers = async () => {
       try {
         const [categoriesResponse, suppliersResponse] = await Promise.all([
-          axios.get("https://imssposerp.com/backend/public/api/categories"),
-          axios.get("https://imssposerp.com/backend/public/api/suppliers"),
+          axios.get("http://127.0.0.1:8000/api/categories"),
+          axios.get("http://127.0.0.1:8000/api/suppliers"),
         ]);
         setCategories(categoriesResponse.data);
         setSuppliers(suppliersResponse.data);
@@ -52,7 +52,7 @@ const ItemWiseStockReportForm = () => {
     console.log("Fetching stock reports with filters:", filters); // Log filters
     try {
       const response = await axios.get(
-        "https://imssposerp.com/backend/public/api/stock-reports",
+        "http://127.0.0.1:8000/api/stock-reports",
         { params: filters }
       );
       console.log("Stock reports fetched:", response.data); // Log response data

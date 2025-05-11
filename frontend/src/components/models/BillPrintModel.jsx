@@ -62,13 +62,13 @@ const BillPrintModal = ({
       try {
         // Fetch customers
         const customersResponse = await axios.get(
-          "https://imssposerp.com/backend/public/api/customers"
+          "http://127.0.0.1:8000/api/customers"
         );
         setCustomers(customersResponse.data.data);
 
         // Fetch company details
         const companyResponse = await axios.get(
-          "https://imssposerp.com/backend/public/api/company-details"
+          "http://127.0.0.1:8000/api/company-details"
         );
         if (companyResponse.data) {
           setCompanyDetails({
@@ -199,7 +199,7 @@ const BillPrintModal = ({
 
     try {
       const response = await axios.post(
-        "https://imssposerp.com/backend/public/api/sales",
+        "http://127.0.0.1:8000/api/sales",
         billData,
         getAuthHeaders()
       );
@@ -489,7 +489,7 @@ const BillPrintModal = ({
 
     try {
       const response = await axios.post(
-        "https://imssposerp.com/backend/public/api/customers",
+        "http://127.0.0.1:8000/api/customers",
         {
           customer_name: newCustomer.name,
           phone: newCustomer.mobile,
@@ -501,7 +501,7 @@ const BillPrintModal = ({
 
       // Refresh customers list
       const customersResponse = await axios.get(
-        "https://imssposerp.com/backend/public/api/customers"
+        "http://127.0.0.1:8000/api/customers"
       );
       setCustomers(customersResponse.data.data);
 

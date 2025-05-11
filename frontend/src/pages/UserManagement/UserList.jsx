@@ -16,7 +16,7 @@ import {
 } from "react-icons/fi";
 import { BsFilter } from "react-icons/bs";
 
-const API_BASE_URL = "https://imssposerp.com/backend/public/api";
+const API_BASE_URL = "http://127.0.0.1:8000/api";
 const USERS_PER_PAGE = 10;
 const DEBOUNCE_DELAY = 300;
 

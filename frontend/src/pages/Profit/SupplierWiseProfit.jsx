@@ -22,9 +22,7 @@ export const SupplierWiseProfit = () => {
   // Fetch suppliers from the backend
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get(
-        "https://imssposerp.com/backend/public/api/suppliers"
-      );
+      const response = await axios.get("http://127.0.0.1:8000/api/suppliers");
       // Transform suppliers for react-select
       const supplierOptions = response.data.map((supplier) => ({
         value: supplier.supplier_name,
@@ -56,7 +54,7 @@ export const SupplierWiseProfit = () => {
       setLoading(true);
       setError("");
       const response = await axios.get(
-        "https://imssposerp.com/backend/public/api/sales/supplier-wise-profit-report",
+        "http://127.0.0.1:8000/api/sales/supplier-wise-profit-report",
         {
           params: {
             supplierName: selectedSupplier.value, // Use value from react-select
