@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Check, Lock, LockOpen, Coins, Wallet, Receipt } from "lucide-react";
+import {
+  X,
+  Check,
+  Lock,
+  LockOpen,
+  Coins,
+  Wallet,
+  Receipt,
+  AlertCircle,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const RegisterModal = ({
@@ -11,44 +20,32 @@ const RegisterModal = ({
   user,
   isClosing = false,
   closingDetails = {},
-  registerStatus = "closed", // New prop for register status
+  registerStatus = "closed",
 }) => {
-  const [inputAmount, setInputAmount] = useState(isClosing ? "" : cashOnHand);
-  const [otherAmount, setOtherAmount] = useState(
-    closingDetails.otherAmount || ""
-  );
-  const [localIsOpen, setLocalIsOpen] = useState(isOpen);
+  const [inputAmount, setInputAmount] = useState("");
+  const [otherAmount, setOtherAmount] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef(null);
 
-  // Sync modal state with register status
+  // Initialize values based on mode
   useEffect(() => {
-    if (registerStatus === "open" && localIsOpen) {
-      setLocalIsOpen(false);
-      onClose();
-    } else if (registerStatus === "closed" && !localIsOpen && !isClosing) {
-      setLocalIsOpen(true);
+    if (isClosing) {
+      setInputAmount(closingDetails.inCashierAmount?.toString() || "");
+      setOtherAmount(closingDetails.otherAmount?.toString() || "");
+    } else {
+      setInputAmount(cashOnHand?.toString() || "");
     }
-  }, [registerStatus, localIsOpen, onClose, isClosing]);
+  }, [isClosing, closingDetails, cashOnHand]);
 
-  // Handle external isOpen changes
+  // Focus input when modal opens
   useEffect(() => {
-    setLocalIsOpen(isOpen);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (localIsOpen) {
+    if (isOpen) {
       setTimeout(() => {
         inputRef.current?.focus();
       }, 300);
     }
-  }, [localIsOpen]);
-
-  useEffect(() => {
-    if (isClosing && closingDetails) {
-      setInputAmount(closingDetails.inCashierAmount || "");
-      setOtherAmount(closingDetails.otherAmount || "");
-    }
-  }, [isClosing, closingDetails]);
+  }, [isOpen]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -56,43 +53,118 @@ const RegisterModal = ({
     }
   };
 
-  const handleConfirm = () => {
-    const amount = parseFloat(inputAmount);
-    const other = parseFloat(otherAmount || 0);
-
-    console.log(
-      "RegisterModal handleConfirm - amount:",
-      amount,
-      "other:",
-      other
-    );
-
-    if (isNaN(amount) || amount < 0) {
-      alert("Please enter a valid non-negative amount");
-      return;
-    }
-
-    if (isClosing && (isNaN(other) || other < 0)) {
-      alert("Please enter a valid non-negative other amount");
-      return;
+  const validateInputs = () => {
+    if (
+      !inputAmount ||
+      isNaN(parseFloat(inputAmount)) ||
+      parseFloat(inputAmount) < 0
+    ) {
+      setError("Please enter a valid cash amount");
+      return false;
     }
 
     if (isClosing) {
-      onConfirm({ inCashierAmount: amount, otherAmount: other });
-    } else {
-      onConfirm(amount);
+      const otherAmt = parseFloat(otherAmount || "0");
+      if (isNaN(otherAmt)) {
+        setError("Please enter a valid other amount");
+        return false;
+      }
+
+      // Validate that cash in register is reasonable compared to opening + sales
+      const expectedMin =
+        (closingDetails.openingCash || 0) + (closingDetails.cashSales || 0);
+      const enteredCash = parseFloat(inputAmount);
+
+      if (enteredCash < expectedMin * 0.9 || enteredCash > expectedMin * 1.5) {
+        setError(
+          `Cash amount seems unusual. Expected around LKR ${expectedMin.toFixed(2)} based on sales.`
+        );
+        return false;
+      }
     }
-    onClose();
+
+    setError("");
+    return true;
   };
 
-  // Don't render if register is open and we're not closing
+  const handleConfirm = async () => {
+    if (!validateInputs()) return;
+
+    setIsSubmitting(true);
+    try {
+      // Remove commas before parsing
+      const sanitizedInput = inputAmount.replace(/,/g, "");
+      const amount = parseFloat(sanitizedInput);
+      const other = parseFloat(otherAmount || 0);
+
+      if (isClosing) {
+        await onConfirm({
+          inCashierAmount: amount,
+          otherAmount: other,
+          expectedAmount:
+            (closingDetails.openingCash || 0) + (closingDetails.cashSales || 0),
+        });
+      } else {
+        await onConfirm(amount);
+        // Removed setCashOnHand call as it is not provided by parent
+        // setCashOnHand(amount);
+      }
+
+      onClose();
+    } catch (err) {
+      setError(err.message || "Failed to process register operation");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const calculateDifference = () => {
+    if (!isClosing) return null;
+
+    const expected =
+      (closingDetails.openingCash || 0) + (closingDetails.cashSales || 0);
+    const actual = parseFloat(inputAmount || 0);
+    const difference = actual - expected;
+
+    return {
+      expected,
+      actual,
+      difference,
+      isOver: difference > 0,
+      isShort: difference < 0,
+    };
+  };
+
+  const diff = calculateDifference();
+
+  // Show read-only view if register is open and we're not closing
   if (registerStatus === "open" && !isClosing) {
-    return null;
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-6 rounded-2xl shadow-2xl max-w-md w-full border border-blue-100 dark:border-gray-700 relative overflow-hidden text-center">
+          <div className="flex flex-col items-center gap-4">
+            <Lock className="text-blue-600 dark:text-blue-300" size={48} />
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
+              Register is currently open
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Cash on hand: LKR {cashOnHand?.toFixed(2) || "0.00"}
+            </p>
+            <button
+              onClick={onClose}
+              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <AnimatePresence>
-      {localIsOpen && (
+      {isOpen && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -169,11 +241,23 @@ const RegisterModal = ({
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={onClose}
-                  className="p-2 bg-white dark:bg-gray-700 rounded-full shadow hover:bg-gray-50 dark:hover:bg-gray-600"
+                  disabled={isSubmitting}
+                  className="p-2 bg-white dark:bg-gray-700 rounded-full shadow hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <X size={20} className="text-gray-600 dark:text-gray-300" />
                 </motion.button>
               </div>
+
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-lg flex items-start gap-2 border border-red-100 dark:border-red-900"
+                >
+                  <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+                  <div>{error}</div>
+                </motion.div>
+              )}
 
               <div className="space-y-6">
                 {isClosing ? (
@@ -198,18 +282,46 @@ const RegisterModal = ({
                         <div className="font-medium text-right dark:text-white">
                           LKR {closingDetails.totalSales?.toFixed(2) || "0.00"}
                         </div>
+
                         <div className="text-gray-600 dark:text-gray-400">
-                          Total Quantity:
+                          Cash Sales:
                         </div>
                         <div className="font-medium text-right dark:text-white">
-                          {closingDetails.totalSalesQty || "0"}
+                          LKR {closingDetails.cashSales?.toFixed(2) || "0.00"}
                         </div>
+
                         <div className="text-gray-600 dark:text-gray-400">
                           Opening Cash:
                         </div>
                         <div className="font-medium text-right dark:text-white">
                           LKR {closingDetails.openingCash?.toFixed(2) || "0.00"}
                         </div>
+
+                        {diff && (
+                          <>
+                            <div className="text-gray-600 dark:text-gray-400">
+                              Expected Cash:
+                            </div>
+                            <div className="font-medium text-right dark:text-white">
+                              LKR {diff.expected.toFixed(2)}
+                            </div>
+
+                            <div className="text-gray-600 dark:text-gray-400">
+                              Difference:
+                            </div>
+                            <div
+                              className={`font-medium text-right ${
+                                diff.isShort
+                                  ? "text-red-500"
+                                  : diff.isOver
+                                    ? "text-green-500"
+                                    : "dark:text-white"
+                              }`}
+                            >
+                              {diff.difference.toFixed(2)} LKR
+                            </div>
+                          </>
+                        )}
                       </div>
                     </motion.div>
 
@@ -218,13 +330,15 @@ const RegisterModal = ({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
                     >
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <div className="flex items-center gap-2 mb-2">
                         <Coins
                           className="text-blue-500 dark:text-blue-400"
                           size={16}
                         />
-                        Cash in Register (LKR)
-                      </label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Cash in Register (LKR)
+                        </label>
+                      </div>
                       <input
                         ref={inputRef}
                         type="number"
@@ -233,13 +347,8 @@ const RegisterModal = ({
                         onKeyDown={handleKeyDown}
                         className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:focus:ring-blue-400 transition-all bg-white dark:bg-gray-800 dark:text-white"
                         placeholder="Enter cash amount"
+                        disabled={isSubmitting}
                       />
-                      <button
-                        onClick={() => window.print()}
-                        className="mt-2 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        Print Mini Report
-                      </button>
                     </motion.div>
 
                     <motion.div
@@ -247,21 +356,28 @@ const RegisterModal = ({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 }}
                     >
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <div className="flex items-center gap-2 mb-2">
                         <Wallet
                           className="text-blue-500 dark:text-blue-400"
                           size={16}
                         />
-                        Other Amount (LKR)
-                      </label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Other Amount (LKR)
+                        </label>
+                      </div>
                       <input
                         type="number"
                         value={otherAmount}
                         onChange={(e) => setOtherAmount(e.target.value)}
                         onKeyDown={handleKeyDown}
                         className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:focus:ring-blue-400 transition-all bg-white dark:bg-gray-800 dark:text-white"
-                        placeholder="Enter other amount"
+                        placeholder="Enter other amount (checks, etc.)"
+                        disabled={isSubmitting}
                       />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Include checks, credit card tips, or other non-cash
+                        amounts
+                      </p>
                     </motion.div>
                   </>
                 ) : (
@@ -303,13 +419,15 @@ const RegisterModal = ({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
                     >
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <div className="flex items-center gap-2 mb-2">
                         <Coins
                           className="text-blue-500 dark:text-blue-400"
                           size={16}
                         />
-                        Opening Cash Amount (LKR)
-                      </label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Opening Cash Amount (LKR)
+                        </label>
+                      </div>
                       <input
                         ref={inputRef}
                         type="number"
@@ -318,7 +436,12 @@ const RegisterModal = ({
                         onKeyDown={handleKeyDown}
                         className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:focus:ring-blue-400 transition-all bg-white dark:bg-gray-800 dark:text-white"
                         placeholder="Enter opening cash amount"
+                        disabled={isSubmitting}
                       />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Count the physical cash in the drawer and enter the
+                        amount
+                      </p>
                     </motion.div>
                   </>
                 )}
@@ -334,6 +457,7 @@ const RegisterModal = ({
                     whileTap={{ scale: 0.98 }}
                     className="flex-1 flex items-center justify-center gap-2 p-3 bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl hover:bg-gray-50 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 shadow-sm"
                     onClick={onClose}
+                    disabled={isSubmitting}
                   >
                     <X size={18} /> Cancel
                   </motion.button>
@@ -342,9 +466,35 @@ const RegisterModal = ({
                     whileTap={{ scale: 0.98 }}
                     className="flex-1 flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:opacity-90 disabled:opacity-50 shadow-md"
                     onClick={handleConfirm}
+                    disabled={isSubmitting}
                   >
-                    <Check size={18} />
-                    {isClosing ? "Close Register" : "Open Register"}
+                    {isSubmitting ? (
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                    ) : (
+                      <>
+                        <Check size={18} />
+                        {isClosing ? "Close Register" : "Open Register"}
+                      </>
+                    )}
                   </motion.button>
                 </motion.div>
               </div>

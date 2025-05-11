@@ -147,7 +147,9 @@ class RegisterController extends Controller
         try {
             DB::beginTransaction();
 
-            $register = CashRegistry::find($request->input('register_id'));
+            $register = CashRegistry::where('id', $request->input('register_id'))
+                ->where('user_id', auth()->id())
+                ->first();
 
             if (!$register || $register->status !== 'open') {
                 DB::rollBack();

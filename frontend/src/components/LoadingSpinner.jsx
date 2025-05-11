@@ -14,26 +14,45 @@ export function LoadingSpinner({ duration = 2000 }) {
   if (!visible) return null;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen space-y-6 bg-gradient-to-br from-white via-gray-100 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
-      {/* Spinner with glow and layered rings */}
-      <div className="relative">
-        <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 bg-blue-400 opacity-75"></div>
-        <div className="animate-spin rounded-full h-16 w-16 border-[6px] border-t-blue-500 border-b-blue-500 border-l-transparent border-r-transparent"></div>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center min-h-screen space-y-8 bg-white dark:bg-gray-900 transition-colors duration-300">
+      {/* Animated logo container */}
+      <div className="relative flex items-center justify-center w-24 h-24">
+        {/* Outer glow */}
+        <div className="absolute inset-0 rounded-full opacity-10 bg-blue-500 animate-pulse-slow" />
+
+        {/* Pulsing ring */}
+        <div className="absolute rounded-full h-20 w-20 border-2 border-blue-200 animate-pulse-slow" />
+
+        {/* Main spinner */}
+        <div className="relative flex items-center justify-center">
+          <div className="animate-spin-slow rounded-full h-16 w-16 border-4 border-t-blue-600 border-r-blue-400 border-b-blue-600 border-l-blue-400" />
+        </div>
+
+        {/* Inner dot */}
+        <div className="absolute rounded-full h-3 w-3 bg-blue-600" />
       </div>
 
-      {/* Company Name with 3D and motion effect */}
-      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 drop-shadow-md animate-float">
-        Sharvaksha
-      </h1>
+      {/* Company branding */}
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400">
+            MUNSI TEX
+          </span>
+        </h1>
+        <div className="h-px w-16 mx-auto bg-gradient-to-r from-transparent via-blue-400 to-transparent" />
+      </div>
 
-      {/* Loading Text */}
-      <div className="flex flex-col items-center text-center">
-        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 animate-pulse">
-          Loading Application...
+      {/* Status indicator */}
+      <div className="flex flex-col items-center space-y-1 text-center max-w-xs">
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+          Loading application resources
         </p>
-        <span className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Please wait while we set things up for you
-        </span>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
+          <div
+            className="bg-blue-600 h-1.5 rounded-full animate-progress"
+            style={{ width: "70%" }}
+          />
+        </div>
       </div>
     </div>
   );

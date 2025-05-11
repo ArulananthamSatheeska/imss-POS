@@ -150,7 +150,7 @@ const POSForm = ({
   const { user } = useAuth();
   const { registerStatus, openRegister, closeRegister, refreshRegisterStatus } =
     useRegister();
-  const terminalId = registerStatus.terminalId || "T-1";
+  const terminalId = registerStatus.register?.terminal_id || "T-1";
   const userId = user?.id || 1;
   const navigate = useNavigate();
 
@@ -1066,7 +1066,7 @@ const POSForm = ({
       alert("Cannot proceed to payment with an empty bill.");
       return;
     }
-    if (!registerStatus.isOpen) {
+    if (registerStatus.status !== "open") {
       // If register is closed, show register modal to prompt opening
       setShowRegisterModal(true);
       return;
@@ -1076,7 +1076,7 @@ const POSForm = ({
       bill_number: billNumber,
     }));
     setShowBillModal(true);
-  }, [products, billNumber, registerStatus.isOpen]);
+  }, [products, billNumber, registerStatus.status]);
 
   const closeBillModal = useCallback(
     (saleSaved = false) => {
@@ -1148,13 +1148,13 @@ const POSForm = ({
     const registerModalDismissed = localStorage.getItem(
       "registerModalDismissed"
     );
-    if (!registerStatus.isOpen && !registerModalDismissed) {
+    if (registerStatus.status !== "open" && !registerModalDismissed) {
       setShowRegisterModal(true);
     } else {
       setShowRegisterModal(false);
     }
     setCheckedRegisterModal(true);
-  }, [registerStatus.isOpen]);
+  }, [registerStatus.status]);
 
   const calculateClosingDetails = () => {
     // Use totalSales and openingCash from registerStatus if available, ensure numbers
@@ -1224,7 +1224,7 @@ const POSForm = ({
           opening_cash: openingCash,
         });
         if (success) {
-          refreshRegisterStatus();
+          refreshRegisterStatus(user.id);
           setShowRegisterModal(false);
         }
       } catch (error) {

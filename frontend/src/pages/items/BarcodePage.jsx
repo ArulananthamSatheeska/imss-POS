@@ -307,7 +307,7 @@ export const BarcodePage = () => {
       </div>
     `
         : template.id === 2
-        ? `
+          ? `
       <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${product.product_name.toUpperCase()}
@@ -329,8 +329,8 @@ export const BarcodePage = () => {
         }
       </div>
     `
-        : template.id === 3
-        ? `
+          : template.id === 3
+            ? `
       <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${product.product_name.toUpperCase()}
@@ -352,7 +352,7 @@ export const BarcodePage = () => {
         </div>
       </div>
     `
-        : `
+            : `
       <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${product.product_name.toUpperCase()}
@@ -426,7 +426,7 @@ export const BarcodePage = () => {
     try {
       const timestamp = new Date().getTime();
       const productsRes = await api
-        .get(`/products?_t=${timestamp}`)
+        .get(`/api/products?_t=${timestamp}`)
         .catch((err) => {
           console.error(
             "Products fetch error:",
@@ -442,8 +442,8 @@ export const BarcodePage = () => {
       const productsData = Array.isArray(productsRes.data.data)
         ? productsRes.data.data
         : Array.isArray(productsRes.data)
-        ? productsRes.data
-        : [];
+          ? productsRes.data
+          : [];
 
       const formattedProducts = productsData.map((product) => {
         const mrpValue =
@@ -611,7 +611,7 @@ export const BarcodePage = () => {
         </div>
       `
           : selectedTemplate.id === 2
-          ? `
+            ? `
         <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; align-items: center; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
           <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${product.product_name.toUpperCase()}
@@ -634,8 +634,8 @@ export const BarcodePage = () => {
           }
         </div>
       `
-          : selectedTemplate.id === 3
-          ? `
+            : selectedTemplate.id === 3
+              ? `
         <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
           <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${product.product_name.toUpperCase()}
@@ -658,7 +658,7 @@ export const BarcodePage = () => {
           </div>
         </div>
       `
-          : `
+              : `
         <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
           <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${product.product_name.toUpperCase()}
@@ -1377,7 +1377,7 @@ export const BarcodePage = () => {
                       </div>
                     `
                           : selectedTemplate.id === 2
-                          ? `
+                            ? `
                       <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; align-items: center; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
                         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                           ${product.product_name.toUpperCase()}
@@ -1398,8 +1398,8 @@ export const BarcodePage = () => {
                         }
                       </div>
                     `
-                          : selectedTemplate.id === 3
-                          ? `
+                            : selectedTemplate.id === 3
+                              ? `
                       <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
                         <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                           ${product.product_name.toUpperCase()}
@@ -1421,7 +1421,7 @@ export const BarcodePage = () => {
                         </div>
                       </div>
                     `
-                          : `
+                              : `
                       <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
                         <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                           ${product.product_name.toUpperCase()}
