@@ -33,7 +33,10 @@ class HeldSale extends Model
             // Get the highest current hold ID number
             $lastHold = static::orderBy('id', 'desc')->first();
             $lastNumber = 0;
-        
+
+            if ($lastHold && preg_match('/HLD-(\d+)/', $lastHold->hold_id, $matches)) {
+                $lastNumber = (int) $matches[1];
+            }
             
             // Generate the next sequential hold ID
             $model->hold_id = 'HLD-' . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
@@ -43,6 +46,7 @@ class HeldSale extends Model
             $model->expires_at = now()->addHours($expiryHours);
         });
     }
+
 
     public function scopeActive($query)
     {
