@@ -56,7 +56,7 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
     }
     try {
       const response = await axios.post(
-        "https://imssposerp.com/backend/public/api/categories",
+        "http://127.0.0.1:8000/api/categories",
         {
           name: newCategory.trim(),
         }
@@ -80,7 +80,7 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
     }
     try {
       const response = await axios.post(
-        "https://imssposerp.com/backend/public/api/store-locations",
+        "http://127.0.0.1:8000/api/store-locations",
         {
           store_name: newStore.trim(),
           phone_number: formData.phone_number || "",
@@ -110,14 +110,11 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       return;
     }
     try {
-      const response = await axios.post(
-        "https://imssposerp.com/backend/public/api/suppliers",
-        {
-          supplier_name: newSupplier.trim(),
-          contact: formData.contact || "",
-          address: formData.address || "",
-        }
-      );
+      const response = await axios.post("http://127.0.0.1:8000/api/suppliers", {
+        supplier_name: newSupplier.trim(),
+        contact: formData.contact || "",
+        address: formData.address || "",
+      });
       setSuppliers((prev) => [...prev, response.data]);
       setFormData((prev) => ({
         ...prev,
@@ -141,12 +138,9 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       return;
     }
     try {
-      const response = await axios.post(
-        "https://imssposerp.com/backend/public/api/units",
-        {
-          unit_name: newUnitType.trim(),
-        }
-      );
+      const response = await axios.post("http://127.0.0.1:8000/api/units", {
+        unit_name: newUnitType.trim(),
+      });
       setUnitTypes((prev) => [...prev, response.data]);
       setFormData((prev) => ({ ...prev, unit_type: response.data.unit_name }));
       setNewUnitType("");
@@ -176,12 +170,10 @@ const ItemForm = ({ onSubmit, initialData, onClose }) => {
       try {
         const [categoriesRes, unitTypesRes, suppliersRes, storesRes] =
           await Promise.all([
-            axios.get("https://imssposerp.com/backend/public/api/categories"),
-            axios.get("https://imssposerp.com/backend/public/api/units"),
-            axios.get("https://imssposerp.com/backend/public/api/suppliers"),
-            axios.get(
-              "https://imssposerp.com/backend/public/api/store-locations"
-            ),
+            axios.get("http://127.0.0.1:8000/api/categories"),
+            axios.get("http://127.0.0.1:8000/api/units"),
+            axios.get("http://127.0.0.1:8000/api/suppliers"),
+            axios.get("http://127.0.0.1:8000/api/store-locations"),
           ]);
 
         setCategories(categoriesRes.data);

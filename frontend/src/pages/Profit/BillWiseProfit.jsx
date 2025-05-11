@@ -123,7 +123,7 @@ const BillWiseProfitReport = () => {
     try {
       setIsLoading(true);
       const response = await axios.get(
-        "https://imssposerp.com/backend/public/api/sales/bill-wise-profit-report",
+        "http://127.0.0.1:8000/api/sales/bill-wise-profit-report",
         {
           params: {
             fromDate,

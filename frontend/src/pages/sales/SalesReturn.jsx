@@ -277,7 +277,7 @@ const SalesReturn = () => {
       const fetchSellingCost = async () => {
         try {
           const response = await axios.get(
-            `https://imssposerp.com/backend/public/api/products/${itemForm.product_id}`
+            `http://127.0.0.1:8000/api/products/${itemForm.product_id}`
           );
           const productData = response.data.data;
           setItemForm((prev) => ({

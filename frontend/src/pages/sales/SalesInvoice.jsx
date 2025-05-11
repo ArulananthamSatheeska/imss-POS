@@ -896,7 +896,7 @@ const SalesInvoice = ({
     if (productId) {
       try {
         const response = await axios.get(
-          `https://imssposerp.com/backend/public/api/products/${productId}`
+          `http://127.0.0.1:8000/api/products/${productId}`
         );
         const productData = response.data.data;
         supplier = productData.supplier || "N/A";

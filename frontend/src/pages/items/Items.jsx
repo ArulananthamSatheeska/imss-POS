@@ -132,7 +132,7 @@ const Items = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const api = axios.create({
-    baseURL: "https://imssposerp.com/backend/public/api",
+    baseURL: "http://127.0.0.1:8000/api",
     headers: {
       Authorization: `Bearer ${currentUser?.token}`,
       "Content-Type": "application/json",
