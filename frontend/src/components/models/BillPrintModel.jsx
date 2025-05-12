@@ -10,6 +10,7 @@ const BillPrintModal = ({
   initialShipping = 0,
   initialTotals = {},
   grandTotal = 0,
+  unit = "",
   totalItemDiscount = 0,
   initialCustomerInfo = { name: "", mobile: "", bill_number: "", userId: "" },
   saleType = "Retail",
@@ -820,7 +821,7 @@ const BillPrintModal = ({
                             {index + 1}
                           </td>
                           <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
-                            {product.qty}
+                            {product.qty.product.unit}
                           </td>
                           <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
                             {product.product_name}
@@ -997,7 +998,7 @@ const BillPrintModal = ({
                       <td className="px-2 py-1 text-left border border-black"></td>
                       <td className="px-2 py-1 text-left border border-black"></td>
                       <td className="px-2 py-1 text-center border border-black">
-                        {product.qty}x
+                        {product.qty.product.unit}x
                       </td>
                       <td className="px-2 py-1 text-right border border-black">
                         {product.mrp.toFixed(2)}

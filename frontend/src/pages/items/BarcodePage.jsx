@@ -4,6 +4,13 @@ import { useAuth } from "../../context/NewAuthContext";
 import { getApi } from "../../services/api";
 import JsBarcode from "jsbarcode";
 
+const config = {
+  productNameSize: "8px",
+  fontSize: "7px",
+  barcodeTextSize: "9px",
+  largeBarcodeFontSize: "11px",
+};
+
 export const BarcodePage = () => {
   const { user } = useAuth();
   const api = getApi();
@@ -48,6 +55,11 @@ export const BarcodePage = () => {
         description: "Tiny with only barcode",
         includes: { expiry: false, seller: false },
       },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
+      },
     ],
     "38mmx25mm": [
       {
@@ -69,6 +81,11 @@ export const BarcodePage = () => {
         id: 4,
         description: "Medium minimal",
         includes: { expiry: false, seller: false },
+      },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
       },
     ],
     "40mmx20mm": [
@@ -92,6 +109,11 @@ export const BarcodePage = () => {
         description: "Standard minimal",
         includes: { expiry: false, seller: false },
       },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
+      },
     ],
     "50mmx25mm": [
       {
@@ -113,6 +135,11 @@ export const BarcodePage = () => {
         id: 4,
         description: "Minimal with only barcode and MRP",
         includes: { expiry: false, seller: false },
+      },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
       },
     ],
     "60mmx15mm": [
@@ -136,6 +163,11 @@ export const BarcodePage = () => {
         description: "Wide minimal",
         includes: { expiry: false, seller: false },
       },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
+      },
     ],
     "75mmx25mm": [
       {
@@ -157,6 +189,11 @@ export const BarcodePage = () => {
         id: 4,
         description: "Wide minimal",
         includes: { expiry: false, seller: false },
+      },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
       },
     ],
     "70mmx30mm": [
@@ -180,6 +217,11 @@ export const BarcodePage = () => {
         description: "Large minimal",
         includes: { expiry: false, seller: false },
       },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
+      },
     ],
     "100mmx50mm": [
       {
@@ -202,6 +244,11 @@ export const BarcodePage = () => {
         description: "Extra large minimal",
         includes: { expiry: false, seller: false },
       },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
+      },
     ],
     "100mmx150mm": [
       {
@@ -223,6 +270,11 @@ export const BarcodePage = () => {
         id: 4,
         description: "Poster minimal",
         includes: { expiry: false, seller: false },
+      },
+      {
+        id: 6,
+        description: "New style with emphasis",
+        includes: { expiry: true, seller: true },
       },
     ],
   };
@@ -307,7 +359,7 @@ export const BarcodePage = () => {
       </div>
     `
         : template.id === 2
-        ? `
+          ? `
       <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${product.product_name.toUpperCase()}
@@ -329,8 +381,8 @@ export const BarcodePage = () => {
         }
       </div>
     `
-        : template.id === 3
-        ? `
+          : template.id === 3
+            ? `
       <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${product.product_name.toUpperCase()}
@@ -352,7 +404,7 @@ export const BarcodePage = () => {
         </div>
       </div>
     `
-        : `
+            : `
       <div style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${product.product_name.toUpperCase()}
@@ -426,7 +478,7 @@ export const BarcodePage = () => {
     try {
       const timestamp = new Date().getTime();
       const productsRes = await api
-        .get(`/products?_t=${timestamp}`)
+        .get(`/api/products?_t=${timestamp}`)
         .catch((err) => {
           console.error(
             "Products fetch error:",
@@ -442,8 +494,8 @@ export const BarcodePage = () => {
       const productsData = Array.isArray(productsRes.data.data)
         ? productsRes.data.data
         : Array.isArray(productsRes.data)
-        ? productsRes.data
-        : [];
+          ? productsRes.data
+          : [];
 
       const formattedProducts = productsData.map((product) => {
         const mrpValue =
@@ -570,169 +622,545 @@ export const BarcodePage = () => {
     const margin = isSmallTemplate ? "0.5px" : "1px";
     const barcodeCanvasWidth = isSmallTemplate ? "40px" : "60px"; // Fixed pixel width for sharpness
 
+    // Define columns based on templateSize for print layout
+    const columnsMap = {
+      "30mmx16mm": 4,
+      "38mmx25mm": 3,
+      "40mmx20mm": 3,
+      "50mmx25mm": 3,
+      "60mmx15mm": 2,
+      "75mmx25mm": 2,
+      "70mmx30mm": 2,
+      "100mmx50mm": 1,
+      "100mmx150mm": 1,
+    };
+    const columns = columnsMap[templateSize] || 3;
+
     const printContent = barcodesToPrint
       .map((product, index) => {
         if (!barcodeImages[index]) return "";
 
-        return selectedTemplate.id === 1
-          ? `
-        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
-          <div style="flex: 1; overflow: hidden;">
-            <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${product.product_name.toUpperCase()}
+        // Common style variables
+        const barcodeFontFamily = "'Libre Barcode 128', cursive";
+        const textFontFamily = "'Roboto', 'Noto Sans Sinhala', sans-serif";
+        const borderStyle = "1px solid #e0e0e0";
+        const barcodeHeight = isSmallTemplate ? "30px" : "40px";
+        const formattedBarcode = product.barcode.replace(
+          /(\d{4})(?=\d)/g,
+          "$1 "
+        ); // Add space every 4 digits
+
+        switch (selectedTemplate.id) {
+          case 1: // Detailed template (pharmaceutical style)
+            return `
+          <div class="barcode-label" style="
+            border: ${borderStyle};
+            padding: 2mm;
+            width: ${labelWidth};
+            height: ${labelHeight};
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: ${textFontFamily};
+            box-sizing: border-box;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          ">
+            <!-- Product Header -->
+            <div style="flex: 1; min-height: 0; overflow: hidden;">
+              <h3 style="
+                margin: 0 0 1mm 0;
+                font-weight: 700;
+                font-size: ${config.productNameSize};
+                text-align: center;
+                text-transform: uppercase;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              ">
+                ${product.product_name || "PRODUCT NAME"}
+              </h3>
+              
+              ${
+                selectedTemplate.includes.expiry && product.expiry_date
+                  ? `
+                <div style="
+                  margin: 0.5mm 0;
+                  font-size: ${config.fontSize};
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">
+                  <strong>EXP:</strong> ${product.expiry_date}
+                </div>
+              `
+                  : ""
+              }
+              
+              <div style="
+                margin: 0.5mm 0;
+                font-size: ${config.fontSize};
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              ">
+                <strong>BATCH:</strong> ${product.batch_number || "N/A"}
+              </div>
+            </div>
+            
+            <!-- Barcode Section -->
+            <div style="flex-shrink: 0; text-align: center;">
+              <img src="${barcodeImages[index]}" style="
+                height: ${barcodeHeight};
+                width: 100%;
+                image-rendering: crisp-edges;
+                margin: 1mm 0;
+              ">
+              <div style="
+                font-family: 'Courier New', monospace;
+                font-size: ${config.barcodeTextSize};
+                letter-spacing: 1px;
+                margin: 0.5mm 0;
+                font-weight: bold;
+              ">
+                ${formattedBarcode}
+              </div>
+            </div>
+            
+            <!-- Footer Section -->
+            <div style="margin-top: auto;">
+              <div style="
+                text-align: center;
+                font-weight: bold;
+                font-size: ${config.fontSize};
+                margin: 1mm 0;
+              ">
+                MRP: Rs. ${product.mrp || "0.00"}
+              </div>
+              
+              ${
+                selectedTemplate.includes.seller && product.supplier
+                  ? `
+                <div style="
+                  font-size: ${config.fontSize};
+                  text-align: center;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">
+                  ${product.supplier}
+                </div>
+              `
+                  : ""
+              }
+            </div>
+          </div>
+        `;
+          case 6: // New style with emphasis
+            return `
+          <div class="barcode-label" style="
+            border: 2px dashed #3b82f6;
+            padding: 3mm;
+            width: ${labelWidth};
+            height: ${labelHeight};
+            background: #e0f2fe;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: ${textFontFamily};
+            box-sizing: border-box;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            text-align: center;
+          ">
+            <h2 style="
+              margin: 0 0 4px 0;
+              font-weight: 900;
+              font-size: 14px;
+              color: #1e40af;
+              text-transform: uppercase;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            ">
+              ${product.product_name || "PRODUCT NAME"}
+            </h2>
+            ${
+              selectedTemplate.includes.expiry && product.expiry_date
+                ? `<div style="
+                  font-size: 10px;
+                  color: #1e3a8a;
+                  margin-bottom: 4px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">
+                  <strong>EXP:</strong> ${product.expiry_date}
+                </div>`
+                : ""
+            }
+            <div style="
+              font-size: 10px;
+              color: #1e3a8a;
+              margin-bottom: 6px;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            ">
+              <strong>BATCH:</strong> ${product.batch_number || "N/A"}
+            </div>
+            <img src="${barcodeImages[index]}" style="
+              height: ${barcodeHeight};
+              width: 80%;
+              image-rendering: crisp-edges;
+              margin-bottom: 6px;
+            ">
+            <div style="
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              letter-spacing: 2px;
+              font-weight: 700;
+              color: #1e40af;
+              margin-bottom: 6px;
+            ">
+              ${formattedBarcode}
+            </div>
+            <div style="
+              font-weight: 900;
+              font-size: 12px;
+              color: #1e40af;
+              margin-bottom: 4px;
+            ">
+              MRP: Rs. ${product.mrp || "0.00"}
+            </div>
+            ${
+              selectedTemplate.includes.seller && product.supplier
+                ? `<div style="
+                  font-size: 10px;
+                  color: #1e40af;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">
+                  ${product.supplier}
+                </div>`
+                : ""
+            }
+          </div>
+        `;
+
+          case 2: // Compact template (retail style)
+            return `
+          <div class="barcode-label" style="
+            border: ${borderStyle};
+            padding: 2mm;
+            width: ${labelWidth};
+            height: ${labelHeight};
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            font-family: ${textFontFamily};
+            box-sizing: border-box;
+            page-break-inside: avoid;
+          ">
+            <h3 style="
+              margin: 0;
+              font-weight: 700;
+              font-size: ${config.productNameSize};
+              text-align: center;
+              text-transform: uppercase;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              max-width: 100%;
+            ">
+              ${product.product_name || "PRODUCT NAME"}
             </h3>
+            
+            <img src="${barcodeImages[index]}" style="
+              height: ${barcodeHeight};
+              width: 100%;
+              image-rendering: crisp-edges;
+              margin: 1mm 0;
+            ">
+            
+            <div style="
+              font-family: 'Courier New', monospace;
+              font-size: ${config.barcodeTextSize};
+              letter-spacing: 1px;
+              margin: 0.5mm 0;
+              font-weight: bold;
+            ">
+              ${formattedBarcode}
+            </div>
+            
+            <div style="
+              font-weight: bold;
+              font-size: ${config.fontSize};
+              margin: 0.5mm 0;
+            ">
+              MRP: Rs. ${product.mrp || "0.00"}
+            </div>
           </div>
-          ${
-            selectedTemplate.includes.expiry && product.expiry_date
-              ? `<div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              <strong>කල්. දිනය/EXP Date:</strong> ${product.expiry_date}
-            </div>`
-              : ""
-          }
-          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            <strong>කු. අං/Batch No:</strong> ${product.batch_number}
+        `;
+
+          case 3: // Bold MRP template (price emphasis)
+            return `
+          <div class="barcode-label" style="
+            border: ${borderStyle};
+            padding: 2mm;
+            width: ${labelWidth};
+            height: ${labelHeight};
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: ${textFontFamily};
+            box-sizing: border-box;
+            page-break-inside: avoid;
+          ">
+            <div style="flex: 1; min-height: 0; overflow: hidden;">
+              <h3 style="
+                margin: 0 0 1mm 0;
+                font-weight: 700;
+                font-size: ${config.productNameSize};
+                text-align: center;
+                text-transform: uppercase;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              ">
+                ${product.product_name || "PRODUCT NAME"}
+              </h3>
+              
+              ${
+                selectedTemplate.includes.expiry && product.expiry_date
+                  ? `
+                <div style="
+                  margin: 0.5mm 0;
+                  font-size: ${config.fontSize};
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">
+                  <strong>EXP:</strong> ${product.expiry_date}
+                </div>
+              `
+                  : ""
+              }
+            </div>
+            
+            <div style="flex-shrink: 0; text-align: center;">
+              <img src="${barcodeImages[index]}" style="
+                height: ${barcodeHeight};
+                width: 100%;
+                image-rendering: crisp-edges;
+                margin: 1mm 0;
+              ">
+              <div style="
+                font-family: 'Courier New', monospace;
+                font-size: ${config.barcodeTextSize};
+                letter-spacing: 1px;
+                margin: 0.5mm 0;
+                font-weight: bold;
+              ">
+                ${formattedBarcode}
+              </div>
+            </div>
+            
+            <div style="
+              background: #f5f5f5;
+              padding: 1mm;
+              text-align: center;
+              font-weight: bold;
+              font-size: ${isSmallTemplate ? "9px" : "11px"};
+              margin-top: 1mm;
+              border-radius: 2px;
+            ">
+              MRP: Rs. ${product.mrp || "0.00"}
+            </div>
           </div>
-          <img src="${
-            barcodeImages[index]
-          }" style="margin: 0 auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
-          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.barcode}
+        `;
+
+          case 5: // Max/Min template (inventory style)
+            return `
+          <div class="barcode-label" style="
+            border: ${borderStyle};
+            padding: 2mm;
+            width: ${labelWidth};
+            height: ${labelHeight};
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: ${textFontFamily};
+            box-sizing: border-box;
+            page-break-inside: avoid;
+          ">
+            <h3 style="
+              margin: 0 0 1mm 0;
+              font-weight: 700;
+              font-size: ${isSmallTemplate ? "9px" : "11px"};
+              text-align: center;
+              text-transform: uppercase;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            ">
+              ${product.product_name || "PRODUCT NAME"}
+            </h3>
+            
+            <div style="
+              display: flex;
+              justify-content: space-between;
+              margin: 1mm 0;
+              font-size: ${config.fontSize};
+            ">
+              <div><strong>MAX:</strong> ${product.row || "N/A"}</div>
+              <div><strong>MIN:</strong> ${product.cabinet || "N/A"}</div>
+            </div>
+            
+            <div style="
+              font-family: ${barcodeFontFamily};
+              font-size: ${config.largeBarcodeFontSize};
+              text-align: center;
+              letter-spacing: 1px;
+              margin: 1mm 0;
+              line-height: 1.2;
+            ">
+              *${formattedBarcode}*
+            </div>
           </div>
-          <div class="mrp" style="text-align: center; font-size: ${fontSize}; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            <strong>MRP:</strong> ${product.mrp}
+        `;
+
+          default: // Basic template
+            return `
+          <div class="barcode-label" style="
+            border: ${borderStyle};
+            padding: 2mm;
+            width: ${labelWidth};
+            height: ${labelHeight};
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: ${textFontFamily};
+            box-sizing: border-box;
+            page-break-inside: avoid;
+          ">
+            <h3 style="
+              margin: 0 0 1mm 0;
+              font-weight: 700;
+              font-size: ${config.productNameSize};
+              text-align: center;
+              text-transform: uppercase;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              max-width: 100%;
+            ">
+              ${product.product_name || "PRODUCT NAME"}
+            </h3>
+            
+            <img src="${barcodeImages[index]}" style="
+              height: ${barcodeHeight};
+              width: 100%;
+              image-rendering: crisp-edges;
+              margin: 1mm 0;
+            ">
+            
+            <div style="
+              font-family: 'Courier New', monospace;
+              font-size: ${config.barcodeTextSize};
+              letter-spacing: 1px;
+              margin: 0.5mm 0;
+              font-weight: bold;
+            ">
+              ${formattedBarcode}
+            </div>
+            
+            <div style="
+              font-weight: bold;
+              font-size: ${config.fontSize};
+              margin: 0.5mm 0;
+            ">
+              MRP: Rs. ${product.mrp || "0.00"}
+            </div>
           </div>
-          ${
-            selectedTemplate.includes.seller && product.supplier
-              ? `<div class="seller" style="text-align: center; font-size: ${fontSize}; margin-top: ${margin}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${product.supplier}
-            </div>`
-              : ""
-          }
-        </div>
-      `
-          : selectedTemplate.id === 2
-          ? `
-        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; align-items: center; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
-          <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.product_name.toUpperCase()}
-          </h3>
-          <img src="${
-            barcodeImages[index]
-          }" style="width: ${barcodeCanvasWidth}; height: auto;" />
-          <div style="line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.barcode}
-          </div>
-          <div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            <strong>MRP:</strong> ${product.mrp}
-          </div>
-          ${
-            selectedTemplate.includes.seller && product.supplier
-              ? `<div style="font-size: ${fontSize}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${product.supplier}
-            </div>`
-              : ""
-          }
-        </div>
-      `
-          : selectedTemplate.id === 3
-          ? `
-        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
-          <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.product_name.toUpperCase()}
-          </h3>
-          ${
-            selectedTemplate.includes.expiry && product.expiry_date
-              ? `<div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              <strong>කල්. දිනය/EXP:</strong> ${product.expiry_date}
-            </div>`
-              : ""
-          }
-          <img src="${
-            barcodeImages[index]
-          }" style="margin: 0 auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
-          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.barcode}
-          </div>
-          <div class="mrp" style="text-align: center; font-size: ${fontSize}; font-weight: bold; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            MRP: ${product.mrp}
-          </div>
-        </div>
-      `
-          : `
-        <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: 100%; max-width: calc(${labelWidth} - 2mm); height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
-          <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.product_name.toUpperCase()}
-          </h3>
-          <img src="${
-            barcodeImages[index]
-          }" style="margin: 2px auto; display: block; width: ${barcodeCanvasWidth}; height: auto;" />
-          <div style="margin: ${margin} 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${product.barcode}
-          </div>
-          <div class="mrp" style="text-align: center; font-size: ${fontSize}; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            <strong>MRP:</strong> ${product.mrp}
-          </div>
-        </div>
-      `;
+        `;
+        }
       })
       .join("");
 
-    const paperWidth = paperSize;
-    const columns = parseInt(paperWidth) <= 50 ? 1 : 2;
-
+    // Enhanced print styles
     const styles = `
-      <style>
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        body { 
-          font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif; 
-          margin: 0; 
-          padding: 0; 
-        }
-        @media print {
-          .barcode-label { 
-            margin: 2mm 0 2mm 2mm;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            width: 100%;
-            max-width: calc(${labelWidth} - 2mm);
-          }
-          @page { 
-            size: ${paperWidth} auto;
-            margin: 0;
-          }
-          .barcode-container {
-            width: ${paperWidth};
-            display: grid;
-            grid-template-columns: repeat(${columns}, 1fr);
-            gap: 0;
-            break-after: auto;
-            page-break-before: auto;
-            page-break-after: auto;
-            page-break-inside: auto;
-          }
-        }
-      </style>
-    `;
+  <style>
+    @page {
+      size: ${paperSize} ${paperSize === "A4" ? "portrait" : "landscape"};
+      margin: 5mm;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    
+    .barcode-container {
+      display: grid;
+      grid-template-columns: repeat(${columns}, 1fr);
+      gap: 2mm;
+      width: 100%;
+      padding: 2mm;
+      box-sizing: border-box;
+    }
+    
+    @media print {
+      body {
+        background: white;
+      }
+      .barcode-container {
+        width: calc(100% - 10mm);
+        margin: 0 auto;
+      }
+      .barcode-label {
+        border: 1px solid #eee !important;
+      }
+    }
+  </style>
+`;
 
+    // Create print window with proper font imports
     const printWindow = window.open("", "_blank");
     printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Barcodes</title>
-          <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;700&display=swap" rel="stylesheet">
-          ${styles}
-        </head>
-        <body>
-          <div class="barcode-container" style="width: ${paperWidth};">
-            ${printContent}
-          </div>
-        </body>
-      </html>
-    `);
+  <html>
+    <head>
+      <title>Print Barcodes</title>
+      <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;700&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
+      ${styles}
+    </head>
+    <body>
+      <div class="barcode-container">
+        ${printContent}
+      </div>
+      <script>
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => window.close(), 500);
+        }, 300);
+      </script>
+    </body>
+  </html>
+`);
     printWindow.document.close();
 
     const waitForRender = () => {
@@ -1377,7 +1805,7 @@ export const BarcodePage = () => {
                       </div>
                     `
                           : selectedTemplate.id === 2
-                          ? `
+                            ? `
                       <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; align-items: center; justify-content: space-around; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
                         <h3 style="margin: 0; font-weight: bold; font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                           ${product.product_name.toUpperCase()}
@@ -1398,8 +1826,8 @@ export const BarcodePage = () => {
                         }
                       </div>
                     `
-                          : selectedTemplate.id === 3
-                          ? `
+                            : selectedTemplate.id === 3
+                              ? `
                       <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
                         <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                           ${product.product_name.toUpperCase()}
@@ -1421,7 +1849,7 @@ export const BarcodePage = () => {
                         </div>
                       </div>
                     `
-                          : `
+                              : `
                       <div class="barcode-label" style="border: 1px solid #000; padding: 2px; text-align: center; font-size: ${fontSize}; width: ${labelWidth}; height: ${labelHeight}; background-color: #fff; position: relative; box-sizing: border-box; margin: 2mm 0 2mm 2mm; display: flex; flex-direction: column; justify-content: center; font-family: 'Noto Sans Sinhala', 'Roboto', sans-serif;">
                         <h3 style="margin: 0; font-weight: bold; font-size: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                           ${product.product_name.toUpperCase()}

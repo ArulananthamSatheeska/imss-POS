@@ -28,7 +28,7 @@ const PurchaseInvoiceForm = ({
       supplierId: "",
       storeId: "",
       paidAmount: 0,
-      status: "pending",
+      status: "unpaid",
       discountPercentage: 0,
       discountAmount: 0,
       discountAmountEdited: false,
@@ -105,9 +105,9 @@ const PurchaseInvoiceForm = ({
     try {
       const timestamp = new Date().getTime();
       const [suppliersRes, storesRes, productsRes] = await Promise.all([
-        api.get(`/suppliers?_t=${timestamp}`),
-        api.get(`/store-locations?_t=${timestamp}`),
-        api.get(`/products?_t=${timestamp}`),
+        api.get(`/api/suppliers?_t=${timestamp}`),
+        api.get(`/api/store-locations?_t=${timestamp}`),
+        api.get(`/api/products?_t=${timestamp}`),
       ]);
 
       const suppliersData = Array.isArray(suppliersRes.data.data)
@@ -774,7 +774,7 @@ const PurchaseInvoiceForm = ({
                       className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
                       disabled={loading}
                     >
-                      <option value="pending">Pending</option>
+                      <option value="unopaid">unpaid</option>
                       <option value="paid">Paid</option>
                       <option value="cancelled">Cancelled</option>
                     </select>

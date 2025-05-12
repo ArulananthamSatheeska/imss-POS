@@ -86,7 +86,7 @@ const SalesReport = () => {
           invoice.invoice_date ||
           invoice.created_at ||
           new Date().toISOString(),
-        status: invoice.status || "Pending",
+        status: invoice.status || "unpaid",
       }));
 
       let sales = [];
@@ -666,7 +666,7 @@ const SalesReport = () => {
             }),
         },
         paymentMethod: row.payment_method || "Cash",
-        status: row.status || (row.type === "sale" ? "Completed" : "Pending"),
+        status: row.status || (row.type === "sale" ? "Completed" : "unpaid"),
       });
     }
   };

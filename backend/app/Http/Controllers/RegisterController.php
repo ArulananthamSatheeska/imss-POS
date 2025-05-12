@@ -66,155 +66,135 @@ class RegisterController extends Controller
             ], 500);
         }
     }
+public function openShift(Request $request): JsonResponse
+{
+    $validator = Validator::make($request->all(), [
+        'user_id' => 'required|integer|exists:users,id',
+        'terminal_id' => 'required|string|max:50',
+        'opening_cash' => 'required|numeric|min:0',
+    ]);
 
-    public function openShift(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'user_id' => 'required|integer|exists:users,id',
-            'terminal_id' => 'required|string|max:50',
-            'opening_cash' => 'required|numeric|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            Log::error('Open shift validation failed', ['errors' => $validator->errors()->toArray(), 'input' => $request->all()]);
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $userId = $request->input('user_id');
-            $terminalId = $request->input('terminal_id');
-
-            // Check for existing open register for this user and terminal
-            $existingOpen = CashRegistry::where('user_id', $userId)
-                ->where('terminal_id', $terminalId)
-                ->where('status', 'open')
-                ->whereNull('closed_at')
-                ->first();
-
-            if ($existingOpen) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'User already has an open cash registry session on this terminal',
-                    'register' => $existingOpen
-                ], 409);
-            }
-
-            $register = CashRegistry::create([
-                'user_id' => $userId,
-                'terminal_id' => $terminalId,
-                'opening_balance' => $request->input('opening_cash'),
-                'opened_at' => now(),
-                'status' => 'open',
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Cash registry opened successfully',
-                'register' => $register,
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Open shift failed: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-            return response()->json([
-                'message' => 'Failed to open cash registry',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $validator->errors()
+        ], 422);
     }
 
-    public function closeShift(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'register_id' => 'required|integer|exists:cash_registries,id',
-            'closing_balance' => 'required|numeric|min:0',
-            'actual_cash' => 'required|numeric|min:0',
+    try {
+        DB::beginTransaction();
+
+        $userId = $request->input('user_id');
+        $terminalId = $request->input('terminal_id');
+
+        // Check for existing open register using CashRegistry model
+        $existingOpen = CashRegistry::where('user_id', $userId)
+            ->where('terminal_id', $terminalId)
+            ->where('status', 'open')
+            ->whereNull('closed_at')
+            ->first();
+
+        if ($existingOpen) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Register already open for this user and terminal',
+                'register' => $existingOpen
+            ], 409);
+        }
+
+        $register = CashRegistry::create([
+            'user_id' => $userId,
+            'terminal_id' => $terminalId,
+            'opening_balance' => $request->input('opening_cash'),
+            'status' => 'open',
+            'opened_at' => now(),
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+        DB::commit();
 
-        try {
-            DB::beginTransaction();
+        return response()->json([
+            'message' => 'Register opened successfully',
+            'register' => $register,
+        ], 201);
 
-            $register = CashRegistry::find($request->input('register_id'));
-
-            if (!$register || $register->status !== 'open') {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'No open cash registry session found'
-                ], 404);
-            }
-
-            // Calculate expected cash on hand
-            $cashIn = $register->cashMovements()->where('type', 'in')->sum('amount');
-            $cashOut = $register->cashMovements()->where('type', 'out')->sum('amount');
-            $expectedCash = $register->opening_balance + $cashIn - $cashOut;
-
-            $actualCash = $request->input('actual_cash');
-
-            // Optional: Validate actual cash against expected cash with tolerance
-            $tolerance = 5.00; // increased tolerance to allow minor discrepancies
-            if (abs($expectedCash - $actualCash) > $tolerance) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'Actual cash does not match expected cash on hand',
-                    'expected_cash' => $expectedCash,
-                    'actual_cash' => $actualCash,
-                ], 422);
-            }
-
-            // Fetch total sales amount between opened_at and now
-            $totalSales = \App\Models\Sale::where('created_at', '>=', $register->opened_at)
-                ->where('created_at', '<=', now())
-                ->sum('total');
-
-            // Fetch total sales quantity between opened_at and now
-            $totalSalesQty = \App\Models\SaleItem::whereHas('sale', function ($query) use ($register) {
-                $query->where('created_at', '>=', $register->opened_at)
-                      ->where('created_at', '<=', now());
-            })->sum('quantity');
-
-            $register->update([
-                'status' => 'closed',
-                'closed_at' => now(),
-                'closing_balance' => $request->input('closing_balance'),
-                'actual_cash' => $actualCash,
-                'total_sales' => $totalSales, // Assuming this column exists in cash_registries table
-                'total_sales_qty' => $totalSalesQty, // Add this column to cash_registries table
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Cash registry closed successfully',
-                'register' => $register,
-                'total_sales' => $totalSales,
-                'total_sales_qty' => $totalSalesQty,
-                'opening_cash' => $register->opening_balance,
-                'closing_time' => $register->closed_at,
-                'notes' => $register->notes ?? '',
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Close shift failed: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-            return response()->json([
-                'message' => 'Failed to close cash registry',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Register open failed: ' . $e->getMessage(), [
+            'request' => $request->all(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response()->json([
+            'message' => 'Failed to open register',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
+public function closeShift(Request $request): JsonResponse
+{
+    $validator = Validator::make($request->all(), [
+        'register_id' => 'required|integer|exists:cash_registries,id',
+        'closing_balance' => 'required|numeric|min:0',
+        'actual_cash' => 'required|numeric|min:0',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        DB::beginTransaction();
+
+        $register = Register::find($request->input('register_id'));
+
+        if (!$register || !$register->isOpen()) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'No open register found'
+            ], 404);
+        }
+
+        // Calculate sales data
+        $totalSales = Sale::where('created_at', '>=', $register->opened_at)
+            ->where('created_at', '<=', now())
+            ->sum('total');
+
+        $totalSalesQty = SaleItem::whereHas('sale', function ($query) use ($register) {
+            $query->where('created_at', '>=', $register->opened_at)
+                  ->where('created_at', '<=', now());
+        })->sum('quantity');
+
+        $register->update([
+            'status' => 'closed',
+            'closed_at' => now(),
+            'closing_balance' => $request->input('closing_balance'),
+            'actual_cash' => $request->input('actual_cash'),
+            'total_sales' => $totalSales,
+            'total_sales_qty' => $totalSalesQty,
+        ]);
+
+        DB::commit();
+
+        return response()->json([
+            'message' => 'Register closed successfully',
+            'register' => $register,
+            'total_sales' => $totalSales,
+            'total_sales_qty' => $totalSalesQty,
+            'opening_cash' => $register->opening_balance,
+            'closing_time' => $register->closed_at,
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'message' => 'Failed to close register',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 
     public function addCash(Request $request): JsonResponse
     {

@@ -36,6 +36,7 @@ class SalesInvoiceController extends Controller
             'items.*.product_id' => 'nullable|exists:products,product_id',
             'items.*.description' => 'nullable|string|max:255',
             'items.*.qty' => 'nullable|numeric|min:0.01',
+            'items.*.free' => 'nullable|numeric|min:0',
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.sales_price' => 'nullable|numeric|min:0', // Added sales_price validation
             'items.*.discount_amount' => 'nullable|numeric|min:0',
@@ -82,6 +83,7 @@ class SalesInvoiceController extends Controller
                 'product_id' => $itemInput['product_id'] ?? null,
                 'description' => $itemInput['description'],
                 'quantity' => $itemInput['qty'],
+                'free' => $itemInput['free'] ?? 0,
                 'unit_price' => $itemInput['unit_price'],
                 'sales_price' => $salesPrice, // Store sales_price
                 'discount_amount' => $itemInput['discount_amount'],
@@ -223,6 +225,7 @@ class SalesInvoiceController extends Controller
                     'product_id' => $itemInput['product_id'] ?? null,
                     'description' => $itemInput['description'],
                     'quantity' => $itemInput['qty'],
+                    'free' => $itemInput['free'] ?? 0,
                     'unit_price' => $itemInput['unit_price'],
                     'sales_price' => $salesPrice, // Store sales_price
                     'discount_amount' => $itemInput['discount_amount'],

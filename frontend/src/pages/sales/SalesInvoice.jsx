@@ -297,6 +297,7 @@ const SalesInvoice = ({
   const [newItem, setNewItem] = useState({
     productId: null,
     qty: 1,
+    free: 0,
     unitPrice: 0,
     discountAmount: 0,
   });
@@ -466,7 +467,10 @@ const SalesInvoice = ({
     setNewItem((prev) => ({
       ...prev,
       [field]:
-        field === "qty" || field === "unitPrice" || field === "discountAmount"
+        field === "qty" ||
+        field === "free" ||
+        field === "unitPrice" ||
+        field === "discountAmount"
           ? value === ""
             ? ""
             : parseFloat(value) || 0
@@ -498,6 +502,7 @@ const SalesInvoice = ({
       id: Date.now(),
       productId,
       qty,
+      free: newItem.free || 0,
       unitPrice: product ? parseFloat(product.mrp) || 0 : unitPrice,
       discountAmount,
       discountPercentage: "",
@@ -1787,7 +1792,27 @@ const SalesInvoice = ({
                     </p>
                   )}
                 </div>
-
+                {/* Free */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    Free <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                      errors.newItemFree ? "border-red-500" : "border-gray-300"
+                    }`}
+                    value={newItem.free}
+                    onChange={(e) => handleNewItemInputChange(e, "free")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                      }
+                    }}
+                  />
+                </div>
                 {/* Unit Price */}
                 <div className="md:col-span-2">
                   <label className="block mb-1 text-sm font-medium text-gray-700">
@@ -1935,6 +1960,12 @@ const SalesInvoice = ({
                         scope="col"
                         className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
+                        Free
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
                         Total
                       </th>
                       <th
@@ -1986,6 +2017,9 @@ const SalesInvoice = ({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                           {formatCurrency(item.salesPrice)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {item.free}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           {formatCurrency(item.total)}
