@@ -4,7 +4,7 @@ import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Pencil, Trash, Eye, Upload } from "lucide-react";
 
-const API_URL = "/customers";
+const API_URL = "/api/customers";
 
 const CustomerManagement = () => {
   const [customers, setCustomers] = useState([]);

@@ -16,7 +16,7 @@ class PurchaseOrderController extends Controller
     {
         try {
             $purchaseOrders = PurchaseOrder::with(['orderItems.product', 'supplier'])->get();
-            return PurchaseOrderResource::collection($purchaseOrders);
+            return response()->json(PurchaseOrderResource::collection($purchaseOrders));
         } catch (\Exception $e) {
             Log::error('Error fetching purchase orders: ' . $e->getMessage());
             return response()->json([
@@ -35,7 +35,7 @@ class PurchaseOrderController extends Controller
                 'phone' => 'required|string|max:20',
                 'address' => 'required|string|max:255',
                 'items' => 'required|array|min:1',
-                'items.*.productId' => 'required|exists:products,id',
+                'items.*.productId' => 'required|exists:products,product_id',
                 'items.*.description' => 'required|string|max:255',
                 'items.*.qty' => 'required|integer|min:1',
                 'items.*.unitPrice' => 'required|numeric|min:0',
@@ -111,6 +111,7 @@ class PurchaseOrderController extends Controller
                 'phone' => 'required|string|max:20',
                 'address' => 'required|string|max:255',
                 'items' => 'required|array|min:1',
+                'items.*.productId' => 'required|exists:products,product_id',
                 'items.*.description' => 'required|string|max:255',
                 'items.*.qty' => 'required|integer|min:1',
                 'items.*.unitPrice' => 'required|numeric|min:0',

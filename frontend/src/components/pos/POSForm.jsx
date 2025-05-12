@@ -5,6 +5,7 @@ import debounce from "lodash/debounce";
 import CloseRegisterModal from "../models/CloseRegisterModal";
 import HeldSalesList from "./HeldSalesList";
 import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
+import CashRegister from "./CashRegistryModal.jsx";
 import RegisterModal from "../models/registerModel.jsx";
 import {
   ClipboardList,
@@ -1145,6 +1146,8 @@ const POSForm = ({
 
   // Check register status on mount
   useEffect(() => {
+    // Reset the dismissal flag to ensure modal shows when register is closed
+    localStorage.removeItem("registerModalDismissed");
     const registerModalDismissed = localStorage.getItem(
       "registerModalDismissed"
     );
@@ -1184,9 +1187,12 @@ const POSForm = ({
     if (isClosingRegister) {
       const closingDetails = calculateClosingDetails();
       try {
-        if (!amount || typeof amount.inCashierAmount !== "number") {
-          alert("Invalid amount provided for closing register.");
-          return;
+        if (
+          !amount ||
+          typeof amount.inCashierAmount !== "number" ||
+          amount.inCashierAmount < 0
+        ) {
+          return "Invalid amount provided for closing register.";
         }
         await closeRegister({
           ...closingDetails,
@@ -1195,15 +1201,23 @@ const POSForm = ({
         });
         setIsClosingRegister(false);
         setShowRegisterModal(false);
+        refreshRegisterStatus();
+        return null;
       } catch (error) {
         console.error("Failed to close register:", error);
-        alert("Failed to close register.");
+        if (
+          error.response &&
+          error.response.data &&
+          error.response.data.message
+        ) {
+          return error.response.data.message;
+        }
+        return "Failed to close register.";
       }
     } else {
       try {
         if (!user || !user.id) {
-          alert("User information is missing. Cannot open register.");
-          return;
+          return "User information is missing. Cannot open register.";
         }
         let openingCash = 0;
         if (typeof amount === "number") {
@@ -1215,8 +1229,10 @@ const POSForm = ({
         ) {
           openingCash = amount.inCashierAmount;
         } else {
-          alert("Invalid amount provided for opening register.");
-          return;
+          return "Invalid amount provided for opening register.";
+        }
+        if (openingCash < 0) {
+          return "Opening cash amount cannot be negative.";
         }
         const success = await openRegister({
           user_id: user.id,
@@ -1226,10 +1242,11 @@ const POSForm = ({
         if (success) {
           refreshRegisterStatus();
           setShowRegisterModal(false);
+          return null;
         }
       } catch (error) {
         console.error("Failed to open register:", error);
-        alert("Failed to open register.");
+        return "Failed to open register.";
       }
     }
   };

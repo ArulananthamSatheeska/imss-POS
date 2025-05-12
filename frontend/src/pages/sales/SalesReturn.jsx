@@ -21,7 +21,7 @@ const SalesReturn = () => {
     items: [],
     refundMethod: "cash",
     remarks: "",
-    status: "pending",
+    status: "unpaid",
   });
   const [itemForm, setItemForm] = useState({
     product_id: "",
@@ -533,7 +533,7 @@ const SalesReturn = () => {
       items: [],
       refundMethod: "cash",
       remarks: "",
-      status: "pending",
+      status: "unpaid",
     });
     setItemForm({
       product_id: "",
@@ -614,7 +614,7 @@ const SalesReturn = () => {
           items: [],
           refundMethod: "cash",
           remarks: "",
-          status: "pending",
+          status: "unpaid",
         });
         setItemForm({
           product_id: "",

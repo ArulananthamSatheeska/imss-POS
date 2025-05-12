@@ -70,15 +70,7 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::get('/verify-token', [AuthController::class, 'verifyToken']);
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
 
-    // Register
-    Route::get('/register/status', [RegisterController::class, 'getStatus']);
-    Route::post('/register/open', [RegisterController::class, 'openShift']);
-    Route::post('/register/close', [RegisterController::class, 'closeShift']);
-    Route::post('/register/cash-in', [RegisterController::class, 'addCash'])->middleware(EnsureRegisterIsOpen::class);
-    Route::post('/register/cash-out', [RegisterController::class, 'removeCash'])->middleware(EnsureRegisterIsOpen::class);
-    Route::get('/register/current', [RegisterController::class, 'getCurrentRegistry'])->middleware(EnsureRegisterIsOpen::class);
-    Route::get('/register/report', [RegisterController::class, 'getRegistryReport'])->middleware(EnsureRegisterIsOpen::class);
-
+    
     // Roles & Permissions
     Route::apiResource('permissions', PermissionController::class)->except(['update']);
     Route::apiResource('roles', RoleController::class);
@@ -99,6 +91,16 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
 
     // Outstanding
 });
+
+    // Register
+    Route::get('/register/status', [RegisterController::class, 'getStatus']);
+    Route::post('/register/open', [RegisterController::class, 'openShift']);
+    Route::post('/register/close', [RegisterController::class, 'closeShift']);
+    Route::post('/register/cash-in', [RegisterController::class, 'addCash'])->middleware(EnsureRegisterIsOpen::class);
+    Route::post('/register/cash-out', [RegisterController::class, 'removeCash'])->middleware(EnsureRegisterIsOpen::class);
+    Route::get('/register/current', [RegisterController::class, 'getCurrentRegistry'])->middleware(EnsureRegisterIsOpen::class);
+    Route::get('/register/report', [RegisterController::class, 'getRegistryReport'])->middleware(EnsureRegisterIsOpen::class);
+
 
     Route::get('/outstanding', [OutstandingController::class, 'index']);
     Route::patch('/outstanding/{id}', [OutstandingController::class, 'update']);
