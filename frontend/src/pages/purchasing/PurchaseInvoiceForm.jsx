@@ -510,6 +510,7 @@ const PurchaseInvoiceForm = ({
       discountAmount: itemForm.discountAmount,
       subtotal,
       total,
+      unit_type: selectedItem.unit_type || "", // Added unit_type here
     };
 
     setItems([...items, newItem]);
