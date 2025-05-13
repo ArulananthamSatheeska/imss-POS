@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { getData, postData, deleteData } from "../../services/api";
+import axios from "axios";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { Pencil, Trash, Eye, Upload } from "lucide-react";
+import { Pencil, Trash, Eye, Upload, RefreshCw } from "lucide-react";
 
-const API_URL = "/customers";
+const API_URL = "http://localhost:8000/api/customers";
+const LOYALTY_CARD_API_URL = "http://localhost:8000/api/loyalty-cards";
 
 const CustomerManagement = () => {
   const [customers, setCustomers] = useState([]);
+  const [loyaltyCards, setLoyaltyCards] = useState([]);
   const [form, setForm] = useState({
     customer_name: "",
     email: "",
@@ -16,6 +18,10 @@ const CustomerManagement = () => {
     nic_number: "",
     photo: null,
     photo_url: null,
+    loyalty_card_number: "",
+    card_name: "",
+    card_types: [], // Array to store multiple types
+    valid_date: "",
   });
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [editingCustomer, setEditingCustomer] = useState(null);
@@ -25,22 +31,104 @@ const CustomerManagement = () => {
 
   useEffect(() => {
     fetchCustomers();
+    fetchLoyaltyCards();
   }, []);
 
   const fetchCustomers = async () => {
     try {
-      const response = await getData(API_URL);
-      setCustomers(response.data);
+      const response = await axios.get(API_URL);
+      console.log("Customers Response:", response.data);
+      const customerData = Array.isArray(response.data)
+        ? response.data
+        : response.data.data || [];
+      setCustomers(customerData);
     } catch (err) {
       console.error("Error fetching customers:", err);
       setErrors({ general: "Error fetching customers" });
+      setCustomers([]);
     }
+  };
+
+  const fetchLoyaltyCards = async () => {
+    try {
+      const response = await axios.get(LOYALTY_CARD_API_URL);
+      console.log("Loyalty Cards Response:", response.data);
+      const uniqueLoyaltyCards = Array.from(
+        new Map(
+          response.data.map((card) => {
+            const key =
+              card.calculation_type === "Point-wise"
+                ? JSON.stringify([
+                    card.card_name,
+                    card.calculation_type,
+                    card.point_calculation_mode,
+                  ])
+                : JSON.stringify([card.card_name, card.calculation_type]);
+            return [key, card];
+          })
+        ).values()
+      );
+      setLoyaltyCards(uniqueLoyaltyCards);
+    } catch (err) {
+      console.error("Error fetching loyalty cards:", err);
+      setErrors({ general: "Error fetching loyalty cards" });
+      setLoyaltyCards([]);
+    }
+  };
+
+  const formatRewardDetails = (card) => {
+    if (
+      card.calculation_type === "Point-wise" &&
+      card.point_calculation_mode === "Threshold-wise"
+    ) {
+      return `${card.points_per_threshold_value} point${
+        parseInt(card.points_per_threshold_value) !== 1 ? "s" : ""
+      } per ${card.points_per_threshold} LKR`;
+    } else if (
+      card.calculation_type === "Point-wise" &&
+      card.point_calculation_mode === "Range-wise"
+    ) {
+      if (Array.isArray(card.ranges) && card.ranges.length > 0) {
+        const firstRange = card.ranges[0];
+        return `LKR ${firstRange.min_range}-${firstRange.max_range}: ${firstRange.points} points`;
+      }
+    } else if (card.calculation_type === "Percentage-wise") {
+      if (Array.isArray(card.ranges) && card.ranges.length > 0) {
+        const firstRange = card.ranges[0];
+        return `LKR ${firstRange.min_range}-${firstRange.max_range}: ${firstRange.discount_percentage}%`;
+      }
+    }
+    return "No reward details";
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    if (name === "card_name") {
+      setForm({
+        ...form,
+        card_name: value,
+        card_types: [], // Reset types when card name changes
+      });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
     setErrors({ ...errors, [name]: "" });
+  };
+
+  const handleTypeChange = (e) => {
+    const type = e.target.value;
+    const mode = e.target.dataset.mode;
+    const combinedType = type === "Point-wise" ? `${type} (${mode})` : type;
+    setForm((prev) => {
+      const updatedTypes = e.target.checked
+        ? [...new Set([...prev.card_types, combinedType])]
+        : prev.card_types.filter((t) => t !== combinedType);
+      console.log("Updated card_types:", updatedTypes);
+      return {
+        ...prev,
+        card_types: updatedTypes,
+      };
+    });
   };
 
   const handlePhotoUpload = (e) => {
@@ -68,8 +156,8 @@ const CustomerManagement = () => {
     if (!form.phone.trim()) {
       newErrors.phone = "Phone is required";
     }
-    if (!form.nic_number.trim()) {
-      newErrors.nic_number = "NIC Number is required";
+    if (form.card_name && form.card_types.length === 0) {
+      newErrors.card_types = "Please select at least one card type";
     }
     return newErrors;
   };
@@ -85,39 +173,42 @@ const CustomerManagement = () => {
     setErrors({});
 
     const formData = new FormData();
-    const requiredFields = {
-      customer_name: form.customer_name.trim(),
-      phone: form.phone.trim(),
-      nic_number: form.nic_number.trim(),
-    };
-
-    for (const [key, value] of Object.entries(requiredFields)) {
-      formData.append(key, value);
-    }
-
+    formData.append("customer_name", form.customer_name.trim());
+    formData.append("phone", form.phone.trim());
     if (form.email.trim()) formData.append("email", form.email.trim());
     if (form.address.trim()) formData.append("address", form.address.trim());
-    if (form.photo instanceof File) {
-      formData.append("photo", form.photo);
+    if (form.nic_number.trim())
+      formData.append("nic_number", form.nic_number.trim());
+    if (form.card_name) formData.append("card_name", form.card_name);
+    if (form.card_types.length > 0) {
+      form.card_types.forEach((type, index) => {
+        const baseType = type.includes("Point-wise") ? "Point-wise" : type;
+        formData.append(`card_types[${index}]`, baseType);
+      });
     }
+    if (form.loyalty_card_number)
+      formData.append("loyalty_card_number", form.loyalty_card_number);
+    if (form.valid_date) formData.append("valid_date", form.valid_date);
+    if (form.photo instanceof File) formData.append("photo", form.photo);
 
     try {
       let response;
       if (editingCustomer && editingCustomer.id) {
         formData.append("_method", "PUT");
-        response = await postData(`${API_URL}/${editingCustomer.id}`, formData);
+        response = await axios.post(
+          `${API_URL}/${editingCustomer.id}`,
+          formData
+        );
       } else {
-        response = await postData(API_URL, formData);
+        response = await axios.post(API_URL, formData);
       }
       fetchCustomers();
       resetForm();
     } catch (err) {
-      if (err.status === 422) {
+      if (err.response && err.response.status === 422) {
         const backendErrors = {};
-        Object.keys(err.details).forEach((key) => {
-          backendErrors[key] = Array.isArray(err.details[key])
-            ? err.details[key][0]
-            : err.details[key];
+        Object.keys(err.response.data.errors).forEach((key) => {
+          backendErrors[key] = err.response.data.errors[key][0];
         });
         setErrors({
           ...backendErrors,
@@ -140,6 +231,10 @@ const CustomerManagement = () => {
       nic_number: "",
       photo: null,
       photo_url: null,
+      loyalty_card_number: "",
+      card_name: "",
+      card_types: [],
+      valid_date: "",
     });
     setEditingCustomer(null);
     setErrors({});
@@ -147,6 +242,8 @@ const CustomerManagement = () => {
   };
 
   const handleEditCustomer = (customer) => {
+    const customerTypes = customer.card_types || [];
+    const uniqueTypes = [...new Set(customerTypes)]; // Ensure no duplicates
     const newForm = {
       customer_name: customer.customer_name || "",
       email: customer.email || "",
@@ -155,7 +252,24 @@ const CustomerManagement = () => {
       nic_number: customer.nic_number || "",
       photo: null,
       photo_url: customer.photo_url || null,
+      loyalty_card_number: customer.loyalty_card_number || "",
+      card_name: customer.card_name || "",
+      card_types: loyaltyCards
+        .filter((card) => card.card_name === customer.card_name)
+        .filter((card) => uniqueTypes.includes(card.calculation_type))
+        .reduce((acc, card) => {
+          const displayType =
+            card.calculation_type === "Point-wise"
+              ? `${card.calculation_type} (${card.point_calculation_mode})`
+              : card.calculation_type;
+          if (!acc.some((t) => t.startsWith(card.calculation_type))) {
+            acc.push(displayType);
+          }
+          return acc;
+        }, []),
+      valid_date: customer.valid_date || "",
     };
+    console.log("Loaded card_types for edit:", newForm.card_types);
     setForm(newForm);
     setEditingCustomer(customer);
     setActiveField("customer_name");
@@ -167,7 +281,7 @@ const CustomerManagement = () => {
 
     setLoading(true);
     try {
-      await deleteData(`${API_URL}/${id}`);
+      await axios.delete(`${API_URL}/${id}`);
       fetchCustomers();
     } catch (err) {
       setErrors({ general: "Error deleting customer" });
@@ -186,7 +300,6 @@ const CustomerManagement = () => {
       if (activeField === "photo") {
         handleAddOrUpdateCustomer();
       } else {
-        // Move to next field or submit
         const fieldOrder = [
           "customer_name",
           "email",
@@ -194,6 +307,8 @@ const CustomerManagement = () => {
           "address",
           "nic_number",
           "photo",
+          "card_name",
+          "valid_date",
         ];
         const currentIndex = fieldOrder.indexOf(activeField);
         if (currentIndex < fieldOrder.length - 1) {
@@ -213,17 +328,40 @@ const CustomerManagement = () => {
     }
   };
 
+  const formatCardTypeDisplay = (cardTypes, cardName) => {
+    if (!cardTypes || !cardName) return "-";
+    return cardTypes
+      .map((type) => {
+        const card = loyaltyCards.find(
+          (c) => c.card_name === cardName && c.calculation_type === type
+        );
+        return card && card.calculation_type === "Point-wise"
+          ? `${card.calculation_type} (${card.point_calculation_mode})`
+          : type;
+      })
+      .join(", ");
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">
         Customer Management
       </h2>
 
-      {/* Customer Form */}
       <Card className="p-6 shadow-sm rounded-lg bg-white border border-gray-200 mb-8">
-        <h3 className="text-lg font-semibold mb-4 text-gray-700">
-          {editingCustomer ? "Edit Customer" : "Add Customer"}
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-700">
+            {editingCustomer ? "Edit Customer" : "Add Customer"}
+          </h3>
+          <Button
+            variant="outline"
+            onClick={fetchLoyaltyCards}
+            className="flex items-center gap-2 text-gray-700 border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-md"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh Loyalty Cards
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label
@@ -322,7 +460,7 @@ const CustomerManagement = () => {
               htmlFor="nic_number"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              NIC Number *
+              NIC Number
             </label>
             <input
               type="text"
@@ -340,6 +478,121 @@ const CustomerManagement = () => {
             {errors.nic_number && (
               <p className="text-red-600 text-xs mt-1">{errors.nic_number}</p>
             )}
+          </div>
+          <div>
+            <label
+              htmlFor="loyalty_card_number"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Loyalty Card Number
+            </label>
+            <input
+              type="text"
+              id="loyalty_card_number"
+              name="loyalty_card_number"
+              value={form.loyalty_card_number}
+              readOnly
+              className="w-full p-2 border rounded-md bg-gray-100 border-gray-300"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="card_name"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Card Name
+            </label>
+            <select
+              id="card_name"
+              name="card_name"
+              value={form.card_name}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setActiveField("card_name")}
+              className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                errors.card_name ? "border-red-500" : "border-gray-300"
+              }`}
+            >
+              <option value="">Select Card Name</option>
+              {[...new Set(loyaltyCards.map((card) => card.card_name))].map(
+                (cardName) => (
+                  <option key={cardName} value={cardName}>
+                    {cardName}
+                  </option>
+                )
+              )}
+            </select>
+            {errors.card_name && (
+              <p className="text-red-600 text-xs mt-1">{errors.card_name}</p>
+            )}
+          </div>
+          {form.card_name && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Card Types (Select all that apply)
+              </label>
+              <div className="flex flex-wrap gap-3">
+                {loyaltyCards
+                  .filter((card) => card.card_name === form.card_name)
+                  .map((card, index) => {
+                    console.log(
+                      "Checking type:",
+                      card.calculation_type,
+                      "in",
+                      form.card_types
+                    );
+                    const displayType =
+                      card.calculation_type === "Point-wise"
+                        ? `${card.calculation_type} (${card.point_calculation_mode})`
+                        : card.calculation_type;
+                    return (
+                      <label
+                        key={`${card.id}-${index}`}
+                        className="flex items-center gap-2"
+                      >
+                        <input
+                          type="checkbox"
+                          value={card.calculation_type}
+                          data-mode={card.point_calculation_mode || ""}
+                          checked={form.card_types.includes(
+                            card.calculation_type === "Point-wise"
+                              ? `${card.calculation_type} (${card.point_calculation_mode})`
+                              : card.calculation_type
+                          )}
+                          onChange={handleTypeChange}
+                          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {displayType} - {formatRewardDetails(card)}
+                        </span>
+                      </label>
+                    );
+                  })}
+              </div>
+              {errors.card_types && (
+                <p className="text-red-600 text-xs mt-1">{errors.card_types}</p>
+              )}
+            </div>
+          )}
+          <div>
+            <label
+              htmlFor="valid_date"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Valid Until
+            </label>
+            <input
+              type="date"
+              id="valid_date"
+              name="valid_date"
+              value={form.valid_date}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setActiveField("valid_date")}
+              className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                errors.valid_date ? "border-red-500" : "border-gray-300"
+              }`}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -455,7 +708,6 @@ const CustomerManagement = () => {
         )}
       </Card>
 
-      {/* Customers Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -469,6 +721,12 @@ const CustomerManagement = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Phone
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Loyalty Card Number
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Card Types
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -489,6 +747,15 @@ const CustomerManagement = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {customer.phone || "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {customer.loyalty_card_number || "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatCardTypeDisplay(
+                      customer.card_types,
+                      customer.card_name
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex space-x-2">
@@ -522,7 +789,6 @@ const CustomerManagement = () => {
         </div>
       </div>
 
-      {/* Customer Details Modal */}
       {selectedCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 relative">
@@ -551,7 +817,6 @@ const CustomerManagement = () => {
                   </svg>
                 </button>
               </div>
-
               <div className="mt-6 space-y-4">
                 <div>
                   <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -561,7 +826,6 @@ const CustomerManagement = () => {
                     {selectedCustomer.email || "-"}
                   </p>
                 </div>
-
                 <div>
                   <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Phone
@@ -570,7 +834,6 @@ const CustomerManagement = () => {
                     {selectedCustomer.phone || "-"}
                   </p>
                 </div>
-
                 <div>
                   <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Address
@@ -579,16 +842,49 @@ const CustomerManagement = () => {
                     {selectedCustomer.address || "-"}
                   </p>
                 </div>
-
                 <div>
                   <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     NIC Number
                   </h4>
                   <p className="mt-1 text-sm text-gray-900">
-                    {selectedCustomer.nic_number}
+                    {selectedCustomer.nic_number || "-"}
                   </p>
                 </div>
-
+                <div>
+                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Loyalty Card Number
+                  </h4>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedCustomer.loyalty_card_number || "-"}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Card Name
+                  </h4>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedCustomer.card_name || "-"}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Card Types
+                  </h4>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {formatCardTypeDisplay(
+                      selectedCustomer.card_types,
+                      selectedCustomer.card_name
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valid Until
+                  </h4>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedCustomer.valid_date || "-"}
+                  </p>
+                </div>
                 <div>
                   <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Photo
@@ -613,7 +909,6 @@ const CustomerManagement = () => {
                 </div>
               </div>
             </div>
-
             <div className="bg-gray-50 px-6 py-3 rounded-b-lg flex justify-end">
               <button
                 type="button"

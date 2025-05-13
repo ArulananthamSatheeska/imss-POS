@@ -87,6 +87,11 @@ import { SupplierWiseProfit } from "./pages/Profit/SupplierWiseProfit.jsx";
 import { CategoryWiseProfit } from "./pages/Profit/CategoryWiseProfit.jsx";
 import ItemForm from "./components/item Form/ItemForm.jsx";
 import FrontPage from "./pages/frontpage.jsx";
+
+import LoyaltyReport from "./pages/Loyalty/LoyaltyReport.jsx"; // Create this file
+import GenerateLoyaltyCard from "./pages/Loyalty/GenerateLoyaltyCard.jsx"; // Create this file
+import LoyaltyCardDesign from "./pages/Loyalty/LoyaltyCardDesign.jsx";
+
 // === App Component ===
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(
@@ -150,6 +155,15 @@ function App() {
                   <Route path="SalesReturn" element={<SalesReturn />} />
                   <Route path="PurchaseReturn" element={<PurchaseReturn />} />
                   <Route path="settings" element={<SettingsForm />} />
+                  <Route path="loyalty/report" element={<LoyaltyReport />} />
+                  <Route
+                    path="loyalty/generate-card"
+                    element={<GenerateLoyaltyCard />}
+                  />
+                  <Route
+                    path="loyalty/design-card"
+                    element={<LoyaltyCardDesign />}
+                  />
                 </Route>
 
                 {/* POS Routes with minimal layout */}

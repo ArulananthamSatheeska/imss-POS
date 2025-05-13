@@ -9,7 +9,22 @@ class Customer extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['customer_name', 'email', 'phone', 'address', 'nic_number', 'photo'];
+    protected $fillable = [
+        'customer_name',
+        'email',
+        'phone',
+        'address',
+        'nic_number',
+        'photo',
+        'loyalty_card_number',
+        'card_name',
+        'card_types', // JSON field for multiple types
+        'valid_date',
+    ];
+
+    protected $casts = [
+        'card_types' => 'array', // Cast JSON to array
+    ];
 
     protected $appends = ['photo_url'];
 
