@@ -275,7 +275,7 @@ const PurchaseOrder = () => {
       phone: order.phone,
     });
     setItems(
-      order.orderItems.map((item) => ({
+      (order.orderItems || []).map((item) => ({
         description: item.description,
         qty: item.qty,
         unitPrice: Number(item.unit_price),
@@ -305,7 +305,7 @@ const PurchaseOrder = () => {
         address: order.address || "N/A",
         phone: order.phone || "N/A",
       },
-      items: order.order_items.map((item) => ({
+      items: order.orderItems.map((item) => ({
         id: item.id,
         description: item.description || "N/A",
         qty: item.qty || 0,
@@ -566,10 +566,10 @@ const PurchaseOrder = () => {
                             <div className="grid grid-cols-1 gap-6">
                               <div className="p-3 border border-gray-200 rounded-md dark:border-slate-700">
                                 <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-400">
-                                  Order Items ({order.order_items?.length || 0})
+                                  Order Items ({order.orderItems?.length || 0})
                                 </h4>
-                                {Array.isArray(order.order_items) &&
-                                order.order_items.length > 0 ? (
+                                {Array.isArray(order.orderItems) &&
+                                order.orderItems.length > 0 ? (
                                   <div className="overflow-x-auto max-h-60">
                                     <table className="min-w-full text-xs divide-y divide-gray-200 dark:divide-slate-600">
                                       <thead className="sticky top-0 text-gray-700 bg-gray-100 dark:bg-slate-700 dark:text-gray-300">
@@ -589,7 +589,7 @@ const PurchaseOrder = () => {
                                         </tr>
                                       </thead>
                                       <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-800 dark:divide-slate-700">
-                                        {order.order_items.map((item) => (
+                                        {order.orderItems.map((item) => (
                                           <tr key={item.id}>
                                             <td className="px-2 py-1 font-medium text-gray-900 dark:text-white">
                                               {item.description || "N/A"}
@@ -709,15 +709,29 @@ const PurchaseOrder = () => {
                       className="transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
                     >
                       <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          name="description"
-                          list={`product-list-${index}`}
-                          value={item.description}
-                          onChange={(e) => handleItemChange(index, e)}
-                          className="w-full p-2 bg-white border border-gray-300 rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Item Description"
-                        />
+                          <input
+                            type="text"
+                            name="description"
+                            list={`product-list-${index}`}
+                            value={item.description}
+                            onChange={(e) => handleItemChange(index, e)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addItem();
+                                // Focus the new item's description input after adding
+                                setTimeout(() => {
+                                  const nextInput = document.querySelector(
+                                    `input[name="description"][data-index="${index + 1}"]`
+                                  );
+                                  if (nextInput) nextInput.focus();
+                                }, 0);
+                              }
+                            }}
+                            data-index={index}
+                            className="w-full p-2 bg-white border border-gray-300 rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Item Description"
+                          />
                         <datalist id={`product-list-${index}`}>
                           {products.map((product) => (
                             <option

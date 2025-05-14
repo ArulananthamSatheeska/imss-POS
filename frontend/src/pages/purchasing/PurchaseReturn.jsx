@@ -16,7 +16,7 @@ const PurchaseReturn = () => {
     items: [],
     refund_method: "cash",
     remarks: "",
-    status: "pending",
+    status: "unpaid",
   });
   const [itemForm, setItemForm] = useState({
     product_id: "",
@@ -55,26 +55,26 @@ const PurchaseReturn = () => {
     try {
       const timestamp = new Date().getTime();
       const [suppliersRes, productsRes, returnsRes] = await Promise.all([
-        api.get(`/suppliers?_t=${timestamp}`),
-        api.get(`/products?_t=${timestamp}`),
-        api.get(`/purchase-returns?_t=${timestamp}`),
+        api.get(`/api/suppliers?_t=${timestamp}`),
+        api.get(`/api/products?_t=${timestamp}`),
+        api.get(`/api/purchase-returns?_t=${timestamp}`),
       ]);
 
       const suppliersData = Array.isArray(suppliersRes.data.data)
         ? suppliersRes.data.data
         : Array.isArray(suppliersRes.data)
-        ? suppliersRes.data
-        : [];
+          ? suppliersRes.data
+          : [];
       const productsData = Array.isArray(productsRes.data.data)
         ? productsRes.data.data
         : Array.isArray(productsRes.data)
-        ? productsRes.data
-        : [];
+          ? productsRes.data
+          : [];
       const returnsData = Array.isArray(returnsRes.data.data)
         ? returnsRes.data.data
         : Array.isArray(returnsRes.data)
-        ? returnsRes.data
-        : [];
+          ? returnsRes.data
+          : [];
 
       returnsData.forEach((returnItem) => {
         if (returnItem.items) {
@@ -186,8 +186,8 @@ const PurchaseReturn = () => {
             ? parseInt(value)
             : 0
           : name === "buying_cost"
-          ? parseFloat(value) || 0
-          : value,
+            ? parseFloat(value) || 0
+            : value,
     }));
   };
 
@@ -293,7 +293,7 @@ const PurchaseReturn = () => {
 
   const handleEditReturn = async (returnItem) => {
     try {
-      const response = await api.get(`/purchase-returns/${returnItem.id}`);
+      const response = await api.get(`/api/purchase-returns/${returnItem.id}`);
       const data = response.data.data;
       setNewReturn({
         supplier_id: data.supplier_id.toString(),
@@ -319,7 +319,7 @@ const PurchaseReturn = () => {
 
   const handleViewReturn = async (returnItem) => {
     try {
-      const response = await api.get(`/purchase-returns/${returnItem.id}`);
+      const response = await api.get(`/api/purchase-returns/${returnItem.id}`);
       setViewReturn(response.data.data);
     } catch (error) {
       const errorMsg = error.response?.data?.message || "Error fetching return";
@@ -339,7 +339,7 @@ const PurchaseReturn = () => {
       items: [],
       refund_method: "cash",
       remarks: "",
-      status: "pending",
+      status: "unpaid",
     });
     setItemForm({
       product_id: "",
@@ -365,7 +365,7 @@ const PurchaseReturn = () => {
       let response;
       if (editMode) {
         response = await api.put(
-          `/purchase-returns/${editReturnId}`,
+          `/api/purchase-returns/${editReturnId}`,
           newReturn
         );
         toast.success("Purchase return updated successfully!");
@@ -375,7 +375,7 @@ const PurchaseReturn = () => {
         setReturnItems(updatedItems);
         handleCancelEdit();
       } else {
-        response = await api.post("/purchase-returns", newReturn);
+        response = await api.post("/api/purchase-returns", newReturn);
         toast.success("Purchase return submitted successfully!");
         setReturnItems(
           [...returnItems, response.data.data].sort((a, b) =>
@@ -388,7 +388,7 @@ const PurchaseReturn = () => {
         items: [],
         refund_method: "cash",
         remarks: "",
-        status: "pending",
+        status: "unpaid",
       });
       setItemForm({
         product_id: "",
@@ -416,10 +416,10 @@ const PurchaseReturn = () => {
     ) {
       setLoading(true);
       try {
-        await api.delete(`/purchase-returns/${id}`);
+        await api.delete(`/api/purchase-returns/${id}`);
         setReturnItems(returnItems.filter((item) => item.id !== id));
         setExpandedRows(expandedRows.filter((rowId) => rowId !== id));
-        toast.success("Purchase return deleted successfully!");
+        toast.success("/api/Purchase return deleted successfully!");
       } catch (error) {
         const errorMsg =
           error.response?.data?.message || "Error deleting purchase return";
@@ -720,7 +720,7 @@ const PurchaseReturn = () => {
                     className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     disabled={loading}
                   >
-                    <option value="pending">Pending</option>
+                    <option value="unpaid">unpaid</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
                   </select>

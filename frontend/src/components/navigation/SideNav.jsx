@@ -125,7 +125,12 @@ const SideNav = ({ isPosOpen }) => {
           icon: BadgeDollarSign,
           roles: ["admin", "manager", "cashier"],
         },
-
+        {
+          path: "/tax",
+          label: "Tax",
+          icon: BadgePercent,
+          roles: ["admin", "manager", "cashier"],
+        },
         {
           path: "/SalesReturn",
           label: "Sales Return",
@@ -152,13 +157,18 @@ const SideNav = ({ isPosOpen }) => {
           icon: ShoppingBasket,
           roles: ["admin", "manager"],
         },
-        // { path: "/PurchaseInvoice", label: "Purchasing Invoice", icon: ClipboardPenLine, roles: ['admin', 'manager'] },
-        // {
-        //   path: "/PurchaseOrder",
-        //   label: "Purchase Order",
-        //   icon: FileText,
-        //   roles: ["admin", "manager"],
-        // },
+        {
+          path: "/PurchaseInvoice",
+          label: "Purchasing Invoice",
+          icon: ClipboardPenLine,
+          roles: ["admin", "manager"],
+        },
+        {
+          path: "/PurchaseOrder",
+          label: "Purchase Order",
+          icon: FileText,
+          roles: ["admin", "manager"],
+        },
         {
           path: "/PurchaseReturn",
           label: "Purchase Return",

@@ -1,0 +1,24 @@
+UEsDBBQABgAIAAAAIQAAAAAAAAAAAAAAAAAJAAAAd29ya2Jvb2svLnhtbCCiBAIooAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA<thinking>
+The user clarified that they need the "product import excel sheet template in the item," meaning they want the Excel sheet template (the structure/format of the Excel file) for product import, not a React component modal.
+
+In Items.jsx, there is an export function that creates an Excel sheet with specific columns and data structure. This export function essentially defines the Excel sheet template for products.
+
+Plan:
+- Extract or create a standalone Excel sheet template file or function for product import in the items module.
+- This could be a downloadable Excel template file or a function that generates the template Excel file with the correct headers and format.
+- Possibly add a button or link in Items.jsx to download this Excel template for users to fill and import.
+
+Dependent files:
+- frontend/src/pages/items/Items.jsx (edit to add download template button and function)
+- Possibly create a new file for the Excel template generation if needed.
+
+Next step:
+- I will search the Items.jsx file for the export function or any Excel sheet template code to understand the current structure.
+- Then plan how to add the Excel sheet template download functionality.
+</thinking>
+
+<search_files>
+<path>frontend/src/pages/items</path>
+<regex>exportData|XLSX.utils.json_to_sheet</regex>
+<file_pattern>*.jsx</file_pattern>
+</search_files>

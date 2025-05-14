@@ -88,9 +88,13 @@ import { CategoryWiseProfit } from "./pages/Profit/CategoryWiseProfit.jsx";
 import ItemForm from "./components/item Form/ItemForm.jsx";
 import FrontPage from "./pages/frontpage.jsx";
 
+
 import LoyaltyReport from "./pages/Loyalty/LoyaltyReport.jsx"; // Create this file
 import GenerateLoyaltyCard from "./pages/Loyalty/GenerateLoyaltyCard.jsx"; // Create this file
 import LoyaltyCardDesign from "./pages/Loyalty/LoyaltyCardDesign.jsx";
+
+
+import Tax from "./pages/sales/Tax.jsx";
 
 // === App Component ===
 function App() {
@@ -274,6 +278,7 @@ function App() {
                   <Route path="UserModal" element={<UserModal />} />
                   <Route path="UserList" element={<UserList />} />
                   <Route path="StaffManagement" element={<StaffManagement />} />
+                  <Route path="Tax" element={<Tax />} />
                   <Route
                     path="StaffRegistration"
                     element={<StaffRegistration />}

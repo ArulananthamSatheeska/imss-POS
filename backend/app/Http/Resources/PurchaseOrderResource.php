@@ -24,7 +24,7 @@ class PurchaseOrderResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'supplier' => $this->whenLoaded('supplier'),
-            'order_items' => OrderItemResource::collection($this->whenLoaded('orderItems')),
+            'orderItems' => OrderItemResource::collection($this->whenLoaded('orderItems')),
         ];
     }
 }

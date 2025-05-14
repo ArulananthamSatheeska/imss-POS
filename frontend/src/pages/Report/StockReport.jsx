@@ -209,11 +209,11 @@ const StockReport = () => {
         "No.": filteredData.indexOf(item) + 1,
         "Product Name": item.itemName ?? "N/A",
         Category: item.category ?? "N/A",
-        Unit: item.unit ?? "N/A",
         "Opening Stock": item.initialOpeningStock ?? 0,
         Purchased: item.purchased ?? 0,
         Sold: item.sold ?? 0,
         "Closing Stock": item.closingStock ?? 0,
+        Unit: item.unit ?? "N/A",
         "Cost Price": formatCurrency(item.costPrice ?? 0),
         "Selling Price": formatCurrency(item.sellingPrice ?? 0),
         "Total Value (Cost)": formatCurrency(item.totalPurchaseValue ?? 0),
@@ -224,11 +224,11 @@ const StockReport = () => {
         "No.": "Total",
         "Product Name": "",
         Category: "",
-        Unit: "",
         "Opening Stock": "",
         Purchased: "",
         Sold: "",
         "Closing Stock": totals.totalClosingStock,
+        Unit: "",
         "Cost Price": "",
         "Selling Price": "",
         "Total Value (Cost)": formatCurrency(totals.totalPurchaseValue),
@@ -432,9 +432,7 @@ const StockReport = () => {
                   <th className="border-b-2 border-blue-200 px-4 py-3 text-left text-sm font-semibold text-blue-800 dark:text-blue-200">
                     Category
                   </th>
-                  <th className="border-b-2 border-blue-200 px-4 py-3 text-left text-sm font-semibold text-blue-800 dark:text-blue-200">
-                    Unit
-                  </th>
+
                   <th className="border-b-2 border-blue-200 px-4 py-3 text-left text-sm font-semibold text-blue-800 dark:text-blue-200">
                     Opening Stock
                   </th>
@@ -446,6 +444,9 @@ const StockReport = () => {
                   </th>
                   <th className="border-b-2 border-blue-200 px-4 py-3 text-left text-sm font-semibold text-blue-800 dark:text-blue-200">
                     Closing Stock
+                  </th>
+                  <th className="border-b-2 border-blue-200 px-4 py-3 text-left text-sm font-semibold text-blue-800 dark:text-blue-200">
+                    Unit
                   </th>
                   <th className="border-b-2 border-blue-200 px-4 py-3 text-left text-sm font-semibold text-blue-800 dark:text-blue-200">
                     Cost Price
@@ -480,9 +481,7 @@ const StockReport = () => {
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {item.category ?? "N/A"}
                     </td>
-                    <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
-                      {item.unit ?? "N/A"}
-                    </td>
+
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {item.initialOpeningStock ?? 0}
                     </td>
@@ -494,6 +493,9 @@ const StockReport = () => {
                     </td>
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {item.closingStock ?? 0}
+                    </td>
+                    <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                      {item.unit ?? "N/A"}
                     </td>
                     <td className="border-b border-gray-100 dark:border-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {formatCurrency(item.costPrice ?? 0)}

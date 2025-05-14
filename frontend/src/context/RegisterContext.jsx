@@ -1,5 +1,3 @@
-// contexts/RegisterContext.jsx
-
 import React, {
   createContext,
   useContext,
@@ -9,9 +7,6 @@ import React, {
 } from "react";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
-
-// Set axios base URL (should be in environment variable)
-axios.defaults.baseURL = "http://127.0.0.1:8000";
 
 const RegisterContext = createContext();
 
@@ -24,6 +19,10 @@ export const RegisterProvider = ({ children }) => {
     userId: null,
     registerId: null,
     terminalId: null,
+    totalSales: 0,
+    totalSalesQty: 0,
+    openingCash: 0,
+    notes: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -47,7 +46,7 @@ export const RegisterProvider = ({ children }) => {
 
     const user = JSON.parse(storedUser);
 
-    // Check if token is expired (optional)
+    // Check if token is expired
     const isTokenExpired = (token) => {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
@@ -60,7 +59,6 @@ export const RegisterProvider = ({ children }) => {
     };
 
     if (isTokenExpired(user.token)) {
-      // Token expired, clear storage and redirect to login
       localStorage.removeItem("user");
       sessionStorage.removeItem("user");
       window.location.href = "/login";
@@ -81,7 +79,6 @@ export const RegisterProvider = ({ children }) => {
       (response) => response,
       (error) => {
         if (error.response && error.response.status === 401) {
-          // Unauthorized, clear storage and redirect to login
           localStorage.removeItem("user");
           sessionStorage.removeItem("user");
           window.location.href = "/login";
@@ -102,6 +99,7 @@ export const RegisterProvider = ({ children }) => {
       const storedUser =
         localStorage.getItem("user") || sessionStorage.getItem("user");
       if (!storedUser) {
+        // No user logged in - clear any existing register status
         setRegisterStatus((prev) => ({
           ...prev,
           isOpen: false,
@@ -112,9 +110,11 @@ export const RegisterProvider = ({ children }) => {
           registerId: null,
           terminalId: null,
         }));
+        localStorage.removeItem("registerStatus");
         return;
       }
 
+      // First try to get fresh status from backend
       const user = JSON.parse(storedUser);
       const response = await axios.get("/api/register/status", {
         params: { user_id: user.id },
@@ -137,36 +137,49 @@ export const RegisterProvider = ({ children }) => {
         };
 
         setRegisterStatus(newStatus);
+        // Update local storage with fresh data from backend
         localStorage.setItem("registerStatus", JSON.stringify(newStatus));
-      } else {
-        setRegisterStatus((prev) => ({
-          ...prev,
-          isOpen: false,
-          cashOnHand: 0,
-          openedAt: null,
-          closedAt: null,
-          userId: null,
-          registerId: null,
-          terminalId: terminalId,
-        }));
-        localStorage.removeItem("registerStatus");
+        return;
       }
+
+      // If register is not open from backend response
+      setRegisterStatus((prev) => ({
+        ...prev,
+        isOpen: false,
+        cashOnHand: 0,
+        openedAt: null,
+        closedAt: null,
+        userId: null,
+        registerId: null,
+        terminalId: terminalId,
+      }));
+      localStorage.removeItem("registerStatus");
     } catch (error) {
       console.error("Failed to fetch register status:", error);
       setError(
         error.response?.data?.message || "Failed to fetch register status"
       );
 
-      // Fallback to local storage if API fails
-      const savedStatus = localStorage.getItem("registerStatus");
-      if (savedStatus) {
-        setRegisterStatus(JSON.parse(savedStatus));
+      // Fallback to local storage only if the error isn't 401 (unauthorized)
+      if (!error.response || error.response.status !== 401) {
+        const savedStatus = localStorage.getItem("registerStatus");
+        if (savedStatus) {
+          const parsedStatus = JSON.parse(savedStatus);
+          // Verify the saved status isn't too old (e.g., more than 24 hours)
+          if (
+            parsedStatus.openedAt &&
+            new Date() - new Date(parsedStatus.openedAt) < 24 * 60 * 60 * 1000
+          ) {
+            setRegisterStatus(parsedStatus);
+          } else {
+            localStorage.removeItem("registerStatus");
+          }
+        }
       }
     } finally {
       setLoading(false);
     }
   }, [getAuthHeaders, terminalId]);
-
   const openRegister = async ({ user_id, terminal_id, opening_cash }) => {
     setLoading(true);
     setError(null);
@@ -185,35 +198,36 @@ export const RegisterProvider = ({ children }) => {
         const register = response.data.register;
         const newStatus = {
           isOpen: true,
-          cashOnHand: register.cash_on_hand,
+          cashOnHand: register.opening_balance, // Use opening_balance from response
           openedAt: new Date(register.opened_at),
           closedAt: null,
           userId: register.user_id,
           registerId: register.id,
-          terminalId: register.terminal_id,
+          terminalId: terminal_id, // Use the terminal_id from the request
+          totalSales: 0,
+          totalSalesQty: 0,
+          openingCash: register.opening_balance,
         };
 
         setRegisterStatus(newStatus);
-        localStorage.setItem("registerStatus", JSON.stringify(newStatus));
+        localStorage.setItem("registerStatus", JSON.stringify(newStatus)); // Save to localStorage
         return { success: true, register: newStatus };
       }
       return { success: false };
     } catch (error) {
-      let errorMessage = "Failed to open register. Please try again.";
-
-      if (error.response) {
-        if (error.response.status === 409) {
-          errorMessage =
-            "A register session is already open for this user and terminal.";
-        } else if (error.response.status === 422) {
-          errorMessage = Object.values(error.response.data.errors).join(" ");
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-      }
-
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
+      console.error("Failed to open register:", error);
+      setError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to open register"
+      );
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to open register",
+      };
     } finally {
       setLoading(false);
     }
@@ -240,57 +254,43 @@ export const RegisterProvider = ({ children }) => {
 
       if (response.status === 200) {
         const register = response.data.register;
-        const totalSales = response.data.total_sales;
-        const totalSalesQty = response.data.total_sales_qty;
-        const openingCash = response.data.opening_cash;
-        const closingTime = response.data.closing_time;
-        const notes = response.data.notes;
-
-        setRegisterStatus({
+        const newStatus = {
           isOpen: false,
           cashOnHand: 0,
           openedAt: null,
-          closedAt: closingTime ? new Date(closingTime) : null,
+          closedAt: response.data.closing_time
+            ? new Date(response.data.closing_time)
+            : null,
           userId: null,
           registerId: null,
           terminalId: null,
-          totalSales: totalSales,
-          totalSalesQty: totalSalesQty,
-          openingCash: openingCash,
-          notes: notes,
-        });
-        localStorage.removeItem("registerStatus");
+          totalSales: response.data.total_sales || 0,
+          totalSalesQty: response.data.total_sales_qty || 0,
+          openingCash: response.data.opening_cash || 0,
+          notes: response.data.notes || "",
+        };
+
+        setRegisterStatus(newStatus);
         return {
           success: true,
-          totalSales,
-          totalSalesQty,
-          openingCash,
-          closingTime,
-          notes,
+          totalSales: response.data.total_sales,
+          totalSalesQty: response.data.total_sales_qty,
+          openingCash: response.data.opening_cash,
+          closingTime: response.data.closing_time,
+          notes: response.data.notes,
         };
       }
-      return { success: false };
+      return { success: false, error: "Unexpected response from server" };
     } catch (error) {
-      let errorMessage = "Failed to close register. Please try again.";
-
-      if (error.response) {
-        console.error(
-          "Register close error response data:",
-          error.response.data
-        );
-        if (error.response.status === 422) {
-          if (error.response.data.errors) {
-            errorMessage = Object.values(error.response.data.errors).join(" ");
-          } else if (error.response.data.message) {
-            errorMessage = error.response.data.message;
-          }
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-      }
-
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
+      console.error("Failed to close register:", error);
+      setError(error.message);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to close register",
+      };
     } finally {
       setLoading(false);
     }

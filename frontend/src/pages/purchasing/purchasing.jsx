@@ -55,10 +55,10 @@ const PurchasingEntryForm = () => {
       const timestamp = new Date().getTime();
       const [suppliersRes, storesRes, productsRes, purchasesRes] =
         await Promise.all([
-          getApi().get(`/suppliers?_t=${timestamp}`),
-          getApi().get(`/store-locations?_t=${timestamp}`),
-          getApi().get(`/products?_t=${timestamp}`),
-          getApi().get(`/purchases?_t=${timestamp}`, {
+          getApi().get(`/api/suppliers?_t=${timestamp}`),
+          getApi().get(`/api/store-locations?_t=${timestamp}`),
+          getApi().get(`/api/products?_t=${timestamp}`),
+          getApi().get(`/api/purchases?_t=${timestamp}`, {
             params: { fromDate, toDate },
           }),
         ]);
@@ -254,7 +254,7 @@ const PurchasingEntryForm = () => {
       supplierId: purchase.supplier_id || "",
       storeId: purchase.store_id || "",
       paidAmount: parseFloat(purchase.paid_amount) || 0,
-      status: purchase.status || "pending",
+      status: purchase.status || "unpaid",
       discountPercentage: parseFloat(purchase.discount_percentage) || 0,
       discountAmount: parseFloat(purchase.discount_amount) || 0,
       discountAmountEdited: purchase.discount_amount > 0,
@@ -307,7 +307,7 @@ const PurchasingEntryForm = () => {
       supplierName: purchase.supplier?.supplier_name || "Unknown",
       storeName: purchase.store?.store_name || "Unknown",
       paidAmount: parseFloat(purchase.paid_amount) || 0,
-      status: purchase.status || "pending",
+      status: purchase.status || "unpaid",
       discountPercentage: parseFloat(purchase.discount_percentage) || 0,
       discountAmount: parseFloat(purchase.discount_amount) || 0,
       taxPercentage: calculateTaxPercentage(purchase),
@@ -361,7 +361,7 @@ const PurchasingEntryForm = () => {
         discount_percentage: newInvoice.discountPercentage || 0,
         discount_amount: newInvoice.discountAmount || 0,
         tax: newInvoice.tax || 0,
-        status: newInvoice.status || "pending",
+        status: newInvoice.status || "unpaid",
         items: newInvoice.items.map((item) => {
           console.log("Saving Item Discount:", {
             discountPercentage: item.discountPercentage,
@@ -382,11 +382,11 @@ const PurchasingEntryForm = () => {
       console.log("Sending Invoice Data:", invoiceData); // Debug: Check full payload
 
       if (newInvoice.id) {
-        await putData(`/purchases/${newInvoice.id}`, invoiceData);
+        await putData(`/api/purchases/${newInvoice.id}`, invoiceData);
         setNotification("Purchase invoice updated successfully!");
         toast.success("Purchase invoice updated successfully!");
       } else {
-        await postData("/purchases", invoiceData);
+        await postData("/api/purchases", invoiceData);
         setNotification("Purchase invoice recorded successfully!");
         toast.success("Purchase invoice recorded successfully!");
       }
@@ -409,7 +409,7 @@ const PurchasingEntryForm = () => {
       return;
     try {
       setLoading(true);
-      await deleteData(`/purchases/${purchaseId}`);
+      await deleteData(`/api/purchases/${purchaseId}`);
       setPurchases(purchases.filter((purchase) => purchase.id !== purchaseId));
       setNotification("Purchase invoice deleted successfully!");
       toast.success("Purchase invoice deleted successfully!");
@@ -1044,7 +1044,7 @@ const PurchasingEntryForm = () => {
                           {formatCurrency(parseFloat(purchase.total) || 0)}
                         </td>
                         <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                          {purchase.status || "Pending"}
+                          {purchase.status || "unpaid"}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-3">

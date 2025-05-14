@@ -10,6 +10,7 @@ const BillPrintModal = ({
   initialShipping = 0,
   initialTotals = {},
   grandTotal = 0,
+  unit = "",
   totalItemDiscount = 0,
   initialCustomerInfo = { name: "", mobile: "", bill_number: "", userId: "" },
   saleType = "Retail",
@@ -820,7 +821,7 @@ const BillPrintModal = ({
                             {index + 1}
                           </td>
                           <td className="px-3 py-2 text-sm text-center text-gray-700 whitespace-nowrap">
-                            {product.qty}
+                            {product.qty} {product.unit_type}x
                           </td>
                           <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
                             {product.product_name}
@@ -949,8 +950,6 @@ const BillPrintModal = ({
                 })}
               </div>
             </div>
-
-            {/* Items Table */}
             <table className="w-full text-sm mt-2 border-collapse bill-table">
               <thead>
                 <tr className="bg-gray-100">
@@ -980,37 +979,40 @@ const BillPrintModal = ({
               <tbody>
                 {initialProducts.map((product, index) => (
                   <React.Fragment key={index}>
-                    {/* Item Name Row */}
+                    {/* Name Row */}
                     <tr className="tr-name">
                       <td className="px-2 py-1 text-left border border-black">
                         {index + 1}
                       </td>
                       <td
-                        className="px-2 py-1 font-bold text-left border border-black"
+                        className="px-2 py-1 font-semibold text-left border border-black"
                         colSpan="6"
                       >
                         {product.product_name}
                       </td>
                     </tr>
-                    {/* Item Details Row */}
+                    {/* Details Row */}
                     <tr className="tr-details">
-                      <td className="px-2 py-1 text-left border border-black"></td>
-                      <td className="px-2 py-1 text-left border border-black"></td>
-                      <td className="px-2 py-1 text-center border border-black">
-                        {product.qty}x
+                      <td className="border border-black px-2 py-1"></td>
+                      <td className="border border-black px-2 py-1 text-left">
+                        {product.qty}
+                        {product.unit_type}x
                       </td>
-                      <td className="px-2 py-1 text-right border border-black">
+                      <td className="border border-black px-2 py-1 text-center">
+                        {/* Keep empty or repurpose */}
+                      </td>
+                      <td className="border border-black px-2 py-1 text-right">
                         {product.mrp.toFixed(2)}
                       </td>
-                      <td className="px-2 py-1 text-right border border-black">
+                      <td className="border border-black px-2 py-1 text-right">
                         {product.price.toFixed(2)}
                       </td>
-                      <td className="px-2 py-1 text-right border border-black">
+                      <td className="border border-black px-2 py-1 text-right">
                         {(
                           product.discount + (product.specialDiscount || 0)
                         ).toFixed(2)}
                       </td>
-                      <td className="px-2 py-1 font-bold text-right border border-black">
+                      <td className="border border-black px-2 py-1 text-right font-semibold">
                         {product.total.toFixed(2)}
                       </td>
                     </tr>

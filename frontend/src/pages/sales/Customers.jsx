@@ -4,8 +4,11 @@ import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Pencil, Trash, Eye, Upload, RefreshCw } from "lucide-react";
 
+
 const API_URL = "http://localhost:8000/api/customers";
 const LOYALTY_CARD_API_URL = "http://localhost:8000/api/loyalty-cards";
+
+
 
 const CustomerManagement = () => {
   const [customers, setCustomers] = useState([]);

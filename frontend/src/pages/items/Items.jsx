@@ -219,25 +219,142 @@ const Items = () => {
       setUploadProgress(0);
     }
   };
-
-  const handleExport = async () => {
+  const handleExport = async (items, setIsExporting, toast) => {
     if (!Array.isArray(items) || items.length === 0) {
       toast.error("No items to export");
       return;
     }
     try {
       setIsExporting(true);
-      const worksheet = XLSX.utils.json_to_sheet(items);
+
+      // Map items to match exactly with the import structure
+      const exportData = items.map((item) => ({
+        product_name: item.product_name ? String(item.product_name) : "",
+        item_code: item.item_code ? String(item.item_code) : "",
+        batch_number: item.batch_number ? String(item.batch_number) : "",
+        expiry_date: item.expiry_date ? new Date(item.expiry_date) : null,
+        buying_cost: item.buying_cost ? Number(item.buying_cost) : 0,
+        sales_price: item.sales_price ? Number(item.sales_price) : 0,
+        minimum_price: item.minimum_price ? Number(item.minimum_price) : 0,
+        wholesale_price: item.wholesale_price
+          ? Number(item.wholesale_price)
+          : 0,
+        barcode: item.barcode ? String(item.barcode) : "",
+        mrp: item.mrp ? Number(item.mrp) : 0,
+        minimum_stock_quantity: item.minimum_stock_quantity
+          ? Number(item.minimum_stock_quantity)
+          : 0,
+        opening_stock_quantity: item.opening_stock_quantity
+          ? Number(item.opening_stock_quantity)
+          : 0,
+        opening_stock_value: item.opening_stock_value
+          ? Number(item.opening_stock_value)
+          : 0,
+        category: item.category ? String(item.category) : "",
+        supplier: item.supplier ? String(item.supplier) : "",
+        unit_type: item.unit_type ? String(item.unit_type) : "",
+        store_location: item.store_location ? String(item.store_location) : "",
+        cabinet: item.cabinet ? String(item.cabinet) : "",
+        row: item.row ? String(item.row) : "",
+        extra_field_name: item.extra_fields?.extra_field_name || "",
+        extra_field_value: item.extra_fields?.extra_field_value || "",
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Set column headers in the correct order
+      const headers = [
+        "product_name",
+        "item_code",
+        "batch_number",
+        "expiry_date",
+        "buying_cost",
+        "sales_price",
+        "minimum_price",
+        "wholesale_price",
+        "barcode",
+        "mrp",
+        "minimum_stock_quantity",
+        "opening_stock_quantity",
+        "opening_stock_value",
+        "category",
+        "supplier",
+        "unit_type",
+        "store_location",
+        "cabinet",
+        "row",
+        "extra_field_name",
+        "extra_field_value",
+      ];
+
+      // Replace the header row with the correct column names
+      XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: "A1" });
+
+      // Set cell types explicitly for proper Excel data types
+      const range = XLSX.utils.decode_range(worksheet["!ref"]);
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        // skip header row
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell_address = { c: C, r: R };
+          const cell_ref = XLSX.utils.encode_cell(cell_address);
+          const cell = worksheet[cell_ref];
+          if (!cell) continue;
+
+          // Determine column by C index
+          switch (C) {
+            case 0: // product_name - string
+            case 1: // item_code - string
+            case 2: // batch_number - string
+            case 8: // barcode - string
+            case 13: // category - string
+            case 14: // supplier - string
+            case 15: // unit_type - string
+            case 16: // store_location - string
+            case 17: // cabinet - string
+            case 18: // row - string
+            case 19: // extra_field_name - string
+            case 20: // extra_field_value - string
+              cell.t = "s";
+              break;
+            case 3: // expiry_date - date
+              if (cell.v instanceof Date) {
+                cell.t = "d";
+                cell.z = XLSX.SSF._table[14]; // date format 'm/d/yy'
+              } else if (typeof cell.v === "string") {
+                // Try to parse date string
+                const dt = new Date(cell.v);
+                if (!isNaN(dt)) {
+                  cell.v = dt;
+                  cell.t = "d";
+                  cell.z = XLSX.SSF._table[14];
+                }
+              }
+              break;
+            case 4: // buying_cost - number
+            case 5: // sales_price - number
+            case 6: // minimum_price - number
+            case 7: // wholesale_price - number
+            case 9: // mrp - number
+            case 10: // minimum_stock_quantity - number
+            case 11: // opening_stock_quantity - number
+            case 12: // opening_stock_value - number
+              cell.t = "n";
+              break;
+            default:
+              cell.t = "s";
+          }
+        }
+      }
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Items");
-      XLSX.writeFile(workbook, "items_list.xlsx");
+      XLSX.writeFile(workbook, "items_export.xlsx");
     } catch (error) {
       toast.error("Error exporting items: " + error.message);
     } finally {
       setIsExporting(false);
     }
   };
-
   const handleEditItem = (item) => {
     if (item && item.product_id) {
       setSelectedItem(item);
@@ -458,7 +575,7 @@ const Items = () => {
 
             {/* Export Button */}
             <button
-              onClick={handleExport}
+              onClick={() => handleExport(items, setIsExporting, toast)}
               disabled={isExporting}
               className={`flex items-center gap-2 px-5 py-2.5 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all duration-200 shadow-sm hover:shadow-md focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-50 whitespace-nowrap ${
                 isExporting ? "opacity-70 cursor-not-allowed" : ""
