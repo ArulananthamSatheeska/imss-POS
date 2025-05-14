@@ -15,7 +15,11 @@ use App\Http\Controllers\{
     StockReportController,
     AuthController,
     CompanyController,
+    CustomerLoyaltyCardController,
+    CustomersLoyaltyCardController,
     DiscountSchemeController,
+    LoyaltyCardController,
+    LoyaltyCardDesignController,
     RoleController,
     PermissionController,
     ProductionCategoryController,
@@ -61,6 +65,7 @@ Route::middleware('auth:api')->get('/test-auth', function () {
 });
 
 
+
 // Authenticated routes with role-permission middleware
 Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddleware::class])->group(function () {
     // Auth
@@ -70,7 +75,22 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
     Route::get('/verify-token', [AuthController::class, 'verifyToken']);
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
 
+
+
     
+
+     
+    // Register
+    Route::get('/register/status', [RegisterController::class, 'getStatus']);
+    Route::post('/register/open', [RegisterController::class, 'openShift']);
+    Route::post('/register/close', [RegisterController::class, 'closeShift']);
+    Route::post('/register/cash-in', [RegisterController::class, 'addCash'])->middleware(EnsureRegisterIsOpen::class);
+    Route::post('/register/cash-out', [RegisterController::class, 'removeCash'])->middleware(EnsureRegisterIsOpen::class);
+    Route::get('/register/current', [RegisterController::class, 'getCurrentRegistry'])->middleware(EnsureRegisterIsOpen::class);
+    Route::get('/register/report', [RegisterController::class, 'getRegistryReport'])->middleware(EnsureRegisterIsOpen::class);
+
+
+
     // Roles & Permissions
     Route::apiResource('permissions', PermissionController::class)->except(['update']);
     Route::apiResource('roles', RoleController::class);
@@ -183,3 +203,15 @@ Route::middleware(['api', 'auth:api', \App\Http\Middleware\RolePermissionMiddlew
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'dashboard']);
+
+
+   
+// Route::get('/customers', [CustomersLoyaltyCardController::class, 'index']);
+// Route::post('/customers', [CustomersLoyaltyCardController::class, 'store']);
+
+
+Route::get('/loyalty-cards', [LoyaltyCardController::class, 'index']);
+Route::post('/loyalty-cards', [LoyaltyCardController::class, 'store']);
+
+
+Route::apiResource('loyalty-card-designs', LoyaltyCardDesignController::class);

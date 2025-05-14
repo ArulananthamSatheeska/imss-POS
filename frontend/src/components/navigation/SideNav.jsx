@@ -340,6 +340,40 @@ const SideNav = ({ isPosOpen }) => {
     //     },
     //   ],
     // },
+
+    {
+      path: "/loyalty",
+      icon: BadgePercent,
+      label: "Loyalty",
+      roles: ["admin", "manager", "cashier"],
+      subItems: [
+        {
+          path: "/loyalty/report",
+          label: "Loyalty Report",
+          icon: FileBarChart,
+          roles: ["admin", "manager"],
+        },
+        {
+          path: "/loyalty/generate-card",
+          label: "Loyalty Card Generate",
+          icon: Barcode,
+          roles: ["admin", "manager"],
+        },
+
+        {
+          path: "Customers",
+          label: "Loyalty Card membership",
+          icon: Users,
+          roles: ["admin", "manager"],
+        },
+        {
+          path: "/loyalty/design-card",
+          label: "Loyalty Card Design",
+          icon: LayoutList,
+          roles: ["admin"],
+        },
+      ],
+    },
     {
       path: "/UserManagement",
       icon: UserRound,
